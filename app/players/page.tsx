@@ -264,21 +264,21 @@ function RankingBlock({
               </span>
             </div>
 
-            <div className="relative mt-4 flex h-80 items-end justify-center overflow-hidden sm:h-[340px]">
+            <div className="relative mt-2 flex h-[390px] items-end justify-center overflow-hidden sm:h-[420px]">
               <img
                 src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${first.player.id}.png`}
                 alt={first.player.name}
-                className="max-h-[360px] max-w-[135%] origin-bottom scale-[1.35] object-contain transition duration-300 group-hover:scale-[1.42]"
+                className="max-h-[420px] max-w-[175%] origin-bottom translate-y-2 scale-[1.75] object-contain transition duration-300 group-hover:scale-[1.82]"
               />
             </div>
 
-            <div className="relative -mt-2 pb-6">
+            <div className="relative -mt-5 pb-6">
               <div className="flex items-center gap-2">
                 {first.season?.seasonImg && (
                   <img
                     src={first.season.seasonImg}
                     alt={first.season.className}
-                    className="h-9 w-auto object-contain"
+                    className="h-11 w-auto object-contain"
                   />
                 )}
                 <span className="text-xs font-semibold text-gray-400">
@@ -359,19 +359,19 @@ function PlayerCard({
       href={`/players/${player.id}`}
       className="group overflow-hidden rounded-2xl border border-white/10 bg-[#181b21] transition hover:-translate-y-1 hover:border-lime-400/50"
     >
-      <div className="relative flex h-72 items-end justify-center overflow-hidden bg-gradient-to-b from-white/5 to-transparent sm:h-80">
+      <div className="relative flex h-[340px] items-end justify-center overflow-hidden bg-gradient-to-b from-white/5 to-transparent sm:h-[370px]">
         {season?.seasonImg && (
           <img
             src={season.seasonImg}
             alt={season.className}
-            className="absolute left-4 top-4 h-9 object-contain"
+            className="absolute left-4 top-4 z-10 h-11 object-contain"
           />
         )}
 
         <img
           src={imageUrl}
           alt={player.name}
-          className="max-h-[330px] max-w-[130%] origin-bottom scale-[1.28] object-contain transition duration-300 group-hover:scale-[1.35]"
+          className="max-h-[370px] max-w-[170%] origin-bottom translate-y-2 scale-[1.7] object-contain transition duration-300 group-hover:scale-[1.78]"
         />
       </div>
 

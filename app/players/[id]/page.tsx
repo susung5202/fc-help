@@ -112,20 +112,20 @@ export default async function PlayerDetailPage({
           ← 선수 DB로 돌아가기
         </Link>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[520px_1fr]">
+        <div className="mt-8 grid gap-8 lg:grid-cols-[580px_1fr]">
           <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#181b21]">
-            <div className="relative flex h-[540px] items-end justify-center overflow-hidden bg-gradient-to-b from-white/10 to-transparent sm:h-[600px]">
+            <div className="relative flex h-[620px] items-end justify-center overflow-hidden bg-gradient-to-b from-white/10 to-transparent sm:h-[680px]">
               {season?.seasonImg && (
                 <img
                   src={season.seasonImg}
                   alt={seasonName}
-                  className="absolute left-6 top-6 h-14 object-contain"
+                  className="absolute left-6 top-6 z-10 h-16 object-contain"
                 />
               )}
               <img
                 src={playerImage}
                 alt={player.name}
-                className="max-h-[590px] max-w-[135%] origin-bottom scale-[1.28] object-contain sm:scale-[1.34]"
+                className="max-h-[680px] max-w-[175%] origin-bottom translate-y-3 scale-[1.68] object-contain sm:scale-[1.78]"
               />
             </div>
           </div>

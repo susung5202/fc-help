@@ -4,6 +4,9 @@ import {
   type PlayerRankingItem,
 } from "@/lib/fconline/playerRankings";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type Player = {
   id: number;
   name: string;
@@ -241,9 +244,9 @@ function RankingBlock({
       {!first ? (
         <div className="flex min-h-[520px] items-center justify-center px-6 text-center">
           <div>
-            <p className="font-semibold text-gray-300">통계를 집계하고 있습니다.</p>
+            <p className="font-semibold text-gray-300">공식 경기 데이터를 불러오지 못했습니다.</p>
             <p className="mt-2 text-sm text-gray-500">
-              NEXON Open API 데이터가 준비되면 자동으로 표시됩니다.
+              NEXON Open API 연결 상태를 확인하고 있습니다.
             </p>
           </div>
         </div>

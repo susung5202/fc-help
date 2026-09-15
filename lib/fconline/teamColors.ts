@@ -85,10 +85,6 @@ function htmlToText(html: string) {
     .trim();
 }
 
-function normalizeName(value: string) {
-  return value.replace(/\s+/g, " ").trim().toLowerCase();
-}
-
 function getClassAttribute(tag: string) {
   return tag.match(/\bclass\s*=\s*["']([^"']*)["']/i)?.[1] ?? "";
 }
@@ -153,246 +149,202 @@ function parseEffectText(raw: string): TeamColorEffect | null {
   const value = Number(match[2]);
   if (!Number.isFinite(value)) return null;
 
-  // FC 온라인에서 실제로 쓰는 세부 능력치만 허용한다.
+  // 알려진 능력치는 앱의 표기와 맞추되, 공식 응답에 새 능력치가 추가되면
+  // 그 이름도 그대로 보여준다.
   const canonical = EFFECT_LABELS.find(
     (candidate) => candidate.replace(/\s+/g, "") === label.replace(/\s+/g, "")
   );
 
-  return canonical ? { label: canonical, value } : null;
+  return { label: canonical ?? label, value };
 }
 
-function parseTeamColors(html: string): TeamColorOption[] {
-  // 공식 데이터센터의 실제 마크업:
-  // div.teamcolor_item > div.name / div.level / div.desc span.item
-  // 텍스트 전체를 정규식으로 추측하지 않고 각 팀컬러 카드 단위로 읽는다.
-  const blocks = extractDivBlocksByClass(html, "teamcolor_item");
-  const rows: TeamColorOption[] = [];
+type TeamColorCandidate = {
+  id: number;
+  name: string;
+  level: number | null;
+};
+
+type TeamColorCandidates = {
+  reinforcement: TeamColorCandidate[];
+  affiliation: TeamColorCandidate[];
+  feature: TeamColorCandidate[];
+};
+
+function extractCandidatesFromSelector(
+  html: string,
+  wrapperClass: "en_wrap" | "tdefault_wrap" | "tspecial_wrap",
+  hasLevel: boolean,
+  sectionLabel: string
+) {
+  const wrapper =
+    extractDivBlocksByClass(html, wrapperClass).find((block) =>
+      htmlToText(block).includes(sectionLabel)
+    ) ?? "";
+  const candidates: TeamColorCandidate[] = [];
   const seen = new Set<string>();
+  const anchorPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
 
-  for (const block of blocks) {
-    const rawName = extractSimpleClassText(block, "div", "name");
-    const name = rawName.replace(/^\d+\.\s*/, "").trim();
-    const levelText = extractSimpleClassText(block, "div", "level");
-    const level = Number(levelText.replace(/[^0-9]/g, "")) || 1;
+  for (const match of wrapper.matchAll(anchorPattern)) {
+    const attributes = match[1];
+    if (!hasClass(`<a ${attributes}>`, "selector_item")) continue;
 
-    if (!name) continue;
+    const id = Number(attributes.match(/\bdata-no\s*=\s*["'](\d+)["']/i)?.[1]);
+    if (!Number.isInteger(id) || id <= 0) continue;
+
+    const rawName = htmlToText(match[2]);
+    const levelMatch = rawName.match(/^Lv\.\s*(\d+)\s+(.+)$/i);
+    const level = hasLevel && levelMatch ? Number(levelMatch[1]) : null;
+    const name = (levelMatch?.[2] ?? rawName).trim();
+    if (!name || (hasLevel && level === null)) continue;
+
+    const key = `${id}|${level ?? "max"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ id, name, level });
+  }
+
+  return candidates;
+}
+
+function parsePlayerAbilityTeamColors(html: string): TeamColorCandidates {
+  // PlayerInfo GET은 이 영역을 빈 컨테이너로만 내려준다. 공식 화면이 실제로
+  // 호출하는 PlayerAbility POST 응답의 세 selector를 각각 읽어야 한다.
+  return {
+    reinforcement: extractCandidatesFromSelector(
+      html,
+      "en_wrap",
+      true,
+      "강화 팀컬러"
+    ),
+    affiliation: extractCandidatesFromSelector(
+      html,
+      "tdefault_wrap",
+      false,
+      "소속 팀컬러"
+    ),
+    feature: extractCandidatesFromSelector(
+      html,
+      "tspecial_wrap",
+      false,
+      "관계 팀컬러"
+    ),
+  };
+}
+
+function parseTeamColorDetail(html: string) {
+  const rows: Array<{ level: number; effects: TeamColorEffect[] }> = [];
+
+  for (const block of extractDivBlocksByClass(html, "level")) {
+    const levelText = extractSimpleClassText(block, "div", "tit");
+    const level = Number(levelText.match(/\d+/)?.[0]);
+    if (!Number.isInteger(level) || level <= 0) continue;
 
     const effects: TeamColorEffect[] = [];
-    const effectPattern = /<span\b[^>]*class=["'][^"']*\bitem\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi;
-
-    for (const effectMatch of block.matchAll(effectPattern)) {
-      const effect = parseEffectText(htmlToText(effectMatch[1]));
+    const liPattern = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
+    for (const match of block.matchAll(liPattern)) {
+      const effect = parseEffectText(htmlToText(match[1]));
       if (effect) effects.push(effect);
     }
 
-    if (effects.length === 0) continue;
-
-    const key = `${normalizeName(name)}|${level}|${effects
-      .map((effect) => `${effect.label}:${effect.value}`)
-      .join(",")}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    rows.push({
-      name,
-      level,
-      maxLevel: level,
-      effects,
-    });
+    if (effects.length > 0) rows.push({ level, effects });
   }
 
   return rows;
 }
 
-function getReinforcementTeamColors(strong: number): TeamColorOption[] {
-  const rows: TeamColorOption[] = [];
+async function getPlayerAbilityHtml(spid: number, strong: number) {
+  const sourceUrl = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${strong}&spid=${spid}`;
+  const body = new URLSearchParams({
+    spid: String(spid),
+    n1Strong: String(strong),
+    n1Grow: "0",
+    n4TeamColorId: "0",
+    n4TeamColorLv: "0",
+    n4TeamColorId_Enhance: "0",
+    n4TeamColorLv_Enhance: "0",
+    n4TeamColorId_Feature: "0",
+    n1Change: "0",
+    strPlayerImg: `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`,
+    rd: "0",
+  });
 
-  const add = (name: string, level: number, bonus: number, maxLevel: number) => {
-    rows.push({
-      name,
-      level,
-      maxLevel,
-      effects: [{ label: "전체 능력치", value: bonus }],
-      category: "reinforcement",
-    });
-  };
-
-  // 공식 선수 상세 페이지에서 강화 단계별로 노출되는 강화 팀컬러.
-  // 3강: 동빛, 5강: 은빛, 8강: 금빛, 11강: 백금빛이 추가된다.
-  if (strong >= 11) {
-    add("백금빛 물결", 1, 4, 2);
-    add("백금빛 물결", 2, 5, 2);
-  }
-
-  if (strong >= 8) {
-    add("금빛 물결", 1, 3, 2);
-    add("금빛 물결", 2, 4, 2);
-  }
-
-  if (strong >= 5) {
-    add("은빛 물결", 1, 2, 2);
-    add("은빛 물결", 2, 3, 2);
-  }
-
-  if (strong >= 3) {
-    add("동빛 물결", 1, 1, 1);
-  }
-
-  return rows;
-}
-
-function getSectionHtml(html: string, startLabel: string, endLabels: string[]) {
-  const start = html.indexOf(startLabel);
-  if (start < 0) return "";
-
-  let end = html.length;
-  for (const endLabel of endLabels) {
-    const candidate = html.indexOf(endLabel, start + startLabel.length);
-    if (candidate >= 0 && candidate < end) end = candidate;
-  }
-
-  return html.slice(start, end);
-}
-
-function extractSelectorNamesFromSection(
-  html: string,
-  startLabel: string,
-  endLabels: string[]
-) {
-  const section = getSectionHtml(html, startLabel, endLabels);
-  if (!section) return [];
-
-  const names: string[] = [];
-  const seen = new Set<string>();
-  const candidates: string[] = [];
-  const selectorPattern = /<a\b[^>]*class=["'][^"']*\bselector_item\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
-
-  for (const match of section.matchAll(selectorPattern)) {
-    candidates.push(htmlToText(match[1]));
-  }
-
-  // 일부 응답은 selector_item 클래스 없이 li 텍스트만 내려온다.
-  if (candidates.length === 0) {
-    const liPattern = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
-    for (const match of section.matchAll(liPattern)) {
-      candidates.push(htmlToText(match[1]));
-    }
-  }
-
-  for (const raw of candidates) {
-    const name = raw.replace(/^선택\s*/, "").trim();
-    if (!name) continue;
-
-    if (
-      name === startLabel ||
-      name === "강화 팀컬러" ||
-      name === "소속 팀컬러" ||
-      name === "관계 팀컬러" ||
-      name === "특성 팀컬러" ||
-      name === "단일팀"
-    ) {
-      continue;
-    }
-
-    if (seen.has(normalizeName(name))) continue;
-    seen.add(normalizeName(name));
-    names.push(name);
-  }
-
-  return names;
-}
-
-async function searchTeamColors(
-  query: string,
-  category: TeamColorCategory
-): Promise<TeamColorOption[]> {
-  const trimmed = query.trim();
-  if (!trimmed) return [];
-
-  const url = new URL("https://fconline.nexon.com/datacenter/teamcolor");
-  url.searchParams.set("strTeamColorCategory", "");
-  url.searchParams.set(
-    "strTeamColorType",
-    category === "feature" ? ",relation," : ",special,club,nation,"
-  );
-  url.searchParams.set("strCategory", "");
-  url.searchParams.set("strTeamColorName", trimmed);
-
-  try {
-    const response = await fetch(url, {
+  const response = await fetch(
+    "https://fconline.nexon.com/datacenter/PlayerAbility",
+    {
+      method: "POST",
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+        Accept: "text/html, */*; q=0.01",
         "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        Referer: sourceUrl,
+        Origin: "https://fconline.nexon.com",
       },
+      body,
       cache: "no-store",
-    });
-
-    if (!response.ok) return [];
-
-    // 반드시 전체 검색 결과를 파싱한 뒤 정확한 이름을 고른다.
-    // 먼저 60개 등으로 자르면 '레알 마드리드'보다 앞에 있는
-    // '19-20 레알 마드리드' 같은 시즌 팀컬러 때문에 정확한 항목이 사라질 수 있다.
-    return parseTeamColors(await response.text());
-  } catch (error) {
-    console.error("FC Online team color fetch failed", error);
-    return [];
-  }
-}
-
-async function resolveNames(
-  names: string[],
-  category: TeamColorCategory
-): Promise<TeamColorOption[]> {
-  const groups = await Promise.all(
-    names.map(async (name) => {
-      const rows = await searchTeamColors(name, category);
-      const exact = rows.filter(
-        (row) => normalizeName(row.name) === normalizeName(name)
-      );
-
-      if (exact.length > 0) {
-        return exact.map((row) => ({ ...row, category }));
-      }
-
-      // 선수 상세 페이지에 실제로 노출된 이름은 절대 버리지 않는다.
-      // 효과 페이지 파싱이 일시적으로 실패해도 잘못된 다른 팀컬러로 대체하지 않는다.
-      return [
-        {
-          name,
-          level: 0,
-          maxLevel: 0,
-          effects: [],
-          category,
-        },
-      ];
-    })
+    }
   );
 
-  const seen = new Set<string>();
-  return groups.flat().filter((row) => {
-    const key = `${normalizeName(row.name)}|${row.level}|${category}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return response.ok ? response.text() : "";
 }
 
-async function getOfficialPlayerInfoHtml(spid: number, strong: number) {
-  const url = new URL("https://fconline.nexon.com/DataCenter/PlayerInfo");
-  url.searchParams.set("n1Strong", String(strong));
-  url.searchParams.set("spid", String(spid));
+async function getTeamColorDetail(teamColorId: number) {
+  const url = new URL(
+    "https://fconline.nexon.com/datacenter/TeamColorDetail"
+  );
+  url.searchParams.set("teamcolorid", String(teamColorId));
 
   const response = await fetch(url, {
     headers: {
       "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+      Accept: "text/html, */*; q=0.01",
       "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: "https://fconline.nexon.com/datacenter/teamcolor",
     },
     cache: "no-store",
   });
 
-  return response.ok ? response.text() : "";
+  return response.ok ? parseTeamColorDetail(await response.text()) : [];
+}
+
+async function resolveCandidates(
+  candidates: TeamColorCandidate[],
+  category: TeamColorCategory,
+  detailsById: Map<number, Promise<ReturnType<typeof parseTeamColorDetail>>>
+) {
+  const resolved = await Promise.all(
+    candidates.map(async (candidate): Promise<TeamColorOption | null> => {
+      let detail = detailsById.get(candidate.id);
+      if (!detail) {
+        detail = getTeamColorDetail(candidate.id);
+        detailsById.set(candidate.id, detail);
+      }
+
+      const rows = await detail;
+      const maxLevel = Math.max(0, ...rows.map((row) => row.level));
+      const row = candidate.level
+        ? rows.find((item) => item.level === candidate.level)
+        : rows.find((item) => item.level === maxLevel);
+
+      // 검색 결과나 이름 유사도 fallback은 사용하지 않는다. PlayerAbility가
+      // 준 ID의 공식 상세 효과까지 확인된 후보만 화면에 노출한다.
+      if (!row) return null;
+
+      return {
+        name: candidate.name,
+        level: row.level,
+        maxLevel,
+        effects: row.effects,
+        category,
+      };
+    })
+  );
+
+  return resolved.filter((row): row is TeamColorOption => row !== null);
 }
 
 export async function getPlayerTeamColors(
@@ -400,35 +352,27 @@ export async function getPlayerTeamColors(
   strong: number
 ): Promise<PlayerTeamColors> {
   const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
-  const reinforcement = getReinforcementTeamColors(safeStrong);
 
   try {
-    // 팀컬러 후보는 전역 검색 결과가 아니라 해당 선수의 공식 PlayerInfo 페이지에서만 뽑는다.
-    // 따라서 푸스카스라면 실제 선수 상세에 있는 레알 마드리드/헝가리 등만 후보가 된다.
-    const playerInfoHtml = await getOfficialPlayerInfoHtml(spid, safeStrong);
-    if (!playerInfoHtml) {
-      return { reinforcement, affiliation: [], feature: [] };
+    const abilityHtml = await getPlayerAbilityHtml(spid, safeStrong);
+    if (!abilityHtml) {
+      return { reinforcement: [], affiliation: [], feature: [] };
     }
 
-    const affiliationNames = extractSelectorNamesFromSection(
-      playerInfoHtml,
-      "소속 팀컬러",
-      ["관계 팀컬러", "특성 팀컬러", "클래스 비교"]
-    );
-    const featureNames = extractSelectorNamesFromSection(
-      playerInfoHtml,
-      playerInfoHtml.includes("관계 팀컬러") ? "관계 팀컬러" : "특성 팀컬러",
-      ["클래스 비교", "동일한 능력치 대조"]
-    );
-
-    const [affiliation, feature] = await Promise.all([
-      resolveNames(affiliationNames, "affiliation"),
-      resolveNames(featureNames, "feature"),
+    const candidates = parsePlayerAbilityTeamColors(abilityHtml);
+    const detailsById = new Map<
+      number,
+      Promise<ReturnType<typeof parseTeamColorDetail>>
+    >();
+    const [reinforcement, affiliation, feature] = await Promise.all([
+      resolveCandidates(candidates.reinforcement, "reinforcement", detailsById),
+      resolveCandidates(candidates.affiliation, "affiliation", detailsById),
+      resolveCandidates(candidates.feature, "feature", detailsById),
     ]);
 
     return { reinforcement, affiliation, feature };
   } catch (error) {
     console.error("FC Online player team color fetch failed", error);
-    return { reinforcement, affiliation: [], feature: [] };
+    return { reinforcement: [], affiliation: [], feature: [] };
   }
 }

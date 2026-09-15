@@ -317,7 +317,7 @@ export default async function PlayerDetailPage({
               <div>
                 <p className="text-sm font-semibold text-gray-300">적용 가능한 팀컬러</p>
                 <p className="mt-1 text-xs text-gray-500">
-                  이 선수가 받을 수 있는 팀컬러만 표시합니다. 강화 1개 · 소속 1개 · 특성 1개까지 동시에 선택할 수 있습니다.
+                  공식 선수 상세에 노출되는 팀컬러만 표시합니다. 강화 1개 · 소속 1개 · 관계/특성 1개까지 동시에 선택할 수 있습니다.
                 </p>
               </div>
               {selectedTeamColors.some(Boolean) && (
@@ -363,7 +363,7 @@ export default async function PlayerDetailPage({
               />
 
               <TeamColorList
-                title="특성 팀컬러"
+                title="관계/특성 팀컬러"
                 emptyText="적용 가능한 특성/관계 팀컬러가 없습니다."
                 options={teamColors.feature}
                 selectedIndex={featurePick}

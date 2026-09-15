@@ -269,12 +269,12 @@ function RankingBlock({
                 data={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${first.player.id}.png`}
                 type="image/png"
                 aria-label={first.player.name}
-                className="max-h-[380px] max-w-[155%] origin-bottom translate-y-1 scale-[1.56] object-contain transition duration-300 group-hover:scale-[1.62]"
+                className="max-h-[410px] max-w-[190%] origin-bottom translate-y-1 scale-[2.15] object-contain transition duration-300 group-hover:scale-[2.2]"
               >
                 <img
                   src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${first.player.id}.png`}
                   alt={first.player.name}
-                  className="max-h-[380px] max-w-[155%] origin-bottom object-contain"
+                  className="max-h-[410px] max-w-[190%] origin-bottom object-contain"
                 />
               </object>
             </div>

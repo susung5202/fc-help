@@ -264,11 +264,11 @@ function RankingBlock({
               </span>
             </div>
 
-            <div className="relative mt-4 flex h-64 items-end justify-center overflow-hidden">
+            <div className="relative mt-4 flex h-80 items-end justify-center overflow-hidden sm:h-[340px]">
               <img
                 src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${first.player.id}.png`}
                 alt={first.player.name}
-                className="max-h-full max-w-full object-contain transition duration-300 group-hover:scale-105"
+                className="max-h-[360px] max-w-[135%] origin-bottom scale-[1.35] object-contain transition duration-300 group-hover:scale-[1.42]"
               />
             </div>
 
@@ -278,7 +278,7 @@ function RankingBlock({
                   <img
                     src={first.season.seasonImg}
                     alt={first.season.className}
-                    className="h-7 w-auto object-contain"
+                    className="h-9 w-auto object-contain"
                   />
                 )}
                 <span className="text-xs font-semibold text-gray-400">
@@ -319,12 +319,12 @@ function RankingBlock({
                 <span className="w-6 text-center text-sm font-black text-gray-500">
                   {index + 2}
                 </span>
-                <div className="flex h-8 w-10 items-center justify-center">
+                <div className="flex h-9 w-12 items-center justify-center">
                   {season?.seasonImg ? (
                     <img
                       src={season.seasonImg}
                       alt={season.className}
-                      className="max-h-7 max-w-10 object-contain"
+                      className="max-h-8 max-w-12 object-contain"
                     />
                   ) : (
                     <span className="text-[10px] text-gray-600">-</span>
@@ -359,19 +359,19 @@ function PlayerCard({
       href={`/players/${player.id}`}
       className="group overflow-hidden rounded-2xl border border-white/10 bg-[#181b21] transition hover:-translate-y-1 hover:border-lime-400/50"
     >
-      <div className="relative flex h-56 items-end justify-center overflow-hidden bg-gradient-to-b from-white/5 to-transparent">
+      <div className="relative flex h-72 items-end justify-center overflow-hidden bg-gradient-to-b from-white/5 to-transparent sm:h-80">
         {season?.seasonImg && (
           <img
             src={season.seasonImg}
             alt={season.className}
-            className="absolute left-4 top-4 h-7 object-contain"
+            className="absolute left-4 top-4 h-9 object-contain"
           />
         )}
 
         <img
           src={imageUrl}
           alt={player.name}
-          className="max-h-full object-contain transition duration-300 group-hover:scale-105"
+          className="max-h-[330px] max-w-[130%] origin-bottom scale-[1.28] object-contain transition duration-300 group-hover:scale-[1.35]"
         />
       </div>
 

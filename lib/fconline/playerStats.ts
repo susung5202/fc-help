@@ -14,6 +14,7 @@ export type PlayerAbilityStat = {
 
 export type PlayerStatsData = {
   strong: number;
+  grow: 1 | 5;
   sourceUrl: string;
   summary: {
     speed: number | null;
@@ -187,16 +188,19 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
 
 export async function getPlayerStats(
   spid: number,
-  strong: number
+  strong: number,
+  grow: number = 1
 ): Promise<PlayerStatsData | null> {
   const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
-  const sourceUrl = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${safeStrong}&spid=${spid}`;
+  const safeGrow: 1 | 5 = grow === 5 ? 5 : 1;
+  const growParam = safeGrow === 5 ? 4 : 0;
+  const sourceUrl = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${safeStrong}&n1grow=${growParam}&spid=${spid}`;
   const abilityUrl = "https://fconline.nexon.com/datacenter/PlayerAbility";
 
   const body = new URLSearchParams({
     spid: String(spid),
     n1Strong: String(safeStrong),
-    n1Grow: "0",
+    n1Grow: String(growParam),
     n4TeamColorId: "0",
     n4TeamColorLv: "0",
     n1Change: "0",
@@ -228,14 +232,13 @@ export async function getPlayerStats(
     const html = await response.text();
     const abilities = parseAbilities(html);
 
-    // 정상 응답은 필드 선수 기준 30개 안팎의 세부 능력치를 포함한다.
-    // 너무 적으면 넥슨 응답/마크업이 달라진 것으로 보고 잘못된 값을 노출하지 않는다.
     if (abilities.length < 20) {
       return null;
     }
 
     return {
       strong: safeStrong,
+      grow: safeGrow,
       sourceUrl,
       summary: {
         speed: null,

@@ -36,6 +36,14 @@ function getStatTextTone(value: number) {
   return "text-gray-200";
 }
 
+function getTeamColorLevelTone(level: number) {
+  if (level >= 5) return "border-rose-400/40 bg-rose-400/15 text-rose-300";
+  if (level === 4) return "border-amber-400/40 bg-amber-400/15 text-amber-300";
+  if (level === 3) return "border-violet-400/40 bg-violet-400/15 text-violet-300";
+  if (level === 2) return "border-emerald-400/40 bg-emerald-400/15 text-emerald-300";
+  return "border-sky-400/40 bg-sky-400/15 text-sky-300";
+}
+
 function selectedOption(options: TeamColorOption[], index: number | null) {
   return index === null ? null : options[index] ?? null;
 }
@@ -447,7 +455,11 @@ function TeamColorList({
                   >
                     {teamColor.name}
                   </p>
-                  <span className="shrink-0 text-[11px] text-gray-500">
+                  <span
+                    className={`shrink-0 rounded-md border px-2 py-1 text-[11px] font-extrabold ${getTeamColorLevelTone(
+                      teamColor.level
+                    )}`}
+                  >
                     {teamColor.level}단계
                   </span>
                 </div>

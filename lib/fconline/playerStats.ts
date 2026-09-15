@@ -147,7 +147,8 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
     }
   }
 
-  const parsed = new Map<string, PlayerAbilityStat>();
+  const ordered: PlayerAbilityStat[] = [];
+  const seen = new Set<string>();
   const detailSections: string[] = [];
   const detailSectionPattern =
     /<ul\b[^>]*class=["'][^"']*\bdata_wrap_playerinfo\b[^"']*["'][^>]*>([\s\S]*?)<\/ul>/gi;
@@ -156,13 +157,12 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
     detailSections.push(sectionMatch[1]);
   }
 
-  // PlayerAbility에는 상단 요약의 "드리블"과 하단 세부 능력치의
-  // "드리블"이 동시에 있다. 전체 HTML을 읽으면 요약값을 세부값으로
-  // 오인하므로 공식 상세 능력치 ul만 파싱한다.
   const detailHtml = detailSections.join("\n");
   const liPattern =
     /<li\b[^>]*class=["'][^"']*\bab\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
 
+  // FC 온라인 PlayerAbility의 실제 상세 능력치 등장 순서를 그대로 보존한다.
+  // 앱에서 공격/패스/수비 등의 임의 그룹 순서로 재배열하지 않는다.
   for (const match of detailHtml.matchAll(liPattern)) {
     const block = match[1];
     const rawLabel = extractClassText(block, "txt");
@@ -172,26 +172,20 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
 
     const definition = canonical.get(normalizeLabel(rawLabel));
     const numberMatch = rawValue.match(/-?\d{1,3}/);
-    if (!definition || !numberMatch) continue;
-
-    // 상세 영역 안에서 동일 능력치가 반복되더라도 첫 공식 값을 유지한다.
-    if (parsed.has(definition.label)) continue;
+    if (!definition || !numberMatch || seen.has(definition.label)) continue;
 
     const value = Number(numberMatch[0]);
     if (!Number.isFinite(value)) continue;
 
-    parsed.set(definition.label, {
+    seen.add(definition.label);
+    ordered.push({
       label: definition.label,
       value,
       group: definition.group,
     });
   }
 
-  return ABILITY_GROUPS.flatMap((group) =>
-    group.labels
-      .map((label) => parsed.get(label))
-      .filter((stat): stat is PlayerAbilityStat => Boolean(stat))
-  );
+  return ordered;
 }
 
 async function fetchOfficialPlayerAbility(
@@ -245,8 +239,6 @@ export async function getPlayerStats(
 ): Promise<PlayerStatsData | null> {
   const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
   const safeGrow: 1 | 5 = grow === 5 ? 5 : 1;
-
-  // FC 온라인 데이터센터는 적응도 1 = 0, 적응도 5 = 4 증가치로 요청한다.
   const growParam = safeGrow === 5 ? 4 : 0;
 
   const sourceUrl = new URL(
@@ -257,8 +249,6 @@ export async function getPlayerStats(
   sourceUrl.searchParams.set("spid", String(spid));
 
   try {
-    // 세부 능력치는 PlayerInfo GET 페이지가 아니라 데이터센터가 실제로
-    // 능력치 변경 시 호출하는 PlayerAbility POST 응답을 기준으로 읽는다.
     const html = await fetchOfficialPlayerAbility(
       spid,
       safeStrong,
@@ -267,13 +257,13 @@ export async function getPlayerStats(
     );
     const abilities = parseAbilities(html);
 
-    // 필드 선수 기준 30개 이상이 정상 응답이다. 일부 항목이 누락됐다고
-    // 전부 실패시키지 않되, 엉뚱한 HTML을 능력치로 표시하지는 않는다.
     if (abilities.length < 30) {
-      console.error(
-        "FC Online PlayerAbility parse failed",
-        { spid, strong: safeStrong, grow: safeGrow, count: abilities.length }
-      );
+      console.error("FC Online PlayerAbility parse failed", {
+        spid,
+        strong: safeStrong,
+        grow: safeGrow,
+        count: abilities.length,
+      });
       return null;
     }
 

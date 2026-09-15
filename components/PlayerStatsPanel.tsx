@@ -23,6 +23,24 @@ type ApiResponse = {
   teamColors: PlayerTeamColors;
 };
 
+const STRONG_RANGES = [
+  { key: "0-1", label: "0-1강", levels: [1] },
+  { key: "2-4", label: "2-4강", levels: [2, 3, 4] },
+  { key: "5-7", label: "5-7강", levels: [5, 6, 7] },
+  { key: "8-10", label: "8-10강", levels: [8, 9, 10] },
+  { key: "11-13", label: "11-13강", levels: [11, 12, 13] },
+] as const;
+
+type StrongRangeKey = (typeof STRONG_RANGES)[number]["key"];
+
+function getStrongRangeKey(strong: number): StrongRangeKey {
+  if (strong <= 1) return "0-1";
+  if (strong <= 4) return "2-4";
+  if (strong <= 7) return "5-7";
+  if (strong <= 10) return "8-10";
+  return "11-13";
+}
+
 function getStatTextTone(value: number) {
   if (value >= 170) return "text-[#67d7ff]";
   if (value >= 160) return "text-[#61e7cb]";
@@ -73,6 +91,9 @@ export default function PlayerStatsPanel({
   initialFeaturePick,
 }: Props) {
   const [strong, setStrong] = useState(initialStrong);
+  const [strongRange, setStrongRange] = useState<StrongRangeKey>(() =>
+    getStrongRangeKey(initialStrong)
+  );
   const [grow, setGrow] = useState<1 | 5>(initialGrow);
   const [stats, setStats] = useState(initialStats);
   const [teamColors, setTeamColors] = useState(initialTeamColors);
@@ -98,6 +119,8 @@ export default function PlayerStatsPanel({
   const selectedTeamColors = [reinforcement, affiliation, feature].filter(
     (item): item is TeamColorOption => Boolean(item)
   );
+  const activeStrongRange =
+    STRONG_RANGES.find((range) => range.key === strongRange) ?? STRONG_RANGES[0];
 
   const adjustedAbilities = useMemo(() => {
     if (!stats) return [];
@@ -279,17 +302,37 @@ export default function PlayerStatsPanel({
 
       <div className="mt-7 grid gap-6 lg:grid-cols-2">
         <StatOptionSection title="강화">
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {Array.from({ length: 13 }, (_, index) => index + 1).map((level) => (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {STRONG_RANGES.map((range) => {
+              const active = strongRange === range.key;
+              return (
+                <button
+                  key={range.key}
+                  type="button"
+                  onClick={() => setStrongRange(range.key)}
+                  className={`h-10 rounded-lg border px-3 text-sm font-bold transition ${
+                    active
+                      ? "border-lime-400/70 bg-lime-400/15 text-lime-300"
+                      : "border-white/10 bg-white/[0.04] text-gray-400 hover:border-white/30 hover:text-white"
+                  }`}
+                >
+                  {range.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2 rounded-xl border border-white/10 bg-black/10 p-3">
+            {activeStrongRange.levels.map((level) => (
               <button
                 key={level}
                 type="button"
                 disabled={loading}
                 onClick={() => loadBaseStats(level, grow)}
-                className={`flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm font-bold transition disabled:opacity-50 ${
+                className={`flex h-10 min-w-14 items-center justify-center rounded-lg border px-4 text-sm font-extrabold transition disabled:opacity-50 ${
                   strong === level
                     ? "border-lime-400 bg-lime-400 text-black"
-                    : "border-white/10 bg-white/[0.04] text-gray-400 hover:border-white/30 hover:text-white"
+                    : "border-white/10 bg-white/[0.04] text-gray-300 hover:border-white/30 hover:text-white"
                 }`}
               >
                 +{level}

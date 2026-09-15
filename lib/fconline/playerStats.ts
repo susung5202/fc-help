@@ -132,15 +132,6 @@ function extractClassText(html: string, className: string) {
   return match ? htmlToText(match[1]) : null;
 }
 
-function getAbilityScope(html: string) {
-  // PlayerInfo/PlayerAbility 응답 안에는 비교용 마크업이 함께 섞일 수 있다.
-  // 실제 선수의 첫 번째 상세 능력치 목록만 파싱해 다른 숫자가 덮어쓰는 일을 막는다.
-  const match = html.match(
-    /<ul\b[^>]*class=["'][^"']*\bdata_wrap_playerinfo\b[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i
-  );
-  return match?.[1] ?? html;
-}
-
 function parseAbilities(html: string): PlayerAbilityStat[] {
   const canonical = new Map<
     string,
@@ -157,10 +148,10 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
   }
 
   const parsed = new Map<string, PlayerAbilityStat>();
-  const scope = getAbilityScope(html);
-  const liPattern = /<li\b[^>]*class=["'][^"']*\bab\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+  const liPattern =
+    /<li\b[^>]*class=["'][^"']*\bab\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
 
-  for (const match of scope.matchAll(liPattern)) {
+  for (const match of html.matchAll(liPattern)) {
     const block = match[1];
     const rawLabel = extractClassText(block, "txt");
     const rawValue = extractClassText(block, "value");
@@ -169,8 +160,11 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
 
     const definition = canonical.get(normalizeLabel(rawLabel));
     const numberMatch = rawValue.match(/-?\d{1,3}/);
-
     if (!definition || !numberMatch) continue;
+
+    // PlayerAbility 응답에 비교용/복제 마크업이 섞여도 화면에 먼저 등장하는
+    // 실제 선수 능력치를 유지한다. 뒤쪽 값으로 덮어쓰지 않는다.
+    if (parsed.has(definition.label)) continue;
 
     const value = Number(numberMatch[0]);
     if (!Number.isFinite(value)) continue;
@@ -189,34 +183,21 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
   );
 }
 
-async function fetchOfficialPlayerInfo(sourceUrl: string) {
-  const response = await fetch(sourceUrl, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-      "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
-    },
-    cache: "no-store",
-  });
-
-  return response.ok ? response.text() : "";
-}
-
 async function fetchOfficialPlayerAbility(
   spid: number,
-  safeStrong: number,
+  strong: number,
   growParam: number,
   sourceUrl: string
 ) {
   const body = new URLSearchParams({
     spid: String(spid),
-    n1Strong: String(safeStrong),
+    n1Strong: String(strong),
     n1Grow: String(growParam),
     n4TeamColorId: "0",
     n4TeamColorLv: "0",
     n1Change: "0",
     strPlayerImg: `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`,
-    rd: `${safeStrong}-${growParam}`,
+    rd: "0",
   });
 
   const response = await fetch(
@@ -225,9 +206,11 @@ async function fetchOfficialPlayerAbility(
       method: "POST",
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        Accept: "text/html, */*; q=0.01",
         "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
         Referer: sourceUrl,
         Origin: "https://fconline.nexon.com",
       },
@@ -236,7 +219,12 @@ async function fetchOfficialPlayerAbility(
     }
   );
 
-  return response.ok ? response.text() : "";
+  if (!response.ok) {
+    console.error("FC Online PlayerAbility HTTP error", response.status);
+    return "";
+  }
+
+  return response.text();
 }
 
 export async function getPlayerStats(
@@ -246,6 +234,8 @@ export async function getPlayerStats(
 ): Promise<PlayerStatsData | null> {
   const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
   const safeGrow: 1 | 5 = grow === 5 ? 5 : 1;
+
+  // FC 온라인 데이터센터는 적응도 1 = 0, 적응도 5 = 4 증가치로 요청한다.
   const growParam = safeGrow === 5 ? 4 : 0;
 
   const sourceUrl = new URL(
@@ -256,23 +246,25 @@ export async function getPlayerStats(
   sourceUrl.searchParams.set("spid", String(spid));
 
   try {
-    // 1순위: 사용자가 공식 데이터센터에서 보는 PlayerInfo 자체를 파싱한다.
-    // 이 값이 화면의 강화/적응도 선택과 가장 직접적으로 일치한다.
-    const pageHtml = await fetchOfficialPlayerInfo(sourceUrl.toString());
-    let abilities = parseAbilities(pageHtml);
+    // 세부 능력치는 PlayerInfo GET 페이지가 아니라 데이터센터가 실제로
+    // 능력치 변경 시 호출하는 PlayerAbility POST 응답을 기준으로 읽는다.
+    const html = await fetchOfficialPlayerAbility(
+      spid,
+      safeStrong,
+      growParam,
+      sourceUrl.toString()
+    );
+    const abilities = parseAbilities(html);
 
-    // PlayerInfo가 봇 차단/부분 응답을 주는 경우에만 동일한 공식 PlayerAbility로 폴백한다.
-    if (abilities.length < 20) {
-      const abilityHtml = await fetchOfficialPlayerAbility(
-        spid,
-        safeStrong,
-        growParam,
-        sourceUrl.toString()
+    // 필드 선수 기준 30개 이상이 정상 응답이다. 일부 항목이 누락됐다고
+    // 전부 실패시키지 않되, 엉뚱한 HTML을 능력치로 표시하지는 않는다.
+    if (abilities.length < 30) {
+      console.error(
+        "FC Online PlayerAbility parse failed",
+        { spid, strong: safeStrong, grow: safeGrow, count: abilities.length }
       );
-      abilities = parseAbilities(abilityHtml);
+      return null;
     }
-
-    if (abilities.length < 20) return null;
 
     return {
       strong: safeStrong,

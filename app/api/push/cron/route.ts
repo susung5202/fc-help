@@ -2,15 +2,30 @@ import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const CRON_SOURCE = "supabase-pg-cron";
-
 export async function GET(request: Request) {
   try {
-    if (request.headers.get("x-fc-help-cron-source") !== CRON_SOURCE) {
+    const suppliedSecret = request.headers.get("x-fc-help-cron-secret");
+
+    if (!suppliedSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const supabase = createAdminClient();
+
+    const { data: secretRow, error: secretError } = await supabase
+      .from("cron_secrets")
+      .select("secret")
+      .eq("name", "push_run")
+      .maybeSingle();
+
+    if (
+      secretError ||
+      !secretRow?.secret ||
+      secretRow.secret !== suppliedSecret
+    ) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const now = new Date();
     const minuteKey = now.toISOString().slice(0, 16);
 

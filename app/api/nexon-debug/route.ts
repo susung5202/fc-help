@@ -2,6 +2,26 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+type MatchTypeMeta = {
+  matchtype?: number;
+  desc?: string;
+};
+
+type MatchIdRow = string | { matchId?: string };
+
+function parseMatchIds(rows: unknown) {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => {
+      if (typeof row === "string") return row;
+      if (row && typeof row === "object" && "matchId" in row) {
+        return String((row as { matchId?: unknown }).matchId ?? "");
+      }
+      return "";
+    })
+    .filter(Boolean);
+}
+
 export async function GET() {
   const apiKey = process.env.NEXON_API_KEY;
   if (!apiKey) {
@@ -9,72 +29,103 @@ export async function GET() {
   }
 
   const headers = { "x-nxopen-api-key": apiKey };
-  const listUrl = "https://open.api.nexon.com/fconline/v1/match?matchtype=50&offset=0&limit=3";
+  const metaUrl =
+    "https://open.api.nexon.com/static/fconline/meta/matchtype.json";
 
   try {
-    const listRes = await fetch(listUrl, { headers, cache: "no-store" });
-    const listText = await listRes.text();
-    let listBody: unknown;
-    try {
-      listBody = JSON.parse(listText);
-    } catch {
-      listBody = listText.slice(0, 500);
-    }
+    const metaRes = await fetch(metaUrl, { headers, cache: "no-store" });
+    const metaBody = (await metaRes.json().catch(() => [])) as MatchTypeMeta[];
 
-    if (!listRes.ok) {
-      return NextResponse.json({
-        ok: false,
-        step: "match-list",
-        hasKey: true,
-        request: "matchtype=50&offset=0&limit=3",
-        status: listRes.status,
-        body: listBody,
-      });
-    }
-
-    const ids = Array.isArray(listBody)
-      ? listBody
-          .map((row) => (typeof row === "string" ? row : (row as { matchId?: string })?.matchId))
-          .filter(Boolean)
+    const officialRows = Array.isArray(metaBody)
+      ? metaBody.filter((row) => String(row.desc ?? "").includes("공식경기"))
       : [];
 
-    if (ids.length === 0) {
-      return NextResponse.json({
-        ok: false,
-        step: "match-list-empty",
-        hasKey: true,
-        status: listRes.status,
-        body: listBody,
-      });
-    }
+    const candidates = [
+      ...officialRows.map((row) => String(Number(row.matchtype))),
+      "50",
+      "52",
+    ].filter((value, index, array) => value !== "NaN" && array.indexOf(value) === index);
 
-    const detailUrl = `https://open.api.nexon.com/fconline/v1/match-detail?matchid=${encodeURIComponent(String(ids[0]))}`;
-    const detailRes = await fetch(detailUrl, { headers, cache: "no-store" });
-    const detailText = await detailRes.text();
-    let detailBody: unknown;
-    try {
-      detailBody = JSON.parse(detailText);
-    } catch {
-      detailBody = detailText.slice(0, 500);
+    const attempts: Array<{
+      matchtype: string;
+      query: string;
+      status: number;
+      count: number;
+      error?: unknown;
+    }> = [];
+
+    for (const matchtype of candidates) {
+      const encoded = encodeURIComponent(matchtype);
+      const queries = [
+        `matchtype=${encoded}&offset=0&limit=3`,
+        `matchtype=${encoded}&limit=3`,
+        `matchtype=${encoded}`,
+      ];
+
+      for (const query of queries) {
+        const listRes = await fetch(
+          `https://open.api.nexon.com/fconline/v1/match?${query}`,
+          { headers, cache: "no-store" }
+        );
+        const text = await listRes.text();
+        let body: unknown;
+        try {
+          body = JSON.parse(text);
+        } catch {
+          body = text.slice(0, 500);
+        }
+
+        const ids = parseMatchIds(body);
+        attempts.push({
+          matchtype,
+          query,
+          status: listRes.status,
+          count: ids.length,
+          error: listRes.ok ? undefined : body,
+        });
+
+        if (!listRes.ok || ids.length === 0) continue;
+
+        const detailRes = await fetch(
+          `https://open.api.nexon.com/fconline/v1/match-detail?matchid=${encodeURIComponent(ids[0])}`,
+          { headers, cache: "no-store" }
+        );
+        const detailText = await detailRes.text();
+        let detailBody: unknown;
+        try {
+          detailBody = JSON.parse(detailText);
+        } catch {
+          detailBody = detailText.slice(0, 500);
+        }
+
+        return NextResponse.json({
+          ok: detailRes.ok,
+          step: "match-detail",
+          hasKey: true,
+          metadataStatus: metaRes.status,
+          officialMatchTypes: officialRows,
+          workingQuery: query,
+          listStatus: listRes.status,
+          listCount: ids.length,
+          detailStatus: detailRes.status,
+          detailHasMatchInfo:
+            !!detailBody &&
+            typeof detailBody === "object" &&
+            !Array.isArray(detailBody) &&
+            Array.isArray((detailBody as { matchInfo?: unknown }).matchInfo),
+          detailBody: detailRes.ok ? undefined : detailBody,
+          attempts,
+        });
+      }
     }
 
     return NextResponse.json({
-      ok: detailRes.ok,
-      step: "match-detail",
+      ok: false,
+      step: "match-list",
       hasKey: true,
-      listStatus: listRes.status,
-      listCount: ids.length,
-      detailStatus: detailRes.status,
-      detailTopLevelKeys:
-        detailBody && typeof detailBody === "object" && !Array.isArray(detailBody)
-          ? Object.keys(detailBody as Record<string, unknown>)
-          : null,
-      detailHasMatchInfo:
-        !!detailBody &&
-        typeof detailBody === "object" &&
-        !Array.isArray(detailBody) &&
-        Array.isArray((detailBody as { matchInfo?: unknown }).matchInfo),
-      detailBody: detailRes.ok ? undefined : detailBody,
+      metadataStatus: metaRes.status,
+      officialMatchTypes: officialRows,
+      attempts,
     });
   } catch (error) {
     return NextResponse.json({

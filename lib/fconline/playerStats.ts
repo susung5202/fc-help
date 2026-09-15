@@ -96,10 +96,6 @@ const ABILITY_GROUPS: Array<{
   },
 ];
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function decodeHtmlEntities(value: string) {
   return value
     .replace(/&nbsp;/gi, " ")
@@ -117,29 +113,76 @@ function decodeHtmlEntities(value: string) {
 }
 
 function htmlToText(html: string) {
-  return decodeHtmlEntities(
-    html
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<(br|\/p|\/div|\/li|\/tr|\/td|\/th|\/section|\/article|\/h\d)>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-  ).replace(/\s+/g, " ").trim();
+  return decodeHtmlEntities(html.replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function extractNumber(text: string, label: string) {
+function normalizeLabel(value: string) {
+  return value.replace(/\s+/g, "").toUpperCase();
+}
+
+function extractClassText(html: string, className: string) {
   const pattern = new RegExp(
-    `${escapeRegExp(label)}\\s*([0-9]{1,3})(?![0-9])`,
+    `<div\\b[^>]*class=["'][^"']*\\b${className}\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>`,
     "i"
   );
-  const match = text.match(pattern);
+  const match = html.match(pattern);
+  return match ? htmlToText(match[1]) : null;
+}
 
-  if (!match) {
-    return null;
+function parseAbilities(html: string): PlayerAbilityStat[] {
+  const canonical = new Map<
+    string,
+    { label: string; group: PlayerStatGroup }
+  >();
+
+  for (const group of ABILITY_GROUPS) {
+    for (const label of group.labels) {
+      canonical.set(normalizeLabel(label), {
+        label,
+        group: group.group,
+      });
+    }
   }
 
-  const value = Number(match[1]);
-  return Number.isFinite(value) ? value : null;
+  const parsed = new Map<string, PlayerAbilityStat>();
+  const liPattern = /<li\b[^>]*class=["'][^"']*\bab\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+
+  for (const match of html.matchAll(liPattern)) {
+    const block = match[1];
+    const rawLabel = extractClassText(block, "txt");
+    const rawValue = extractClassText(block, "value");
+
+    if (!rawLabel || !rawValue) {
+      continue;
+    }
+
+    const definition = canonical.get(normalizeLabel(rawLabel));
+    const numberMatch = rawValue.match(/-?\d{1,3}/);
+
+    if (!definition || !numberMatch) {
+      continue;
+    }
+
+    const value = Number(numberMatch[0]);
+
+    if (!Number.isFinite(value)) {
+      continue;
+    }
+
+    parsed.set(definition.label, {
+      label: definition.label,
+      value,
+      group: definition.group,
+    });
+  }
+
+  return ABILITY_GROUPS.flatMap((group) =>
+    group.labels
+      .map((label) => parsed.get(label))
+      .filter((stat): stat is PlayerAbilityStat => Boolean(stat))
+  );
 }
 
 export async function getPlayerStats(
@@ -148,14 +191,31 @@ export async function getPlayerStats(
 ): Promise<PlayerStatsData | null> {
   const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
   const sourceUrl = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${safeStrong}&spid=${spid}`;
+  const abilityUrl = "https://fconline.nexon.com/datacenter/PlayerAbility";
+
+  const body = new URLSearchParams({
+    spid: String(spid),
+    n1Strong: String(safeStrong),
+    n1Grow: "0",
+    n4TeamColorId: "0",
+    n4TeamColorLv: "0",
+    n1Change: "0",
+    strPlayerImg: `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`,
+    rd: "0",
+  });
 
   try {
-    const response = await fetch(sourceUrl, {
+    const response = await fetch(abilityUrl, {
+      method: "POST",
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
         "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        Referer: sourceUrl,
+        Origin: "https://fconline.nexon.com",
       },
+      body,
       next: {
         revalidate: 3600,
       },
@@ -166,33 +226,10 @@ export async function getPlayerStats(
     }
 
     const html = await response.text();
-    const text = htmlToText(html);
-    const totalAbilityIndex = text.indexOf("총 능력치");
+    const abilities = parseAbilities(html);
 
-    if (totalAbilityIndex < 0) {
-      return null;
-    }
-
-    const summarySection = text.slice(0, totalAbilityIndex);
-    const detailSection = text.slice(totalAbilityIndex);
-
-    const abilities: PlayerAbilityStat[] = [];
-
-    for (const group of ABILITY_GROUPS) {
-      for (const label of group.labels) {
-        const value = extractNumber(detailSection, label);
-
-        if (value !== null) {
-          abilities.push({
-            label,
-            value,
-            group: group.group,
-          });
-        }
-      }
-    }
-
-    // 데이터센터 HTML 구조가 변경된 경우 잘못된 빈 화면을 보여주지 않는다.
+    // 정상 응답은 필드 선수 기준 30개 안팎의 세부 능력치를 포함한다.
+    // 너무 적으면 넥슨 응답/마크업이 달라진 것으로 보고 잘못된 값을 노출하지 않는다.
     if (abilities.length < 20) {
       return null;
     }
@@ -201,16 +238,17 @@ export async function getPlayerStats(
       strong: safeStrong,
       sourceUrl,
       summary: {
-        speed: extractNumber(summarySection, "스피드"),
-        shooting: extractNumber(summarySection, "슛"),
-        passing: extractNumber(summarySection, "패스"),
-        dribbling: extractNumber(summarySection, "드리블"),
-        defending: extractNumber(summarySection, "수비"),
-        physical: extractNumber(summarySection, "피지컬"),
+        speed: null,
+        shooting: null,
+        passing: null,
+        dribbling: null,
+        defending: null,
+        physical: null,
       },
       abilities,
     };
-  } catch {
+  } catch (error) {
+    console.error("FC Online PlayerAbility fetch failed", error);
     return null;
   }
 }

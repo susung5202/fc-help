@@ -39,6 +39,22 @@ function parseIndex(value?: string) {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : null;
 }
 
+function getEnhancementBadgeTone(grade: number) {
+  if (grade >= 13) return "border-lime-300/70 bg-lime-400/20 text-lime-200 shadow-[0_0_14px_rgba(163,230,53,0.18)]";
+  if (grade === 12) return "border-fuchsia-300/60 bg-fuchsia-400/20 text-fuchsia-200";
+  if (grade === 11) return "border-pink-300/60 bg-pink-400/20 text-pink-200";
+  if (grade === 10) return "border-orange-300/60 bg-orange-400/20 text-orange-200";
+  if (grade === 9) return "border-emerald-300/60 bg-emerald-400/20 text-emerald-200";
+  if (grade === 8) return "border-cyan-300/60 bg-cyan-400/20 text-cyan-200";
+  if (grade === 7) return "border-sky-300/60 bg-sky-400/20 text-sky-200";
+  if (grade === 6) return "border-violet-300/60 bg-violet-400/20 text-violet-200";
+  if (grade === 5) return "border-rose-300/60 bg-rose-400/20 text-rose-200";
+  if (grade === 4) return "border-amber-300/60 bg-amber-400/20 text-amber-200";
+  if (grade === 3) return "border-slate-200/50 bg-slate-200/15 text-slate-100";
+  if (grade === 2) return "border-orange-700/70 bg-orange-800/30 text-orange-200";
+  return "border-white/15 bg-white/10 text-gray-200";
+}
+
 export default async function PlayerDetailPage({
   params,
   searchParams,
@@ -131,9 +147,14 @@ export default async function PlayerDetailPage({
           </div>
 
           <div className="flex flex-col justify-center">
-            <div>
+            <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-lg bg-lime-400/10 px-3 py-1.5 text-sm font-bold text-lime-400">
                 {seasonName}
+              </span>
+              <span
+                className={`rounded-lg border px-3 py-1.5 text-sm font-black ${getEnhancementBadgeTone(strong)}`}
+              >
+                +{strong}
               </span>
             </div>
             <h1 className="mt-5 text-4xl font-extrabold md:text-5xl">

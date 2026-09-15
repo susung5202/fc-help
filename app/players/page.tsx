@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+  getPlayerRankings,
+  type PlayerRankingItem,
+} from "@/lib/fconline/playerRankings";
 
 type Player = {
   id: number;
@@ -45,14 +49,16 @@ export default async function PlayersPage({
   const { q = "" } = await searchParams;
   const query = q.trim();
 
-  const [players, seasons] = await Promise.all([
+  const [players, seasons, rankings] = await Promise.all([
     getPlayers(),
     getSeasons(),
+    query ? Promise.resolve(null) : getPlayerRankings(),
   ]);
 
   const seasonMap = new Map(
     seasons.map((season) => [Number(season.seasonId), season])
   );
+  const playerMap = new Map(players.map((player) => [player.id, player]));
 
   const results = query
     ? players
@@ -99,7 +105,7 @@ export default async function PlayersPage({
         <p className="text-sm font-semibold text-lime-400">PLAYER DATABASE</p>
         <h1 className="mt-2 text-4xl font-bold">선수 DB</h1>
         <p className="mt-3 text-gray-400">
-          FC 온라인 공식 데이터를 기반으로 선수를 검색합니다.
+          FC 온라인 공식 데이터를 기반으로 선수 정보와 최근 공식경기 통계를 확인합니다.
         </p>
 
         <form
@@ -124,11 +130,31 @@ export default async function PlayersPage({
 
         <div className="mt-12">
           {!query ? (
-            <div className="rounded-2xl border border-white/10 bg-[#181b21] px-6 py-16 text-center">
-              <p className="text-lg font-semibold">원하는 선수를 검색해주세요.</p>
-              <p className="mt-2 text-sm text-gray-500">
-                선수 이름을 입력하면 시즌별 선수를 확인할 수 있습니다.
-              </p>
+            <div className="grid gap-6 xl:grid-cols-3">
+              <RankingBlock
+                title="최근 인기 선수"
+                description="최근 공식경기 출전 횟수 기준"
+                items={rankings?.popular ?? []}
+                playerMap={playerMap}
+                seasonMap={seasonMap}
+                metricLabel={(item) => `최근 ${item.metric}회 출전`}
+              />
+              <RankingBlock
+                title="최고 평점 선수"
+                description="최근 공식경기 평균 평점 기준"
+                items={rankings?.rating ?? []}
+                playerMap={playerMap}
+                seasonMap={seasonMap}
+                metricLabel={(item) => `평균 평점 ${item.metric.toFixed(2)}`}
+              />
+              <RankingBlock
+                title="강화 인기 선수"
+                description="최근 공식경기 선수·강화 단계 조합 기준"
+                items={rankings?.grade ?? []}
+                playerMap={playerMap}
+                seasonMap={seasonMap}
+                metricLabel={(item) => `+${item.grade} · ${item.metric}회 출전`}
+              />
             </div>
           ) : results.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-[#181b21] px-6 py-16 text-center">
@@ -168,6 +194,146 @@ export default async function PlayersPage({
         </div>
       </section>
     </main>
+  );
+}
+
+function RankingBlock({
+  title,
+  description,
+  items,
+  playerMap,
+  seasonMap,
+  metricLabel,
+}: {
+  title: string;
+  description: string;
+  items: PlayerRankingItem[];
+  playerMap: Map<number, Player>;
+  seasonMap: Map<number, Season>;
+  metricLabel: (item: PlayerRankingItem) => string;
+}) {
+  const resolved = items
+    .map((item) => {
+      const player = playerMap.get(item.spid);
+      if (!player) return null;
+      const season = seasonMap.get(Math.floor(item.spid / 1_000_000));
+      return { item, player, season };
+    })
+    .filter(
+      (
+        row
+      ): row is {
+        item: PlayerRankingItem;
+        player: Player;
+        season: Season | undefined;
+      } => Boolean(row)
+    );
+
+  const first = resolved[0];
+
+  return (
+    <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#181b21] shadow-2xl shadow-black/10">
+      <div className="border-b border-white/10 px-6 py-5">
+        <h2 className="text-xl font-extrabold">{title}</h2>
+        <p className="mt-1 text-xs text-gray-500">{description}</p>
+      </div>
+
+      {!first ? (
+        <div className="flex min-h-[520px] items-center justify-center px-6 text-center">
+          <div>
+            <p className="font-semibold text-gray-300">통계를 집계하고 있습니다.</p>
+            <p className="mt-2 text-sm text-gray-500">
+              NEXON Open API 데이터가 준비되면 자동으로 표시됩니다.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <Link
+            href={`/players/${first.player.id}`}
+            className="group relative block overflow-hidden border-b border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent px-6 pt-5"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400 text-sm font-black text-black">
+                1
+              </span>
+              <span className="rounded-full border border-lime-400/20 bg-lime-400/10 px-3 py-1 text-xs font-bold text-lime-300">
+                {metricLabel(first.item)}
+              </span>
+            </div>
+
+            <div className="relative mt-4 flex h-64 items-end justify-center overflow-hidden">
+              <img
+                src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${first.player.id}.png`}
+                alt={first.player.name}
+                className="max-h-full max-w-full object-contain transition duration-300 group-hover:scale-105"
+              />
+            </div>
+
+            <div className="relative -mt-2 pb-6">
+              <div className="flex items-center gap-2">
+                {first.season?.seasonImg && (
+                  <img
+                    src={first.season.seasonImg}
+                    alt={first.season.className}
+                    className="h-7 w-auto object-contain"
+                  />
+                )}
+                <span className="text-xs font-semibold text-gray-400">
+                  {first.season?.className ?? "시즌 미확인"}
+                </span>
+                <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-black text-white">
+                  +{first.item.grade}
+                </span>
+              </div>
+
+              <h3 className="mt-3 text-2xl font-black tracking-tight">
+                {first.player.name}
+              </h3>
+
+              <div className="mt-4 flex items-end justify-between border-t border-white/10 pt-4">
+                <span className="text-xs font-semibold text-gray-500">가격</span>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-300">시세 연동 예정</p>
+                  <p className="mt-0.5 text-[11px] text-gray-600">공식 Open API 미지원</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          <div className="divide-y divide-white/[0.07]">
+            {resolved.slice(1, 5).map(({ item, player, season }, index) => (
+              <Link
+                key={`${player.id}-${item.grade}`}
+                href={`/players/${player.id}`}
+                className="flex items-center gap-3 px-5 py-4 transition hover:bg-white/[0.04]"
+              >
+                <span className="w-6 text-center text-sm font-black text-gray-500">
+                  {index + 2}
+                </span>
+                <div className="flex h-8 w-10 items-center justify-center">
+                  {season?.seasonImg ? (
+                    <img
+                      src={season.seasonImg}
+                      alt={season.className}
+                      className="max-h-7 max-w-10 object-contain"
+                    />
+                  ) : (
+                    <span className="text-[10px] text-gray-600">-</span>
+                  )}
+                </div>
+                <span className="min-w-0 flex-1 truncate text-sm font-bold">
+                  {player.name}
+                </span>
+                <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-black text-gray-200">
+                  +{item.grade}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

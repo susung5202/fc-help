@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   const headers = { "x-nxopen-api-key": apiKey };
-  const listUrl = "https://open.api.nexon.com/fconline/v1/match?matchtype=50&offset=0&limit=3&orderby=desc";
+  const listUrl = "https://open.api.nexon.com/fconline/v1/match?matchtype=50&offset=0&limit=3";
 
   try {
     const listRes = await fetch(listUrl, { headers, cache: "no-store" });
@@ -26,6 +26,7 @@ export async function GET() {
         ok: false,
         step: "match-list",
         hasKey: true,
+        request: "matchtype=50&offset=0&limit=3",
         status: listRes.status,
         body: listBody,
       });

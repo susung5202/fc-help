@@ -49,7 +49,7 @@ async function nexonFetch<T>(url: string, apiKey: string): Promise<T | null> {
   try {
     const res = await fetch(url, {
       headers: { "x-nxopen-api-key": apiKey },
-      next: { revalidate: 1800 },
+      cache: "no-store",
     });
 
     if (!res.ok) return null;
@@ -86,7 +86,6 @@ async function getOfficialMatchTypeCandidates(apiKey: string) {
         desc: String(row.desc ?? "").trim(),
       }));
 
-    // 메타데이터의 현재 공식경기 값을 우선 사용한다.
     for (const row of rows) {
       if (row.desc === "공식경기") candidates.push(row.matchtype);
     }
@@ -102,7 +101,6 @@ async function getOfficialMatchTypeCandidates(apiKey: string) {
     }
   }
 
-  // 메타데이터 조회가 잠시 실패해도 과거/문서 예시 값을 순차 시도한다.
   candidates.push("50", "52");
   return [...new Set(candidates)];
 }
@@ -113,6 +111,7 @@ async function getRecentMatchIds(apiKey: string, limit: number) {
   for (const matchtype of matchTypes) {
     const encoded = encodeURIComponent(matchtype);
     const requests = [
+      `${API_BASE}/match?matchtype=${encoded}&offset=0&limit=${limit}&orderby=desc`,
       `${API_BASE}/match?matchtype=${encoded}&offset=0&limit=${limit}`,
       `${API_BASE}/match?matchtype=${encoded}&limit=${limit}`,
       `${API_BASE}/match?matchtype=${encoded}`,
@@ -154,7 +153,6 @@ export async function getPlayerRankings(): Promise<PlayerRankings> {
 
   const details: MatchDetail[] = [];
 
-  // API 호출을 한 번에 과도하게 몰지 않도록 작은 묶음으로 처리합니다.
   for (let i = 0; i < matchIds.length; i += 8) {
     const chunk = matchIds.slice(i, i + 8);
     const rows = await Promise.all(
@@ -181,7 +179,6 @@ export async function getPlayerRankings(): Promise<PlayerRankings> {
         const grade = Number(player.spGrade ?? 1);
         const rating = Number(player.status?.spRating ?? 0);
 
-        // 벤치/미출전 선수처럼 평점이 없는 항목은 실사용 집계에서 제외합니다.
         if (
           !Number.isFinite(spid) ||
           spid <= 0 ||

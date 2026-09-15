@@ -148,10 +148,22 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
   }
 
   const parsed = new Map<string, PlayerAbilityStat>();
+  const detailSections: string[] = [];
+  const detailSectionPattern =
+    /<ul\b[^>]*class=["'][^"']*\bdata_wrap_playerinfo\b[^"']*["'][^>]*>([\s\S]*?)<\/ul>/gi;
+
+  for (const sectionMatch of html.matchAll(detailSectionPattern)) {
+    detailSections.push(sectionMatch[1]);
+  }
+
+  // PlayerAbility에는 상단 요약의 "드리블"과 하단 세부 능력치의
+  // "드리블"이 동시에 있다. 전체 HTML을 읽으면 요약값을 세부값으로
+  // 오인하므로 공식 상세 능력치 ul만 파싱한다.
+  const detailHtml = detailSections.join("\n");
   const liPattern =
     /<li\b[^>]*class=["'][^"']*\bab\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
 
-  for (const match of html.matchAll(liPattern)) {
+  for (const match of detailHtml.matchAll(liPattern)) {
     const block = match[1];
     const rawLabel = extractClassText(block, "txt");
     const rawValue = extractClassText(block, "value");
@@ -162,8 +174,7 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
     const numberMatch = rawValue.match(/-?\d{1,3}/);
     if (!definition || !numberMatch) continue;
 
-    // PlayerAbility 응답에 비교용/복제 마크업이 섞여도 화면에 먼저 등장하는
-    // 실제 선수 능력치를 유지한다. 뒤쪽 값으로 덮어쓰지 않는다.
+    // 상세 영역 안에서 동일 능력치가 반복되더라도 첫 공식 값을 유지한다.
     if (parsed.has(definition.label)) continue;
 
     const value = Number(numberMatch[0]);

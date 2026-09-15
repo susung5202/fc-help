@@ -253,9 +253,9 @@ function RankingBlock({
         <>
           <Link
             href={`/players/${first.player.id}`}
-            className="group relative block overflow-hidden border-b border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent px-6 pt-5"
+            className="group block overflow-hidden border-b border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 px-6 pt-5">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400 text-sm font-black text-black">
                 1
               </span>
@@ -264,36 +264,48 @@ function RankingBlock({
               </span>
             </div>
 
-            <div className="relative mt-2 flex h-[390px] items-end justify-center overflow-hidden sm:h-[420px]">
-              <img
-                src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${first.player.id}.png`}
-                alt={first.player.name}
-                className="max-h-[420px] max-w-[175%] origin-bottom translate-y-2 scale-[1.75] object-contain transition duration-300 group-hover:scale-[1.82]"
-              />
+            <div className="relative mt-1 flex h-[340px] items-end justify-center overflow-hidden px-4 sm:h-[360px]">
+              <object
+                data={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${first.player.id}.png`}
+                type="image/png"
+                aria-label={first.player.name}
+                className="max-h-[355px] max-w-[132%] origin-bottom translate-y-1 scale-[1.34] object-contain transition duration-300 group-hover:scale-[1.39]"
+              >
+                <img
+                  src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${first.player.id}.png`}
+                  alt={first.player.name}
+                  className="max-h-[355px] max-w-[132%] origin-bottom object-contain"
+                />
+              </object>
             </div>
 
-            <div className="relative -mt-5 pb-6">
-              <div className="flex items-center gap-2">
+            <div className="relative border-t border-white/[0.06] bg-[#181b21]/95 px-6 pb-6 pt-5">
+              <div className="flex min-w-0 items-center gap-3">
                 {first.season?.seasonImg && (
-                  <img
-                    src={first.season.seasonImg}
-                    alt={first.season.className}
-                    className="h-11 w-auto object-contain"
-                  />
+                  <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-lg bg-white/[0.04]">
+                    <img
+                      src={first.season.seasonImg}
+                      alt={first.season.className}
+                      className="max-h-8 max-w-10 object-contain"
+                    />
+                  </div>
                 )}
-                <span className="text-xs font-semibold text-gray-400">
-                  {first.season?.className ?? "시즌 미확인"}
-                </span>
-                <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-black text-white">
-                  +{first.item.grade}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-xs font-semibold text-gray-400">
+                      {first.season?.className ?? "시즌 미확인"}
+                    </span>
+                    <span className="shrink-0 rounded-md bg-white/10 px-2 py-1 text-xs font-black text-white">
+                      +{first.item.grade}
+                    </span>
+                  </div>
+                  <h3 className="mt-2 truncate text-2xl font-black tracking-tight">
+                    {first.player.name}
+                  </h3>
+                </div>
               </div>
 
-              <h3 className="mt-3 text-2xl font-black tracking-tight">
-                {first.player.name}
-              </h3>
-
-              <div className="mt-4 flex items-end justify-between border-t border-white/10 pt-4">
+              <div className="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
                 <span className="text-xs font-semibold text-gray-500">가격</span>
                 <div className="text-right">
                   <p className="text-sm font-bold text-gray-300">

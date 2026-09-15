@@ -42,6 +42,22 @@ async function getSeasons(): Promise<Season[]> {
   return res.json();
 }
 
+function getEnhancementBadgeTone(grade: number) {
+  if (grade >= 13) return "border-lime-300/70 bg-lime-400/20 text-lime-200 shadow-[0_0_14px_rgba(163,230,53,0.18)]";
+  if (grade === 12) return "border-fuchsia-300/60 bg-fuchsia-400/20 text-fuchsia-200";
+  if (grade === 11) return "border-pink-300/60 bg-pink-400/20 text-pink-200";
+  if (grade === 10) return "border-orange-300/60 bg-orange-400/20 text-orange-200";
+  if (grade === 9) return "border-emerald-300/60 bg-emerald-400/20 text-emerald-200";
+  if (grade === 8) return "border-cyan-300/60 bg-cyan-400/20 text-cyan-200";
+  if (grade === 7) return "border-sky-300/60 bg-sky-400/20 text-sky-200";
+  if (grade === 6) return "border-violet-300/60 bg-violet-400/20 text-violet-200";
+  if (grade === 5) return "border-rose-300/60 bg-rose-400/20 text-rose-200";
+  if (grade === 4) return "border-amber-300/60 bg-amber-400/20 text-amber-200";
+  if (grade === 3) return "border-slate-200/50 bg-slate-200/15 text-slate-100";
+  if (grade === 2) return "border-orange-700/70 bg-orange-800/30 text-orange-200";
+  return "border-white/15 bg-white/10 text-gray-200";
+}
+
 export default async function PlayersPage({
   searchParams,
 }: {
@@ -289,7 +305,9 @@ function RankingBlock({
                     <span className="truncate text-xs font-semibold text-gray-400">
                       {first.season?.className ?? "시즌 미확인"}
                     </span>
-                    <span className="shrink-0 rounded-md bg-white/10 px-2 py-1 text-xs font-black text-white">
+                    <span
+                      className={`shrink-0 rounded-md border px-2 py-1 text-xs font-black ${getEnhancementBadgeTone(first.item.grade)}`}
+                    >
                       +{first.item.grade}
                     </span>
                   </div>
@@ -339,7 +357,9 @@ function RankingBlock({
                 <span className="min-w-0 flex-1 truncate text-sm font-bold">
                   {player.name}
                 </span>
-                <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-black text-gray-200">
+                <span
+                  className={`rounded-md border px-2 py-1 text-xs font-black ${getEnhancementBadgeTone(item.grade)}`}
+                >
                   +{item.grade}
                 </span>
               </Link>

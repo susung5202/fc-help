@@ -71,7 +71,10 @@ export async function getPlayerRankings(): Promise<PlayerRankings> {
   const apiKey = process.env.NEXON_API_KEY;
   if (!apiKey) return { popular: [], rating: [], grade: [] };
 
-  const listUrl = `${API_BASE}/match?matchtype=${OFFICIAL_MATCH_TYPE}&offset=0&limit=${SAMPLE_MATCH_COUNT}&orderby=desc`;
+  // 공식 문서상 목록은 기본적으로 최신순이며 orderby는 필수가 아닙니다.
+  // 일부 현재 서버에서는 orderby가 OPENAPI00004(유효하지 않은 파라미터)를
+  // 발생시키므로 필요한 파라미터만 전송합니다.
+  const listUrl = `${API_BASE}/match?matchtype=${OFFICIAL_MATCH_TYPE}&offset=0&limit=${SAMPLE_MATCH_COUNT}`;
   const matchRows = await nexonFetch<MatchIdRow[]>(listUrl, apiKey);
 
   const matchIds = (matchRows ?? [])

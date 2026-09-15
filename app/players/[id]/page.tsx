@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import PlayerArtwork from "@/components/PlayerArtwork";
 import PlayerStatsPanel from "@/components/PlayerStatsPanel";
 import { getPlayerStats } from "@/lib/fconline/playerStats";
 import { getPlayerTeamColors } from "@/lib/fconline/teamColors";
@@ -81,7 +82,6 @@ export default async function PlayerDetailPage({
   const seasonId = Math.floor(spid / 1_000_000);
   const season = seasons.find((item) => Number(item.seasonId) === seasonId);
   const seasonName = season?.className ?? "시즌 미확인";
-  const playerImage = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`;
 
   return (
     <main className="min-h-screen bg-[#0f1115] text-white">
@@ -123,10 +123,11 @@ export default async function PlayerDetailPage({
                   className="absolute left-6 top-6 z-10 h-16 object-contain"
                 />
               )}
-              <img
-                src={playerImage}
+              <PlayerArtwork
+                key={spid}
+                spid={spid}
                 alt={player.name}
-                className="max-h-[680px] max-w-[175%] origin-bottom translate-y-3 scale-[1.68] object-contain sm:scale-[1.78]"
+                className="h-[85%] w-auto max-w-none shrink-0 object-contain object-bottom"
               />
             </div>
           </div>

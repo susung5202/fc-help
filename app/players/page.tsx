@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PlayerArtwork from "@/components/PlayerArtwork";
 import {
   getPlayerRankings,
   type PlayerRankingItem,
@@ -265,18 +266,11 @@ function RankingBlock({
             </div>
 
             <div className="relative mt-1 flex h-[340px] items-end justify-center overflow-hidden px-4 sm:h-[360px]">
-              <object
-                data={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${first.player.id}.png`}
-                type="image/png"
-                aria-label={first.player.name}
-                className="max-h-[410px] max-w-[190%] origin-bottom translate-y-1 scale-[2.15] object-contain transition duration-300 group-hover:scale-[2.2]"
-              >
-                <img
-                  src={`https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/players/p${first.player.id}.png`}
-                  alt={first.player.name}
-                  className="max-h-[410px] max-w-[190%] origin-bottom object-contain"
-                />
-              </object>
+              <PlayerArtwork
+                spid={first.player.id}
+                alt={first.player.name}
+                className="max-h-[430px] max-w-[190%] origin-bottom translate-y-1 scale-[2.15] object-contain transition duration-300 group-hover:scale-[2.2]"
+              />
             </div>
 
             <div className="relative border-t border-white/[0.06] bg-[#181b21]/95 px-6 pb-6 pt-5">
@@ -364,8 +358,6 @@ function PlayerCard({
   player: Player;
   season?: Season;
 }) {
-  const imageUrl = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.id}.png`;
-
   return (
     <Link
       href={`/players/${player.id}`}
@@ -380,8 +372,8 @@ function PlayerCard({
           />
         )}
 
-        <img
-          src={imageUrl}
+        <PlayerArtwork
+          spid={player.id}
           alt={player.name}
           className="max-h-[370px] max-w-[170%] origin-bottom translate-y-2 scale-[1.7] object-contain transition duration-300 group-hover:scale-[1.78]"
         />

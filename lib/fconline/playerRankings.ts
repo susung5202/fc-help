@@ -1,7 +1,9 @@
 export type PlayerRankingItem = {
   spid: number;
+  name: string;
   grade: number;
   metric: number;
+  price: string | null;
 };
 
 export type PlayerRankings = {
@@ -10,240 +12,248 @@ export type PlayerRankings = {
   grade: PlayerRankingItem[];
 };
 
-type MatchIdRow = string | { matchId?: string };
+type RankingKind = "popular" | "rating";
 
-type MatchPlayer = {
-  spId?: number;
-  spGrade?: number;
-  status?: {
-    spRating?: number;
-  };
-};
+const PLAYER_STATS_URL =
+  "https://fconline.nexon.com/datacenter/PlayerRankerStatList";
+const DAILY_TRADE_URL = "https://fconline.nexon.com/datacenter/dailytrade";
+const OFFICIAL_REFERER = "https://fconline.nexon.com/DataCenter/PlayerStat";
+const CACHE_SECONDS = 3600;
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 
-type MatchInfo = {
-  player?: MatchPlayer[];
-};
+function decodeHtml(value: string) {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16))
+    )
+    .replace(/&#(\d+);/g, (_, decimal: string) =>
+      String.fromCodePoint(Number.parseInt(decimal, 10))
+    );
+}
 
-type MatchDetail = {
-  matchInfo?: MatchInfo[];
-};
+function htmlToText(value: string) {
+  return decodeHtml(value.replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-type MatchTypeMeta = {
-  matchtype?: number;
-  desc?: string;
-};
+function parseNumber(value: string) {
+  const match = htmlToText(value).match(/[\d,.]+/);
+  if (!match) return null;
 
-type Aggregate = {
-  appearances: number;
-  ratingSum: number;
-  ratingCount: number;
-  grades: Map<number, number>;
-};
+  const parsed = Number(match[0].replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
-const API_BASE = "https://open.api.nexon.com/fconline/v1";
-const MATCH_TYPE_META_URL =
-  "https://open.api.nexon.com/static/fconline/meta/matchtype.json";
-const SAMPLE_MATCH_COUNT = 40;
+function playerStatParams(orderBy: string) {
+  return new URLSearchParams({
+    n1Confederation: "0",
+    n4LeagueId: "0",
+    strSeason: "",
+    strPosition: "",
+    n4TeamId: "0",
+    n4NationId: "0",
+    n1Strong: "1",
+    n1Grow: "0",
+    n1TeamColor: "0",
+    strOrderby: orderBy,
+    strOrderbyDetail: "",
+    n1History: "0",
+    n4PlayYear: "0",
+    teamcolorid: "0",
+    strTeamColorCategory: "",
+    strPlayerName: "",
+    strTeamName: "",
+    strNationName: "",
+    strTeamColorName: "",
+    n4RankerMin: "1",
+    n4RankerMax: "10000",
+    n1PlayType: "50",
+    n4OvrMin: "",
+    n4OvrMax: "",
+    n4SalaryMin: "",
+    n4SalaryMax: "",
+    n4PageNo: "1",
+  });
+}
 
-async function nexonFetch<T>(url: string, apiKey: string): Promise<T | null> {
-  try {
-    const res = await fetch(url, {
-      headers: { "x-nxopen-api-key": apiKey },
-      cache: "no-store",
+async function fetchPlayerStatRanking(kind: RankingKind) {
+  const orderBy =
+    kind === "popular"
+      ? "count_matchid descending"
+      : "total_rating descending";
+  const response = await fetch(PLAYER_STATS_URL, {
+    method: "POST",
+    headers: {
+      Accept: "text/html, */*; q=0.01",
+      "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "User-Agent": USER_AGENT,
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: OFFICIAL_REFERER,
+      Origin: "https://fconline.nexon.com",
+    },
+    body: playerStatParams(orderBy),
+    next: { revalidate: CACHE_SECONDS },
+  });
+
+  if (!response.ok) {
+    throw new Error(`FC Online player stats HTTP ${response.status}`);
+  }
+
+  return parsePlayerStatRanking(await response.text(), kind);
+}
+
+export function parsePlayerStatRanking(
+  html: string,
+  kind: RankingKind
+): PlayerRankingItem[] {
+  const rowPattern =
+    /<div\s+class="tr"[^>]*onclick="[^"]*PlayerVs1[^"]*?val\([^\d]*(\d+)[^"]*"[^>]*>/gi;
+  const rows = [...html.matchAll(rowPattern)];
+  const metricClass = kind === "popular" ? "p_at" : "p_av";
+  const results: PlayerRankingItem[] = [];
+  const seen = new Set<number>();
+
+  for (let index = 0; index < rows.length && results.length < 5; index += 1) {
+    const spid = Number(rows[index][1]);
+    if (!Number.isFinite(spid) || seen.has(spid)) continue;
+
+    const start = rows[index].index ?? 0;
+    const end = rows[index + 1]?.index ?? html.length;
+    const block = html.slice(start, end);
+    const nameMatch = block.match(
+      /<div\s+class=["']info_top["'][^>]*>[\s\S]*?<div\s+class=["']name["'][^>]*>([\s\S]*?)<\/div>/i
+    );
+    const gradeMatch = block.match(
+      new RegExp(`name=["']Strong${spid}["'][^>]*value=["'](\\d+)\\/`, "i")
+    );
+    const metricMatch = block.match(
+      new RegExp(
+        `<div\\s+class=["']td\\s+${metricClass}["'][^>]*>([\\s\\S]*?)<\\/div>`,
+        "i"
+      )
+    );
+    const name = nameMatch ? htmlToText(nameMatch[1]) : "";
+    const metric = metricMatch ? parseNumber(metricMatch[1]) : null;
+
+    if (!name || metric === null) continue;
+
+    seen.add(spid);
+    results.push({
+      spid,
+      name,
+      grade: Number(gradeMatch?.[1] ?? 1),
+      metric,
+      price: null,
     });
-
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
-}
-
-function parseMatchIds(rows: unknown, limit: number) {
-  if (!Array.isArray(rows)) return [];
-
-  return rows
-    .map((row) => {
-      if (typeof row === "string") return row;
-      if (row && typeof row === "object" && "matchId" in row) {
-        return String((row as { matchId?: unknown }).matchId ?? "");
-      }
-      return "";
-    })
-    .filter((id): id is string => Boolean(id))
-    .slice(0, limit);
-}
-
-async function getOfficialMatchTypeCandidates(apiKey: string) {
-  const meta = await nexonFetch<MatchTypeMeta[]>(MATCH_TYPE_META_URL, apiKey);
-  const candidates: string[] = [];
-
-  if (Array.isArray(meta)) {
-    const rows = meta
-      .filter((row) => Number.isFinite(Number(row.matchtype)))
-      .map((row) => ({
-        matchtype: String(Number(row.matchtype)),
-        desc: String(row.desc ?? "").trim(),
-      }));
-
-    for (const row of rows) {
-      if (row.desc === "공식경기") candidates.push(row.matchtype);
-    }
-
-    for (const row of rows) {
-      if (
-        row.desc.includes("공식경기") &&
-        !row.desc.includes("감독") &&
-        !row.desc.includes("볼타")
-      ) {
-        candidates.push(row.matchtype);
-      }
-    }
   }
 
-  candidates.push("50", "52");
-  return [...new Set(candidates)];
-}
-
-async function getRecentMatchIds(apiKey: string, limit: number) {
-  const matchTypes = await getOfficialMatchTypeCandidates(apiKey);
-
-  for (const matchtype of matchTypes) {
-    const encoded = encodeURIComponent(matchtype);
-    const requests = [
-      `${API_BASE}/match?matchtype=${encoded}&offset=0&limit=${limit}&orderby=desc`,
-      `${API_BASE}/match?matchtype=${encoded}&offset=0&limit=${limit}`,
-      `${API_BASE}/match?matchtype=${encoded}&limit=${limit}`,
-      `${API_BASE}/match?matchtype=${encoded}`,
-    ];
-
-    for (const url of requests) {
-      const rows = await nexonFetch<MatchIdRow[]>(url, apiKey);
-      const ids = parseMatchIds(rows, limit);
-      if (ids.length > 0) return ids;
-    }
+  if (results.length < 5) {
+    throw new Error(
+      `FC Online ${kind} ranking parse failed (${results.length}/5)`
+    );
   }
 
-  return [];
+  return results;
 }
 
-function mostUsedGrade(grades: Map<number, number>) {
-  let bestGrade = 1;
-  let bestCount = -1;
+async function fetchReinforcementRanking() {
+  const response = await fetch(DAILY_TRADE_URL, {
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+      "User-Agent": USER_AGENT,
+    },
+    next: { revalidate: CACHE_SECONDS },
+  });
 
-  for (const [grade, count] of grades) {
-    if (count > bestCount || (count === bestCount && grade > bestGrade)) {
-      bestGrade = grade;
-      bestCount = count;
-    }
+  if (!response.ok) {
+    throw new Error(`FC Online daily trade HTTP ${response.status}`);
   }
 
-  return bestGrade;
+  return parseReinforcementRanking(await response.text());
+}
+
+export function parseReinforcementRanking(html: string): PlayerRankingItem[] {
+  const sectionStart = html.search(/id=["']goldTrade["']/i);
+  const sectionEnd = html.search(/id=["']rankWin["']/i);
+
+  if (sectionStart < 0 || sectionEnd <= sectionStart) {
+    throw new Error("FC Online reinforcement ranking section not found");
+  }
+
+  const section = html.slice(sectionStart, sectionEnd);
+  const playerPattern =
+    /PlayerInfo\?spid=(\d+)&(?:amp;)?n1Strong=(\d+)[^>]*>[\s\S]*?<span\s+class=["']hidden["'][^>]*>([\s\S]*?)<\/span>/gi;
+  const matches = [...section.matchAll(playerPattern)];
+  const results: PlayerRankingItem[] = [];
+  const seen = new Set<string>();
+
+  for (
+    let index = 0;
+    index < matches.length && results.length < 5;
+    index += 1
+  ) {
+    const spid = Number(matches[index][1]);
+    const grade = Number(matches[index][2]);
+    const key = `${spid}:${grade}`;
+    if (!Number.isFinite(spid) || !Number.isFinite(grade) || seen.has(key)) {
+      continue;
+    }
+
+    const start = matches[index].index ?? 0;
+    const end = matches[index + 1]?.index ?? section.length;
+    const block = section.slice(start, end);
+    const priceMatch = block.match(
+      /<span\s+class=["']price["'][^>]*(?:alt|title)=["']([\d,]+)["'][^>]*>([\s\S]*?)<\/span>/i
+    );
+    const priceValue = priceMatch ? Number(priceMatch[1].replace(/,/g, "")) : 0;
+    const price = priceMatch ? htmlToText(priceMatch[2]) : null;
+    const name = htmlToText(matches[index][3]);
+
+    if (!name || !price || !Number.isFinite(priceValue) || priceValue <= 0) {
+      continue;
+    }
+
+    seen.add(key);
+    results.push({ spid, name, grade, metric: priceValue, price });
+  }
+
+  if (results.length < 5) {
+    throw new Error(
+      `FC Online reinforcement ranking parse failed (${results.length}/5)`
+    );
+  }
+
+  return results;
+}
+
+async function safelyLoad(
+  label: string,
+  loader: () => Promise<PlayerRankingItem[]>
+) {
+  try {
+    return await loader();
+  } catch (error) {
+    console.error(`Failed to load ${label} from FC Online Data Center`, error);
+    return [];
+  }
 }
 
 export async function getPlayerRankings(): Promise<PlayerRankings> {
-  const apiKey = process.env.NEXON_API_KEY;
-  if (!apiKey) return { popular: [], rating: [], grade: [] };
-
-  const matchIds = await getRecentMatchIds(apiKey, SAMPLE_MATCH_COUNT);
-
-  if (matchIds.length === 0) {
-    return { popular: [], rating: [], grade: [] };
-  }
-
-  const details: MatchDetail[] = [];
-
-  for (let i = 0; i < matchIds.length; i += 8) {
-    const chunk = matchIds.slice(i, i + 8);
-    const rows = await Promise.all(
-      chunk.map((matchId) =>
-        nexonFetch<MatchDetail>(
-          `${API_BASE}/match-detail?matchid=${encodeURIComponent(matchId)}`,
-          apiKey
-        )
-      )
-    );
-    details.push(...rows.filter((row): row is MatchDetail => Boolean(row)));
-  }
-
-  const aggregate = new Map<number, Aggregate>();
-  const gradeAggregate = new Map<
-    string,
-    { spid: number; grade: number; count: number }
-  >();
-
-  for (const detail of details) {
-    for (const info of detail.matchInfo ?? []) {
-      for (const player of info.player ?? []) {
-        const spid = Number(player.spId);
-        const grade = Number(player.spGrade ?? 1);
-        const rating = Number(player.status?.spRating ?? 0);
-
-        if (
-          !Number.isFinite(spid) ||
-          spid <= 0 ||
-          !Number.isFinite(rating) ||
-          rating <= 0
-        ) {
-          continue;
-        }
-
-        const current = aggregate.get(spid) ?? {
-          appearances: 0,
-          ratingSum: 0,
-          ratingCount: 0,
-          grades: new Map<number, number>(),
-        };
-
-        current.appearances += 1;
-        current.ratingSum += rating;
-        current.ratingCount += 1;
-        current.grades.set(grade, (current.grades.get(grade) ?? 0) + 1);
-        aggregate.set(spid, current);
-
-        const gradeKey = `${spid}:${grade}`;
-        const gradeCurrent = gradeAggregate.get(gradeKey) ?? {
-          spid,
-          grade,
-          count: 0,
-        };
-        gradeCurrent.count += 1;
-        gradeAggregate.set(gradeKey, gradeCurrent);
-      }
-    }
-  }
-
-  const popular = [...aggregate.entries()]
-    .sort((a, b) => b[1].appearances - a[1].appearances)
-    .slice(0, 5)
-    .map(([spid, row]) => ({
-      spid,
-      grade: mostUsedGrade(row.grades),
-      metric: row.appearances,
-    }));
-
-  const rating = [...aggregate.entries()]
-    .filter(([, row]) => row.ratingCount >= 3)
-    .sort((a, b) => {
-      const aRating = a[1].ratingSum / a[1].ratingCount;
-      const bRating = b[1].ratingSum / b[1].ratingCount;
-      return bRating - aRating || b[1].ratingCount - a[1].ratingCount;
-    })
-    .slice(0, 5)
-    .map(([spid, row]) => ({
-      spid,
-      grade: mostUsedGrade(row.grades),
-      metric: Number((row.ratingSum / row.ratingCount).toFixed(2)),
-    }));
-
-  const grade = [...gradeAggregate.values()]
-    .sort((a, b) => b.count - a.count || b.grade - a.grade)
-    .slice(0, 5)
-    .map((row) => ({
-      spid: row.spid,
-      grade: row.grade,
-      metric: row.count,
-    }));
+  const [popular, rating, grade] = await Promise.all([
+    safelyLoad("popular players", () => fetchPlayerStatRanking("popular")),
+    safelyLoad("player ratings", () => fetchPlayerStatRanking("rating")),
+    safelyLoad("reinforcement trades", fetchReinforcementRanking),
+  ]);
 
   return { popular, rating, grade };
 }

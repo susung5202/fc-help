@@ -4,9 +4,6 @@ import {
   type PlayerRankingItem,
 } from "@/lib/fconline/playerRankings";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 type Player = {
   id: number;
   name: string;
@@ -136,15 +133,15 @@ export default async function PlayersPage({
             <div className="grid gap-6 xl:grid-cols-3">
               <RankingBlock
                 title="최근 인기 선수"
-                description="최근 공식경기 출전 횟수 기준"
+                description="전일 상위 1만 랭커 공식경기 출전 수 기준"
                 items={rankings?.popular ?? []}
                 playerMap={playerMap}
                 seasonMap={seasonMap}
-                metricLabel={(item) => `최근 ${item.metric}회 출전`}
+                metricLabel={(item) => `전일 ${item.metric}회 출전`}
               />
               <RankingBlock
                 title="최고 평점 선수"
-                description="최근 공식경기 평균 평점 기준"
+                description="전일 상위 1만 랭커 공식경기 평점 기준"
                 items={rankings?.rating ?? []}
                 playerMap={playerMap}
                 seasonMap={seasonMap}
@@ -152,11 +149,11 @@ export default async function PlayersPage({
               />
               <RankingBlock
                 title="강화 인기 선수"
-                description="최근 공식경기 선수·강화 단계 조합 기준"
+                description="전일 +8 이상 이적시장 거래 선수 기준"
                 items={rankings?.grade ?? []}
                 playerMap={playerMap}
                 seasonMap={seasonMap}
-                metricLabel={(item) => `+${item.grade} · ${item.metric}회 출전`}
+                metricLabel={(item) => `+${item.grade} 강화 거래`}
               />
             </div>
           ) : results.length === 0 ? (
@@ -217,8 +214,10 @@ function RankingBlock({
 }) {
   const resolved = items
     .map((item) => {
-      const player = playerMap.get(item.spid);
-      if (!player) return null;
+      const player = playerMap.get(item.spid) ?? {
+        id: item.spid,
+        name: item.name,
+      };
       const season = seasonMap.get(Math.floor(item.spid / 1_000_000));
       return { item, player, season };
     })
@@ -244,9 +243,9 @@ function RankingBlock({
       {!first ? (
         <div className="flex min-h-[520px] items-center justify-center px-6 text-center">
           <div>
-            <p className="font-semibold text-gray-300">공식 경기 데이터를 불러오지 못했습니다.</p>
+            <p className="font-semibold text-gray-300">공식 데이터를 불러오지 못했습니다.</p>
             <p className="mt-2 text-sm text-gray-500">
-              NEXON Open API 연결 상태를 확인하고 있습니다.
+              FC온라인 데이터센터가 일시적으로 응답하지 않습니다.
             </p>
           </div>
         </div>
@@ -297,8 +296,14 @@ function RankingBlock({
               <div className="mt-4 flex items-end justify-between border-t border-white/10 pt-4">
                 <span className="text-xs font-semibold text-gray-500">가격</span>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-300">시세 연동 예정</p>
-                  <p className="mt-0.5 text-[11px] text-gray-600">공식 Open API 미지원</p>
+                  <p className="text-sm font-bold text-gray-300">
+                    {first.item.price ?? "가격 정보 없음"}
+                  </p>
+                  {!first.item.price && (
+                    <p className="mt-0.5 text-[11px] text-gray-600">
+                      공식 가격 데이터 미제공
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

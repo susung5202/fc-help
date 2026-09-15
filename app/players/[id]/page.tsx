@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getPlayerStats } from "@/lib/fconline/playerStats";
 
 type Player = {
   id: number;
@@ -11,6 +12,15 @@ type Season = {
   className: string;
   seasonImg: string;
 };
+
+const STAT_GROUPS = [
+  "공격",
+  "패스",
+  "드리블",
+  "수비",
+  "피지컬",
+  "골키퍼",
+] as const;
 
 async function getPlayers(): Promise<Player[]> {
   const res = await fetch(
@@ -40,19 +50,28 @@ async function getSeasons(): Promise<Season[]> {
 
 export default async function PlayerDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ strong?: string }>;
 }) {
   const { id } = await params;
+  const { strong: strongParam = "1" } = await searchParams;
   const spid = Number(id);
 
   if (!Number.isFinite(spid)) {
     notFound();
   }
 
-  const [players, seasons] = await Promise.all([
+  const parsedStrong = Number(strongParam);
+  const strong = Number.isFinite(parsedStrong)
+    ? Math.min(13, Math.max(1, Math.trunc(parsedStrong)))
+    : 1;
+
+  const [players, seasons, stats] = await Promise.all([
     getPlayers(),
     getSeasons(),
+    getPlayerStats(spid, strong),
   ]);
 
   const player = players.find((item) => item.id === spid);
@@ -68,6 +87,17 @@ export default async function PlayerDetailPage({
 
   const seasonName = season?.className ?? "시즌 미확인";
   const playerImage = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`;
+
+  const summaryStats = stats
+    ? [
+        ["스피드", stats.summary.speed],
+        ["슛", stats.summary.shooting],
+        ["패스", stats.summary.passing],
+        ["드리블", stats.summary.dribbling],
+        ["수비", stats.summary.defending],
+        ["피지컬", stats.summary.physical],
+      ]
+    : [];
 
   return (
     <main className="min-h-screen bg-[#0f1115] text-white">
@@ -140,8 +170,25 @@ export default async function PlayerDetailPage({
             </h1>
 
             <p className="mt-4 max-w-xl text-gray-400">
-              FC 온라인 공식 선수 데이터를 기반으로 제공되는 선수 정보입니다.
+              FC 온라인 공식 선수 데이터와 데이터센터 능력치를 기반으로
+              제공합니다.
             </p>
+
+            {stats && (
+              <div className="mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
+                {summaryStats.map(([label, value]) => (
+                  <div
+                    key={String(label)}
+                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-4 text-center"
+                  >
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className="mt-1 text-2xl font-extrabold text-lime-400">
+                      {value ?? "-"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -156,6 +203,105 @@ export default async function PlayerDetailPage({
             </div>
           </section>
         </div>
+
+        <section className="mt-6 rounded-2xl border border-white/10 bg-[#181b21] p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-lime-400">PLAYER STATS</p>
+              <h2 className="mt-1 text-2xl font-bold">상세 능력치</h2>
+              <p className="mt-2 text-sm text-gray-500">
+                FC 온라인 데이터센터 기준 · 강화 적용 · 적응도 1 · 팀컬러 미적용
+              </p>
+            </div>
+
+            {stats && (
+              <a
+                href={stats.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-semibold text-gray-400 transition hover:text-white"
+              >
+                공식 데이터센터 원본 ↗
+              </a>
+            )}
+          </div>
+
+          <div className="mt-6">
+            <p className="mb-3 text-sm font-semibold text-gray-300">강화 단계</p>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {Array.from({ length: 13 }, (_, index) => index + 1).map(
+                (level) => (
+                  <Link
+                    key={level}
+                    href={`/players/${spid}?strong=${level}`}
+                    className={`flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm font-bold transition ${
+                      strong === level
+                        ? "border-lime-400 bg-lime-400 text-black"
+                        : "border-white/10 bg-white/[0.04] text-gray-400 hover:border-white/30 hover:text-white"
+                    }`}
+                  >
+                    +{level}
+                  </Link>
+                )
+              )}
+            </div>
+          </div>
+
+          {!stats ? (
+            <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-10 text-center">
+              <p className="font-semibold">능력치를 불러오지 못했습니다.</p>
+              <p className="mt-2 text-sm text-gray-500">
+                FC 온라인 데이터센터가 일시적으로 응답하지 않거나 페이지 구조가
+                변경되었을 수 있습니다.
+              </p>
+              <a
+                href={`https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${strong}&spid=${spid}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-block text-sm font-semibold text-lime-400"
+              >
+                공식 데이터센터에서 확인 ↗
+              </a>
+            </div>
+          ) : (
+            <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+              {STAT_GROUPS.map((groupName) => {
+                const groupStats = stats.abilities.filter(
+                  (stat) => stat.group === groupName
+                );
+
+                if (groupStats.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <div
+                    key={groupName}
+                    className="rounded-2xl border border-white/10 bg-[#12151a] p-5"
+                  >
+                    <h3 className="text-lg font-bold">{groupName}</h3>
+
+                    <div className="mt-4 divide-y divide-white/5">
+                      {groupStats.map((stat) => (
+                        <div
+                          key={stat.label}
+                          className="flex items-center justify-between py-2.5"
+                        >
+                          <span className="text-sm text-gray-400">
+                            {stat.label}
+                          </span>
+                          <span className="text-lg font-extrabold text-white">
+                            {stat.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </section>
 
       <footer className="mt-20 border-t border-white/10 px-6 py-8 text-center text-sm text-gray-500">

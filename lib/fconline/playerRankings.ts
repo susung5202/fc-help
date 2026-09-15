@@ -28,6 +28,11 @@ type MatchDetail = {
   matchInfo?: MatchInfo[];
 };
 
+type MatchTypeMeta = {
+  matchtype?: number;
+  desc?: string;
+};
+
 type Aggregate = {
   appearances: number;
   ratingSum: number;
@@ -36,7 +41,8 @@ type Aggregate = {
 };
 
 const API_BASE = "https://open.api.nexon.com/fconline/v1";
-const OFFICIAL_MATCH_TYPE = 50;
+const MATCH_TYPE_META_URL =
+  "https://open.api.nexon.com/static/fconline/meta/matchtype.json";
 const SAMPLE_MATCH_COUNT = 40;
 
 async function nexonFetch<T>(url: string, apiKey: string): Promise<T | null> {
@@ -51,6 +57,75 @@ async function nexonFetch<T>(url: string, apiKey: string): Promise<T | null> {
   } catch {
     return null;
   }
+}
+
+function parseMatchIds(rows: unknown, limit: number) {
+  if (!Array.isArray(rows)) return [];
+
+  return rows
+    .map((row) => {
+      if (typeof row === "string") return row;
+      if (row && typeof row === "object" && "matchId" in row) {
+        return String((row as { matchId?: unknown }).matchId ?? "");
+      }
+      return "";
+    })
+    .filter((id): id is string => Boolean(id))
+    .slice(0, limit);
+}
+
+async function getOfficialMatchTypeCandidates(apiKey: string) {
+  const meta = await nexonFetch<MatchTypeMeta[]>(MATCH_TYPE_META_URL, apiKey);
+  const candidates: string[] = [];
+
+  if (Array.isArray(meta)) {
+    const rows = meta
+      .filter((row) => Number.isFinite(Number(row.matchtype)))
+      .map((row) => ({
+        matchtype: String(Number(row.matchtype)),
+        desc: String(row.desc ?? "").trim(),
+      }));
+
+    // 메타데이터의 현재 공식경기 값을 우선 사용한다.
+    for (const row of rows) {
+      if (row.desc === "공식경기") candidates.push(row.matchtype);
+    }
+
+    for (const row of rows) {
+      if (
+        row.desc.includes("공식경기") &&
+        !row.desc.includes("감독") &&
+        !row.desc.includes("볼타")
+      ) {
+        candidates.push(row.matchtype);
+      }
+    }
+  }
+
+  // 메타데이터 조회가 잠시 실패해도 과거/문서 예시 값을 순차 시도한다.
+  candidates.push("50", "52");
+  return [...new Set(candidates)];
+}
+
+async function getRecentMatchIds(apiKey: string, limit: number) {
+  const matchTypes = await getOfficialMatchTypeCandidates(apiKey);
+
+  for (const matchtype of matchTypes) {
+    const encoded = encodeURIComponent(matchtype);
+    const requests = [
+      `${API_BASE}/match?matchtype=${encoded}&offset=0&limit=${limit}`,
+      `${API_BASE}/match?matchtype=${encoded}&limit=${limit}`,
+      `${API_BASE}/match?matchtype=${encoded}`,
+    ];
+
+    for (const url of requests) {
+      const rows = await nexonFetch<MatchIdRow[]>(url, apiKey);
+      const ids = parseMatchIds(rows, limit);
+      if (ids.length > 0) return ids;
+    }
+  }
+
+  return [];
 }
 
 function mostUsedGrade(grades: Map<number, number>) {
@@ -71,15 +146,7 @@ export async function getPlayerRankings(): Promise<PlayerRankings> {
   const apiKey = process.env.NEXON_API_KEY;
   if (!apiKey) return { popular: [], rating: [], grade: [] };
 
-  // 공식 문서상 목록은 기본적으로 최신순이며 orderby는 필수가 아닙니다.
-  // 일부 현재 서버에서는 orderby가 OPENAPI00004(유효하지 않은 파라미터)를
-  // 발생시키므로 필요한 파라미터만 전송합니다.
-  const listUrl = `${API_BASE}/match?matchtype=${OFFICIAL_MATCH_TYPE}&offset=0&limit=${SAMPLE_MATCH_COUNT}`;
-  const matchRows = await nexonFetch<MatchIdRow[]>(listUrl, apiKey);
-
-  const matchIds = (matchRows ?? [])
-    .map((row) => (typeof row === "string" ? row : row.matchId))
-    .filter((id): id is string => Boolean(id));
+  const matchIds = await getRecentMatchIds(apiKey, SAMPLE_MATCH_COUNT);
 
   if (matchIds.length === 0) {
     return { popular: [], rating: [], grade: [] };
@@ -102,7 +169,10 @@ export async function getPlayerRankings(): Promise<PlayerRankings> {
   }
 
   const aggregate = new Map<number, Aggregate>();
-  const gradeAggregate = new Map<string, { spid: number; grade: number; count: number }>();
+  const gradeAggregate = new Map<
+    string,
+    { spid: number; grade: number; count: number }
+  >();
 
   for (const detail of details) {
     for (const info of detail.matchInfo ?? []) {
@@ -112,7 +182,12 @@ export async function getPlayerRankings(): Promise<PlayerRankings> {
         const rating = Number(player.status?.spRating ?? 0);
 
         // 벤치/미출전 선수처럼 평점이 없는 항목은 실사용 집계에서 제외합니다.
-        if (!Number.isFinite(spid) || spid <= 0 || !Number.isFinite(rating) || rating <= 0) {
+        if (
+          !Number.isFinite(spid) ||
+          spid <= 0 ||
+          !Number.isFinite(rating) ||
+          rating <= 0
+        ) {
           continue;
         }
 

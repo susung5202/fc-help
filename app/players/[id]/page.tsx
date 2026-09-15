@@ -99,6 +99,8 @@ export default async function PlayerDetailPage({
       ]
     : [];
 
+  const hasSummaryStats = summaryStats.some(([, value]) => value !== null);
+
   return (
     <main className="min-h-screen bg-[#0f1115] text-white">
       <header className="border-b border-white/10">
@@ -174,7 +176,7 @@ export default async function PlayerDetailPage({
               제공합니다.
             </p>
 
-            {stats && (
+            {stats && hasSummaryStats && (
               <div className="mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {summaryStats.map(([label, value]) => (
                   <div

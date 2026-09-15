@@ -48,15 +48,71 @@ async function getSeasons(): Promise<Season[]> {
   return res.json();
 }
 
+function buildStatsHref(
+  spid: number,
+  strong: number,
+  grow: number,
+  teamColor: number
+) {
+  const params = new URLSearchParams({
+    strong: String(strong),
+    grow: String(grow),
+    teamColor: String(teamColor),
+  });
+
+  return `/players/${spid}?${params.toString()}`;
+}
+
+function getStatTone(value: number) {
+  if (value >= 150) {
+    return "border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300";
+  }
+
+  if (value >= 140) {
+    return "border-rose-400/40 bg-rose-400/10 text-rose-300";
+  }
+
+  if (value >= 130) {
+    return "border-orange-400/40 bg-orange-400/10 text-orange-300";
+  }
+
+  if (value >= 120) {
+    return "border-amber-300/40 bg-amber-300/10 text-amber-200";
+  }
+
+  if (value >= 110) {
+    return "border-lime-400/40 bg-lime-400/10 text-lime-300";
+  }
+
+  if (value >= 100) {
+    return "border-emerald-400/40 bg-emerald-400/10 text-emerald-300";
+  }
+
+  if (value >= 90) {
+    return "border-cyan-400/40 bg-cyan-400/10 text-cyan-300";
+  }
+
+  return "border-white/10 bg-white/[0.04] text-gray-200";
+}
+
 export default async function PlayerDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ strong?: string }>;
+  searchParams: Promise<{
+    strong?: string;
+    grow?: string;
+    teamColor?: string;
+  }>;
 }) {
   const { id } = await params;
-  const { strong: strongParam = "1" } = await searchParams;
+  const {
+    strong: strongParam = "1",
+    grow: growParam = "1",
+    teamColor: teamColorParam = "0",
+  } = await searchParams;
+
   const spid = Number(id);
 
   if (!Number.isFinite(spid)) {
@@ -68,10 +124,17 @@ export default async function PlayerDetailPage({
     ? Math.min(13, Math.max(1, Math.trunc(parsedStrong)))
     : 1;
 
+  const grow = Number(growParam) === 5 ? 5 : 1;
+
+  const parsedTeamColor = Number(teamColorParam);
+  const teamColor = Number.isFinite(parsedTeamColor)
+    ? Math.min(9, Math.max(0, Math.trunc(parsedTeamColor)))
+    : 0;
+
   const [players, seasons, stats] = await Promise.all([
     getPlayers(),
     getSeasons(),
-    getPlayerStats(spid, strong),
+    getPlayerStats(spid, strong, grow),
   ]);
 
   const player = players.find((item) => item.id === spid);
@@ -88,18 +151,13 @@ export default async function PlayerDetailPage({
   const seasonName = season?.className ?? "시즌 미확인";
   const playerImage = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`;
 
-  const summaryStats = stats
-    ? [
-        ["스피드", stats.summary.speed],
-        ["슛", stats.summary.shooting],
-        ["패스", stats.summary.passing],
-        ["드리블", stats.summary.dribbling],
-        ["수비", stats.summary.defending],
-        ["피지컬", stats.summary.physical],
-      ]
+  const adjustedAbilities = stats
+    ? stats.abilities.map((stat) => ({
+        ...stat,
+        baseValue: stat.value,
+        value: Math.min(200, stat.value + teamColor),
+      }))
     : [];
-
-  const hasSummaryStats = summaryStats.some(([, value]) => value !== null);
 
   return (
     <main className="min-h-screen bg-[#0f1115] text-white">
@@ -176,21 +234,17 @@ export default async function PlayerDetailPage({
               제공합니다.
             </p>
 
-            {stats && hasSummaryStats && (
-              <div className="mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
-                {summaryStats.map(([label, value]) => (
-                  <div
-                    key={String(label)}
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-4 text-center"
-                  >
-                    <p className="text-xs text-gray-500">{label}</p>
-                    <p className="mt-1 text-2xl font-extrabold text-lime-400">
-                      {value ?? "-"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
+              <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+                +{strong}강
+              </span>
+              <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+                적응도 {grow}
+              </span>
+              <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+                팀컬러 +{teamColor}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -212,7 +266,7 @@ export default async function PlayerDetailPage({
               <p className="text-sm font-semibold text-lime-400">PLAYER STATS</p>
               <h2 className="mt-1 text-2xl font-bold">상세 능력치</h2>
               <p className="mt-2 text-sm text-gray-500">
-                FC 온라인 데이터센터 기준 · 강화 적용 · 적응도 1 · 팀컬러 미적용
+                강화 +{strong} · 적응도 {grow} · 팀컬러 전체 능력치 +{teamColor}
               </p>
             </div>
 
@@ -228,26 +282,70 @@ export default async function PlayerDetailPage({
             )}
           </div>
 
-          <div className="mt-6">
-            <p className="mb-3 text-sm font-semibold text-gray-300">강화 단계</p>
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {Array.from({ length: 13 }, (_, index) => index + 1).map(
-                (level) => (
+          <div className="mt-7 grid gap-6 lg:grid-cols-3">
+            <StatOptionSection title="강화">
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {Array.from({ length: 13 }, (_, index) => index + 1).map(
+                  (level) => (
+                    <Link
+                      key={level}
+                      href={buildStatsHref(spid, level, grow, teamColor)}
+                      className={`flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm font-bold transition ${
+                        strong === level
+                          ? "border-lime-400 bg-lime-400 text-black"
+                          : "border-white/10 bg-white/[0.04] text-gray-400 hover:border-white/30 hover:text-white"
+                      }`}
+                    >
+                      +{level}
+                    </Link>
+                  )
+                )}
+              </div>
+            </StatOptionSection>
+
+            <StatOptionSection title="적응도">
+              <div className="flex gap-2">
+                {[1, 5].map((level) => (
                   <Link
                     key={level}
-                    href={`/players/${spid}?strong=${level}`}
-                    className={`flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm font-bold transition ${
-                      strong === level
+                    href={buildStatsHref(spid, strong, level, teamColor)}
+                    className={`flex h-10 min-w-16 items-center justify-center rounded-lg border px-4 text-sm font-bold transition ${
+                      grow === level
                         ? "border-lime-400 bg-lime-400 text-black"
                         : "border-white/10 bg-white/[0.04] text-gray-400 hover:border-white/30 hover:text-white"
                     }`}
                   >
                     +{level}
                   </Link>
-                )
-              )}
-            </div>
+                ))}
+              </div>
+            </StatOptionSection>
+
+            <StatOptionSection title="팀컬러">
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {Array.from({ length: 10 }, (_, index) => index).map(
+                  (bonus) => (
+                    <Link
+                      key={bonus}
+                      href={buildStatsHref(spid, strong, grow, bonus)}
+                      className={`flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm font-bold transition ${
+                        teamColor === bonus
+                          ? "border-lime-400 bg-lime-400 text-black"
+                          : "border-white/10 bg-white/[0.04] text-gray-400 hover:border-white/30 hover:text-white"
+                      }`}
+                    >
+                      +{bonus}
+                    </Link>
+                  )
+                )}
+              </div>
+            </StatOptionSection>
           </div>
+
+          <p className="mt-3 text-xs leading-5 text-gray-600">
+            팀컬러는 현재 전체 능력치 보너스(+0~+9) 기준입니다. 특정 클럽/국가
+            팀컬러의 추가 세부 능력치 효과는 별도 적용되지 않습니다.
+          </p>
 
           {!stats ? (
             <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-10 text-center">
@@ -257,7 +355,7 @@ export default async function PlayerDetailPage({
                 변경되었을 수 있습니다.
               </p>
               <a
-                href={`https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${strong}&spid=${spid}`}
+                href={`https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${strong}&n1grow=${grow === 5 ? 4 : 0}&spid=${spid}`}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-4 inline-block text-sm font-semibold text-lime-400"
@@ -268,7 +366,7 @@ export default async function PlayerDetailPage({
           ) : (
             <div className="mt-8 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
               {STAT_GROUPS.map((groupName) => {
-                const groupStats = stats.abilities.filter(
+                const groupStats = adjustedAbilities.filter(
                   (stat) => stat.group === groupName
                 );
 
@@ -287,14 +385,27 @@ export default async function PlayerDetailPage({
                       {groupStats.map((stat) => (
                         <div
                           key={stat.label}
-                          className="flex items-center justify-between py-2.5"
+                          className="flex items-center justify-between gap-4 py-2.5"
                         >
                           <span className="text-sm text-gray-400">
                             {stat.label}
                           </span>
-                          <span className="text-lg font-extrabold text-white">
-                            {stat.value}
-                          </span>
+
+                          <div className="flex items-center gap-2">
+                            {teamColor > 0 && (
+                              <span className="text-[11px] font-semibold text-lime-400/80">
+                                {stat.baseValue}+{teamColor}
+                              </span>
+                            )}
+
+                            <span
+                              className={`min-w-14 rounded-lg border px-2.5 py-1 text-center text-lg font-extrabold ${getStatTone(
+                                stat.value
+                              )}`}
+                            >
+                              {stat.value}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -310,6 +421,21 @@ export default async function PlayerDetailPage({
         FC Help · FC Online Data & Community
       </footer>
     </main>
+  );
+}
+
+function StatOptionSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="mb-3 text-sm font-semibold text-gray-300">{title}</p>
+      {children}
+    </div>
   );
 }
 

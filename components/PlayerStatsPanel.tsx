@@ -6,6 +6,7 @@ import type {
   PlayerTeamColors,
   TeamColorOption,
 } from "@/lib/fconline/teamColors";
+import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 
 type Props = {
   spid: number;
@@ -284,7 +285,9 @@ export default function PlayerStatsPanel({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold">
-        <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+        <span
+          className={`rounded-lg border px-3 py-2 ${getEnhancementBadgeTone(strong)}`}
+        >
           +{strong}강
         </span>
         <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -310,10 +313,12 @@ export default function PlayerStatsPanel({
                   key={range.key}
                   type="button"
                   onClick={() => setStrongRange(range.key)}
-                  className={`h-10 rounded-lg border px-3 text-sm font-bold transition ${
+                  className={`h-10 rounded-lg border px-3 text-sm font-bold transition ${getEnhancementBadgeTone(
+                    range.levels[0]
+                  )} ${
                     active
-                      ? "border-lime-400/70 bg-lime-400/15 text-lime-300"
-                      : "border-white/10 bg-white/[0.04] text-gray-400 hover:border-white/30 hover:text-white"
+                      ? "ring-2 ring-white/40 opacity-100"
+                      : "opacity-70 hover:opacity-100"
                   }`}
                 >
                   {range.label}
@@ -329,10 +334,12 @@ export default function PlayerStatsPanel({
                 type="button"
                 disabled={loading}
                 onClick={() => loadBaseStats(level, grow)}
-                className={`flex h-10 min-w-14 items-center justify-center rounded-lg border px-4 text-sm font-extrabold transition disabled:opacity-50 ${
+                className={`flex h-10 min-w-14 items-center justify-center rounded-lg border px-4 text-sm font-extrabold transition disabled:opacity-50 ${getEnhancementBadgeTone(
+                  level
+                )} ${
                   strong === level
-                    ? "border-lime-400 bg-lime-400 text-black"
-                    : "border-white/10 bg-white/[0.04] text-gray-300 hover:border-white/30 hover:text-white"
+                    ? "ring-2 ring-white/50 opacity-100"
+                    : "opacity-75 hover:opacity-100"
                 }`}
               >
                 +{level}

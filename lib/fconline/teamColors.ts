@@ -135,107 +135,41 @@ function parseTeamColors(html: string): TeamColorOption[] {
   return rows;
 }
 
-function cleanSelectorName(value: string) {
-  return htmlToText(value)
-    .replace(/^선택\s*/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+function getReinforcementTeamColors(strong: number): TeamColorOption[] {
+  const rows: TeamColorOption[] = [];
 
-function extractSelectorNames(block: string) {
-  const names: string[] = [];
-  const seen = new Set<string>();
-
-  for (const match of block.matchAll(
-    /<a\b[^>]*class=["'][^"']*\bselector_item\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi
-  )) {
-    const name = cleanSelectorName(match[1]);
-    if (!name) continue;
-    if (/^(강화 팀컬러|소속 팀컬러|관계 팀컬러|특성 팀컬러|단일팀|-)$/.test(name)) {
-      continue;
-    }
-    if (seen.has(name)) continue;
-    seen.add(name);
-    names.push(name);
-  }
-
-  return names;
-}
-
-function extractAbilitySelectorGroups(html: string) {
-  const result: PlayerTeamColors extends infer _T
-    ? { reinforcementNames: string[]; affiliationNames: string[]; featureNames: string[] }
-    : never = {
-    reinforcementNames: [],
-    affiliationNames: [],
-    featureNames: [],
+  const add = (name: string, level: number, bonus: number, maxLevel: number) => {
+    rows.push({
+      name,
+      level,
+      maxLevel,
+      effects: [{ label: "전체 능력치", value: bonus }],
+      category: "reinforcement",
+    });
   };
 
-  // PlayerAbility 응답은 각 팀컬러 selector의 제목(a.ability) 뒤에
-  // div.tdefault > div.selector_list 형태로 실제 적용 가능한 후보를 내려준다.
-  // 전체 PlayerInfo GET에는 이 목록이 비어있는 경우가 있어서 반드시 POST 응답을 본다.
-  const anchors = Array.from(
-    html.matchAll(
-      /<a\b[^>]*class=["'][^"']*\bability\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi
-    )
-  );
-
-  for (let index = 0; index < anchors.length; index += 1) {
-    const current = anchors[index];
-    const label = htmlToText(current[1]);
-    const start = (current.index ?? 0) + current[0].length;
-    const end =
-      index + 1 < anchors.length
-        ? anchors[index + 1].index ?? html.length
-        : Math.min(html.length, start + 30000);
-    const block = html.slice(start, end);
-    const names = extractSelectorNames(block);
-
-    if (names.length === 0) continue;
-
-    if (label.includes("강화 팀컬러")) {
-      result.reinforcementNames.push(...names);
-    } else if (label.includes("소속 팀컬러")) {
-      result.affiliationNames.push(...names);
-    } else if (label.includes("관계 팀컬러") || label.includes("특성 팀컬러")) {
-      result.featureNames.push(...names);
-    }
+  // FC 온라인 공식 강화 팀컬러 기준.
+  // 동빛: 3강+, 은빛: 5강+, 금빛: 8강+, 백금빛: 11강+
+  if (strong >= 11) {
+    add("백금빛 물결", 1, 4, 2);
+    add("백금빛 물결", 2, 5, 2);
   }
 
-  // 일부 응답은 제목 텍스트가 selector 내부 첫 항목으로만 존재한다.
-  // 이 경우 tdefault 블록 순서와 첫 항목 이름으로 한 번 더 복구한다.
-  if (
-    result.reinforcementNames.length === 0 &&
-    result.affiliationNames.length === 0 &&
-    result.featureNames.length === 0
-  ) {
-    const selectorBlocks = Array.from(
-      html.matchAll(
-        /<div\b[^>]*class=["'][^"']*\btdefault\b[^"']*["'][^>]*>([\s\S]*?)(?=<div\b[^>]*class=["'][^"']*\btdefault\b|$)/gi
-      )
-    );
-
-    for (const match of selectorBlocks) {
-      const block = match[1];
-      const text = htmlToText(block);
-      const names = extractSelectorNames(block);
-      if (text.includes("강화 팀컬러")) {
-        result.reinforcementNames.push(...names);
-      } else if (text.includes("소속 팀컬러")) {
-        result.affiliationNames.push(...names);
-      } else if (text.includes("관계 팀컬러") || text.includes("특성 팀컬러")) {
-        result.featureNames.push(...names);
-      }
-    }
+  if (strong >= 8) {
+    add("금빛 물결", 1, 3, 2);
+    add("금빛 물결", 2, 4, 2);
   }
 
-  const unique = (items: string[]) => Array.from(new Set(items));
+  if (strong >= 5) {
+    add("은빛 물결", 1, 1, 2);
+    add("은빛 물결", 2, 3, 2);
+  }
 
-  return {
-    reinforcementNames: unique(result.reinforcementNames),
-    affiliationNames: unique(result.affiliationNames),
-    featureNames: unique(result.featureNames),
-  };
+  if (strong >= 3) {
+    add("동빛 물결", 1, 1, 1);
+  }
+
+  return rows;
 }
 
 export async function searchTeamColors(query: string): Promise<TeamColorOption[]> {
@@ -273,12 +207,15 @@ async function resolveNames(
   const groups = await Promise.all(
     names.map(async (name) => {
       const rows = await searchTeamColors(name);
+
+      // 반드시 정확히 같은 팀컬러만 허용한다.
+      // 검색 결과 첫 행으로 대체하면 '레알 마드리드'가
+      // '19-20 레알 마드리드'로 잘못 바뀌는 문제가 생긴다.
       const exact = rows.filter(
         (row) => normalizeName(row.name) === normalizeName(name)
       );
 
-      const candidates = exact.length > 0 ? exact : rows.slice(0, 1);
-      return candidates.map((row) => ({ ...row, category }));
+      return exact.map((row) => ({ ...row, category }));
     })
   );
 
@@ -291,17 +228,38 @@ async function resolveNames(
   });
 }
 
-export async function getPlayerTeamColors(
-  spid: number,
-  strong: number
-): Promise<PlayerTeamColors> {
-  const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
-  const sourceUrl = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${safeStrong}&spid=${spid}`;
-  const abilityUrl = "https://fconline.nexon.com/datacenter/PlayerAbility";
+function extractSelectorNames(html: string): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const itemPattern = /<a\b[^>]*class=["'][^"']*\bselector_item\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
 
+  for (const match of html.matchAll(itemPattern)) {
+    const name = htmlToText(match[1]).replace(/^선택\s*/, "").trim();
+    if (!name) continue;
+    if (
+      name === "강화 팀컬러" ||
+      name === "소속 팀컬러" ||
+      name === "관계 팀컬러" ||
+      name === "특성 팀컬러" ||
+      name === "단일팀" ||
+      /^Lv\.\d+/i.test(name)
+    ) {
+      continue;
+    }
+
+    if (seen.has(name)) continue;
+    seen.add(name);
+    names.push(name);
+  }
+
+  return names.slice(0, 50);
+}
+
+async function getPlayerAbilityHtml(spid: number, strong: number) {
+  const sourceUrl = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${strong}&spid=${spid}`;
   const body = new URLSearchParams({
     spid: String(spid),
-    n1Strong: String(safeStrong),
+    n1Strong: String(strong),
     n1Grow: "0",
     n4TeamColorId: "0",
     n4TeamColorLv: "0",
@@ -310,39 +268,46 @@ export async function getPlayerTeamColors(
     rd: "0",
   });
 
+  const response = await fetch("https://fconline.nexon.com/datacenter/PlayerAbility", {
+    method: "POST",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+      "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Referer: sourceUrl,
+      Origin: "https://fconline.nexon.com",
+    },
+    body,
+    next: { revalidate: 3600 },
+  });
+
+  return response.ok ? response.text() : "";
+}
+
+export async function getPlayerTeamColors(
+  spid: number,
+  strong: number
+): Promise<PlayerTeamColors> {
+  const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
+  const reinforcement = getReinforcementTeamColors(safeStrong);
+
   try {
-    const response = await fetch(abilityUrl, {
-      method: "POST",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        Referer: sourceUrl,
-        Origin: "https://fconline.nexon.com",
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      body,
-      next: { revalidate: 3600 },
-    });
+    const abilityHtml = await getPlayerAbilityHtml(spid, safeStrong);
 
-    if (!response.ok) {
-      return { reinforcement: [], affiliation: [], feature: [] };
-    }
+    // PlayerAbility의 selector_item 목록은 해당 선수에게 실제로 노출되는
+    // 소속 팀컬러 후보다. 전체 팀컬러 검색 페이지를 섞지 않는다.
+    const affiliationNames = extractSelectorNames(abilityHtml);
+    const affiliation = await resolveNames(affiliationNames, "affiliation");
 
-    const html = await response.text();
-    const { reinforcementNames, affiliationNames, featureNames } =
-      extractAbilitySelectorGroups(html);
-
-    const [reinforcement, affiliation, feature] = await Promise.all([
-      resolveNames(reinforcementNames, "reinforcement"),
-      resolveNames(affiliationNames, "affiliation"),
-      resolveNames(featureNames, "feature"),
-    ]);
+    // 관계/특성 팀컬러는 현재 PlayerAbility에서 별도 selector가 확실히
+    // 식별되는 경우에만 추후 추가한다. 잘못된 팀컬러를 보여주는 것보다
+    // 빈 목록이 안전하다.
+    const feature: TeamColorOption[] = [];
 
     return { reinforcement, affiliation, feature };
   } catch (error) {
     console.error("FC Online player team color fetch failed", error);
-    return { reinforcement: [], affiliation: [], feature: [] };
+    return { reinforcement, affiliation: [], feature: [] };
   }
 }

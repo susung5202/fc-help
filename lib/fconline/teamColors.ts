@@ -3,11 +3,20 @@ export type TeamColorEffect = {
   value: number;
 };
 
+export type TeamColorCategory = "reinforcement" | "affiliation" | "feature";
+
 export type TeamColorOption = {
   name: string;
   maxLevel: number;
   level: number;
   effects: TeamColorEffect[];
+  category?: TeamColorCategory;
+};
+
+export type PlayerTeamColors = {
+  reinforcement: TeamColorOption[];
+  affiliation: TeamColorOption[];
+  feature: TeamColorOption[];
 };
 
 const EFFECT_LABELS = [
@@ -80,6 +89,10 @@ function htmlToText(html: string) {
     .trim();
 }
 
+function normalizeName(value: string) {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function parseEffects(raw: string): TeamColorEffect[] {
   const labelPattern = EFFECT_LABELS.map(escapeRegExp).join("|");
   const effectPattern = new RegExp(`(${labelPattern})\\s*\\+(\\d+)`, "g");
@@ -98,8 +111,6 @@ function parseTeamColors(html: string): TeamColorOption[] {
   const text = htmlToText(html);
   const labelPattern = EFFECT_LABELS.map(escapeRegExp).join("|");
   const effectsBlock = `(?:(?:${labelPattern})\\s*\\+\\d+\\s*){1,10}`;
-
-  // 공식 데이터센터 결과는 "최고 단계 숫자 → 팀컬러명 → N단계 → 적용 효과" 순서다.
   const rowPattern = new RegExp(
     `(?:^|\\s)([1-9]|1[0-3])\\s+(.{1,90}?)\\s+(\\d+)단계\\s+(${effectsBlock})`,
     "g"
@@ -113,22 +124,40 @@ function parseTeamColors(html: string): TeamColorOption[] {
     const name = match[2].trim();
     const level = Number(match[3]);
     const effects = parseEffects(match[4]);
-
     if (!name || effects.length === 0) continue;
 
     const key = `${name}|${level}|${effects.map((e) => `${e.label}:${e.value}`).join(",")}`;
     if (seen.has(key)) continue;
     seen.add(key);
-
-    rows.push({
-      name,
-      maxLevel,
-      level,
-      effects,
-    });
+    rows.push({ name, maxLevel, level, effects });
   }
 
   return rows;
+}
+
+function extractSectionItems(html: string, startLabel: string, endLabel: string) {
+  const start = html.indexOf(startLabel);
+  if (start < 0) return [];
+
+  const end = html.indexOf(endLabel, start + startLabel.length);
+  const section = html.slice(start, end >= 0 ? end : start + 30000);
+  const items: string[] = [];
+  const seen = new Set<string>();
+
+  for (const match of section.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
+    const text = htmlToText(match[1]);
+    if (!text) continue;
+    if (text === startLabel || text === endLabel) continue;
+    if (/^팀컬러$/.test(text)) continue;
+    if (/^[0-9]+$/.test(text)) continue;
+
+    const cleaned = text.replace(/^선택\s*/, "").trim();
+    if (!cleaned || seen.has(cleaned)) continue;
+    seen.add(cleaned);
+    items.push(cleaned);
+  }
+
+  return items.slice(0, 40);
 }
 
 export async function searchTeamColors(query: string): Promise<TeamColorOption[]> {
@@ -152,10 +181,85 @@ export async function searchTeamColors(query: string): Promise<TeamColorOption[]
     });
 
     if (!response.ok) return [];
-
     return parseTeamColors(await response.text()).slice(0, 60);
   } catch (error) {
     console.error("FC Online team color fetch failed", error);
     return [];
+  }
+}
+
+async function resolveNames(
+  names: string[],
+  category: TeamColorCategory
+): Promise<TeamColorOption[]> {
+  const groups = await Promise.all(
+    names.map(async (name) => {
+      const rows = await searchTeamColors(name);
+      const exact = rows.filter(
+        (row) => normalizeName(row.name) === normalizeName(name)
+      );
+
+      const candidates = exact.length > 0 ? exact : rows.slice(0, 1);
+      return candidates.map((row) => ({ ...row, category }));
+    })
+  );
+
+  const seen = new Set<string>();
+  return groups.flat().filter((row) => {
+    const key = `${row.name}|${row.level}|${category}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export async function getPlayerTeamColors(
+  spid: number,
+  strong: number
+): Promise<PlayerTeamColors> {
+  const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
+  const url = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${safeStrong}&spid=${spid}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+      },
+      next: { revalidate: 3600 },
+    });
+
+    if (!response.ok) {
+      return { reinforcement: [], affiliation: [], feature: [] };
+    }
+
+    const html = await response.text();
+    const reinforcementNames = extractSectionItems(
+      html,
+      "강화 팀컬러",
+      "소속 팀컬러"
+    );
+    const affiliationNames = extractSectionItems(
+      html,
+      "소속 팀컬러",
+      "관계 팀컬러"
+    ).filter((name) => name !== "소속 팀컬러");
+    const featureNames = extractSectionItems(
+      html,
+      "관계 팀컬러",
+      "클래스 비교"
+    ).filter((name) => name !== "관계 팀컬러");
+
+    const [reinforcement, affiliation, feature] = await Promise.all([
+      resolveNames(reinforcementNames, "reinforcement"),
+      resolveNames(affiliationNames, "affiliation"),
+      resolveNames(featureNames, "feature"),
+    ]);
+
+    return { reinforcement, affiliation, feature };
+  } catch (error) {
+    console.error("FC Online player team color fetch failed", error);
+    return { reinforcement: [], affiliation: [], feature: [] };
   }
 }

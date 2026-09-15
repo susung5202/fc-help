@@ -125,11 +125,20 @@ function normalizeLabel(value: string) {
 
 function extractClassText(html: string, className: string) {
   const pattern = new RegExp(
-    `<div\\b[^>]*class=["'][^"']*\\b${className}\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>`,
+    `<(?:div|span)\\b[^>]*class=["'][^"']*\\b${className}\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/(?:div|span)>`,
     "i"
   );
   const match = html.match(pattern);
   return match ? htmlToText(match[1]) : null;
+}
+
+function getAbilityScope(html: string) {
+  // PlayerInfo/PlayerAbility 응답 안에는 비교용 마크업이 함께 섞일 수 있다.
+  // 실제 선수의 첫 번째 상세 능력치 목록만 파싱해 다른 숫자가 덮어쓰는 일을 막는다.
+  const match = html.match(
+    /<ul\b[^>]*class=["'][^"']*\bdata_wrap_playerinfo\b[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i
+  );
+  return match?.[1] ?? html;
 }
 
 function parseAbilities(html: string): PlayerAbilityStat[] {
@@ -148,29 +157,23 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
   }
 
   const parsed = new Map<string, PlayerAbilityStat>();
+  const scope = getAbilityScope(html);
   const liPattern = /<li\b[^>]*class=["'][^"']*\bab\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
 
-  for (const match of html.matchAll(liPattern)) {
+  for (const match of scope.matchAll(liPattern)) {
     const block = match[1];
     const rawLabel = extractClassText(block, "txt");
     const rawValue = extractClassText(block, "value");
 
-    if (!rawLabel || !rawValue) {
-      continue;
-    }
+    if (!rawLabel || !rawValue) continue;
 
     const definition = canonical.get(normalizeLabel(rawLabel));
     const numberMatch = rawValue.match(/-?\d{1,3}/);
 
-    if (!definition || !numberMatch) {
-      continue;
-    }
+    if (!definition || !numberMatch) continue;
 
     const value = Number(numberMatch[0]);
-
-    if (!Number.isFinite(value)) {
-      continue;
-    }
+    if (!Number.isFinite(value)) continue;
 
     parsed.set(definition.label, {
       label: definition.label,
@@ -186,17 +189,25 @@ function parseAbilities(html: string): PlayerAbilityStat[] {
   );
 }
 
-export async function getPlayerStats(
-  spid: number,
-  strong: number,
-  grow: number = 1
-): Promise<PlayerStatsData | null> {
-  const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
-  const safeGrow: 1 | 5 = grow === 5 ? 5 : 1;
-  const growParam = safeGrow === 5 ? 4 : 0;
-  const sourceUrl = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${safeStrong}&n1grow=${growParam}&spid=${spid}`;
-  const abilityUrl = "https://fconline.nexon.com/datacenter/PlayerAbility";
+async function fetchOfficialPlayerInfo(sourceUrl: string) {
+  const response = await fetch(sourceUrl, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+      "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+    },
+    cache: "no-store",
+  });
 
+  return response.ok ? response.text() : "";
+}
+
+async function fetchOfficialPlayerAbility(
+  spid: number,
+  safeStrong: number,
+  growParam: number,
+  sourceUrl: string
+) {
   const body = new URLSearchParams({
     spid: String(spid),
     n1Strong: String(safeStrong),
@@ -205,11 +216,12 @@ export async function getPlayerStats(
     n4TeamColorLv: "0",
     n1Change: "0",
     strPlayerImg: `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`,
-    rd: "0",
+    rd: `${safeStrong}-${growParam}`,
   });
 
-  try {
-    const response = await fetch(abilityUrl, {
+  const response = await fetch(
+    "https://fconline.nexon.com/datacenter/PlayerAbility",
+    {
       method: "POST",
       headers: {
         "User-Agent":
@@ -220,26 +232,52 @@ export async function getPlayerStats(
         Origin: "https://fconline.nexon.com",
       },
       body,
-      next: {
-        revalidate: 3600,
-      },
-    });
-
-    if (!response.ok) {
-      return null;
+      cache: "no-store",
     }
+  );
 
-    const html = await response.text();
-    const abilities = parseAbilities(html);
+  return response.ok ? response.text() : "";
+}
 
+export async function getPlayerStats(
+  spid: number,
+  strong: number,
+  grow: number = 1
+): Promise<PlayerStatsData | null> {
+  const safeStrong = Math.min(13, Math.max(1, Math.trunc(strong)));
+  const safeGrow: 1 | 5 = grow === 5 ? 5 : 1;
+  const growParam = safeGrow === 5 ? 4 : 0;
+
+  const sourceUrl = new URL(
+    "https://fconline.nexon.com/DataCenter/PlayerInfo"
+  );
+  sourceUrl.searchParams.set("n1Strong", String(safeStrong));
+  sourceUrl.searchParams.set("n1grow", String(growParam));
+  sourceUrl.searchParams.set("spid", String(spid));
+
+  try {
+    // 1순위: 사용자가 공식 데이터센터에서 보는 PlayerInfo 자체를 파싱한다.
+    // 이 값이 화면의 강화/적응도 선택과 가장 직접적으로 일치한다.
+    const pageHtml = await fetchOfficialPlayerInfo(sourceUrl.toString());
+    let abilities = parseAbilities(pageHtml);
+
+    // PlayerInfo가 봇 차단/부분 응답을 주는 경우에만 동일한 공식 PlayerAbility로 폴백한다.
     if (abilities.length < 20) {
-      return null;
+      const abilityHtml = await fetchOfficialPlayerAbility(
+        spid,
+        safeStrong,
+        growParam,
+        sourceUrl.toString()
+      );
+      abilities = parseAbilities(abilityHtml);
     }
+
+    if (abilities.length < 20) return null;
 
     return {
       strong: safeStrong,
       grow: safeGrow,
-      sourceUrl,
+      sourceUrl: sourceUrl.toString(),
       summary: {
         speed: null,
         shooting: null,
@@ -251,7 +289,7 @@ export async function getPlayerStats(
       abilities,
     };
   } catch (error) {
-    console.error("FC Online PlayerAbility fetch failed", error);
+    console.error("FC Online player stat fetch failed", error);
     return null;
   }
 }

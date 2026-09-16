@@ -243,7 +243,7 @@ export default function SquadPlayerCard({
         <span className={`text-[8px] font-black leading-none sm:text-sm ${getPositionTone(slotPosition)}`}>
           {slotPosition}
         </span>
-        <span className="mt-0.5 text-[14px] font-black leading-none text-white sm:text-[24px]">
+        <span className="mt-0.5 text-[14px] font-black leading-none text-white sm:text-[21px]">
           {enhancedOvr ?? "-"}
         </span>
       </div>

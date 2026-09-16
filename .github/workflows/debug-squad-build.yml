@@ -1,0 +1,28 @@
+name: Debug squad deployment build
+
+on:
+  push:
+    paths:
+      - .github/workflows/debug-squad-build.yml
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create temporary VAPID build env
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const webpush = require('web-push');
+          const keys = webpush.generateVAPIDKeys();
+          fs.appendFileSync(process.env.GITHUB_ENV, `VAPID_SUBJECT=mailto:build@example.com\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `NEXT_PUBLIC_VAPID_PUBLIC_KEY=${keys.publicKey}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `VAPID_PRIVATE_KEY=${keys.privateKey}\n`);
+          NODE
+      - run: npm run build

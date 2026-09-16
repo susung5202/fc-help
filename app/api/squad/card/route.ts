@@ -40,7 +40,23 @@ const ALL_POSITIONS = [
   "RS",
   "ST",
   "LS",
+  "LW",
 ] as const;
+
+const OFFICIAL_POSITION_ALIASES: Record<string, string> = {
+  LS: "ST",
+  RS: "ST",
+  LF: "CF",
+  RF: "CF",
+  LAM: "CAM",
+  RAM: "CAM",
+  LCM: "CM",
+  RCM: "CM",
+  LDM: "CDM",
+  RDM: "CDM",
+  LCB: "CB",
+  RCB: "CB",
+};
 
 export const maxDuration = 30;
 
@@ -109,18 +125,20 @@ function parseMobilePositionOvr(html: string, position: string): number | null {
   if (!ALL_POSITIONS.includes(position as (typeof ALL_POSITIONS)[number])) return null;
 
   const text = htmlToText(html);
+  const enhancementMarker = text.indexOf("강화");
+  const header = enhancementMarker >= 0 ? text.slice(0, enhancementMarker) : text;
   const escaped = escapeRegExp(position);
-  const positionFirst = text.match(
+  const positionFirst = header.match(
     new RegExp(`(?:^|\\s)${escaped}\\s+(\\d{2,3})(?=\\s|$)`)
   );
-  if (positionFirst) return Number(positionFirst[1]);
-
-  const valueFirst = text.match(
+  const valueFirst = header.match(
     new RegExp(`(?:^|\\s)(\\d{2,3})\\s+${escaped}(?=\\s|$)`)
   );
-  if (valueFirst) return Number(valueFirst[1]);
+  const match = positionFirst ?? valueFirst;
+  if (!match) return null;
 
-  return null;
+  const ovr = Number(match[1]);
+  return Number.isFinite(ovr) && ovr >= 40 && ovr <= 200 ? ovr : null;
 }
 
 function normalizeAssetUrl(src: string) {
@@ -183,14 +201,18 @@ export async function GET(request: Request) {
   try {
     const mobileHtml = await fetchMobilePlayerHtml(spid);
     const text = htmlToText(mobileHtml);
-    const normalizedPosition = normalizeSquadPosition(position);
+    const fallbackPosition = normalizeSquadPosition(position);
+    const officialAlias = OFFICIAL_POSITION_ALIASES[position];
+    const officialPositionOvr =
+      parseMobilePositionOvr(mobileHtml, position) ??
+      (officialAlias ? parseMobilePositionOvr(mobileHtml, officialAlias) : null);
 
     const data: CardData = {
       salary: parseSalary(mobileHtml, playerName),
       prices: parsePrices(mobileHtml),
       positionOvr:
-        parseMobilePositionOvr(mobileHtml, normalizedPosition) ??
-        calculatePositionOvrFromText(text, normalizedPosition),
+        officialPositionOvr ??
+        calculatePositionOvrFromText(text, fallbackPosition),
       traitIcons: parseTraitIcons(mobileHtml),
     };
 

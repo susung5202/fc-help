@@ -247,9 +247,10 @@ export default function SquadPlayerCard({
 
       <div className="absolute right-0 top-0 z-30 flex flex-col items-end gap-1">
         <span
-          className={`rounded-sm border px-1.5 py-1 text-[9px] font-black leading-none sm:text-[11px] ${getEnhancementBadgeTone(grade)}`}
+          className={`flex h-6 w-6 items-center justify-center rounded-[2px] border-2 p-0 text-[11px] font-black leading-none sm:h-8 sm:w-8 sm:text-[14px] ${getEnhancementBadgeTone(grade)}`}
+          title={`${grade}강`}
         >
-          +{grade}
+          {grade}
         </span>
         <SalaryHex salary={details?.salary} />
       </div>

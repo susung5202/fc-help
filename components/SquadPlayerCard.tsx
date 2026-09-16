@@ -63,8 +63,12 @@ function formatBp(value: string | null | undefined) {
   const digits = normalizeDigits(value);
   if (!digits) return "시세 -";
 
-  if (digits.length <= 8) {
+  if (digits.length <= 4) {
     return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  if (digits.length <= 8) {
+    return `${Math.floor(Number(digits) / 10_000).toLocaleString("ko-KR")}만`;
   }
 
   const labels = ["", "만", "억", "조", "경", "해"];

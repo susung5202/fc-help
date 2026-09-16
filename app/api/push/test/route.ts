@@ -44,6 +44,7 @@ export async function POST(request: Request) {
         title,
         body: message,
         url,
+        playSound: body.playSound !== false,
       })
     );
 

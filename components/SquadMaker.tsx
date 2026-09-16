@@ -7,7 +7,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import PlayerArtwork from "@/components/PlayerArtwork";
+import SquadPlayerCard from "@/components/SquadPlayerCard";
 import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 
 type SearchPlayer = {
@@ -621,13 +621,15 @@ export default function SquadMaker() {
               );
             })}
 
-            {formation.slots.map((slot) => (
-              <PositionBadge
-                key={`badge-${slot.slotId}`}
-                slot={slot}
-                active={draggingSlotId !== null && slot.slotId === dropTargetSlotId}
-              />
-            ))}
+            {formation.slots.map((slot) =>
+              players[slot.slotId] ? null : (
+                <PositionBadge
+                  key={`badge-${slot.slotId}`}
+                  slot={slot}
+                  active={draggingSlotId !== null && slot.slotId === dropTargetSlotId}
+                />
+              )
+            )}
           </div>
         </div>
 
@@ -742,8 +744,6 @@ function SquadSlotButton({
   onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 }) {
-  const traitCount = player?.newTraits?.length ?? 0;
-
   return (
     <button
       type="button"
@@ -770,47 +770,19 @@ function SquadSlotButton({
       aria-label={player ? `${player.name} 위치 이동 또는 선택` : `${slot.label} 선수 선택`}
     >
       {player ? (
-        <div className="relative w-[68px] sm:w-[88px]">
-          <div
-            className={`relative h-[70px] overflow-hidden rounded-xl border bg-black/10 drop-shadow-xl transition sm:h-[88px] ${
-              dragging
-                ? "border-lime-300/70"
-                : dropTarget
-                  ? "border-lime-300 ring-2 ring-lime-300/35"
-                  : "border-transparent"
-            }`}
-          >
-            {player.seasonImg && (
-              <img
-                src={player.seasonImg}
-                alt={player.seasonName}
-                className="absolute left-1 top-1 z-20 h-4 max-w-7 object-contain sm:h-5 sm:max-w-8"
-              />
-            )}
-            <span
-              className={`absolute right-1 top-1 z-20 rounded border px-1 py-0.5 text-[9px] font-black ${getEnhancementBadgeTone(player.grade)}`}
-            >
-              +{player.grade}
-            </span>
-            <PlayerArtwork
-              key={player.id}
-              spid={player.id}
-              alt={player.name}
-              className="absolute bottom-0 left-1/2 max-h-[70px] max-w-[130%] -translate-x-1/2 object-contain sm:max-h-[88px]"
-            />
-          </div>
-          <div className="-mt-0.5 rounded-md bg-black/75 px-1 py-1 text-center shadow-lg backdrop-blur">
-            <p className="truncate text-[9px] font-black text-white sm:text-[11px]">{player.name}</p>
-            <p className="mt-0.5 text-[8px] font-black text-lime-300 sm:text-[9px]">
-              OVR {player.ovr ?? "-"}
-            </p>
-            {traitCount > 0 && (
-              <p className="mt-0.5 truncate text-[7px] font-bold text-cyan-200 sm:text-[8px]">
-                신규특성 {traitCount}
-              </p>
-            )}
-          </div>
-        </div>
+        <SquadPlayerCard
+          spid={player.id}
+          name={player.name}
+          seasonName={player.seasonName}
+          seasonImg={player.seasonImg}
+          primaryPosition={player.position}
+          baseOvr={player.ovr}
+          slotPosition={slot.label}
+          grade={player.grade}
+          newTraits={player.newTraits ?? []}
+          dragging={dragging}
+          dropTarget={dropTarget}
+        />
       ) : (
         <span
           className="block h-[clamp(48px,10%,76px)] w-[clamp(48px,15%,86px)]"

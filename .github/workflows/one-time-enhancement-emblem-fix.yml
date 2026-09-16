@@ -1,0 +1,57 @@
+name: One-time enhancement emblem fix
+
+on:
+  push:
+    paths:
+      - .github/workflows/one-time-enhancement-emblem-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Patch enhancement emblem mapping
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/api/squad/team-color/route.ts')
+          s = p.read_text(encoding='utf-8')
+
+          marker = 'const ENHANCEMENT_RULES = ['
+          insert = '''const ENHANCEMENT_EMBLEM_MAP = {\n  "금빛 물결": { id: 10001, emblemUrl: "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/teamcolor/tc_u_g.png" },\n  "은빛 물결": { id: 10002, emblemUrl: "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/teamcolor/tc_u_s.png" },\n  "동빛 물결": { id: 10003, emblemUrl: "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/teamcolor/tc_u_b.png" },\n  "백금빛 물결": { id: 10004, emblemUrl: "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/teamcolor/tc_u_p.png" },\n} as const;\n\nfunction getOfficialEnhancementEmblem(name: string) {\n  const waveName = Object.keys(ENHANCEMENT_EMBLEM_MAP).find((key) => name.includes(key));\n  return waveName ? ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] : null;\n}\n\n'''
+          if 'const ENHANCEMENT_EMBLEM_MAP' not in s:
+              if marker not in s:
+                  raise SystemExit('enhancement rules marker not found')
+              s = s.replace(marker, insert + marker, 1)
+
+          old = '''    const enhancementInfo = enhancementOption ? await fetchTeamInfo(enhancementOption) : null;'''
+          new = '''    const enhancementInfo = enhancementOption ? await fetchTeamInfo(enhancementOption) : null;\n    const officialEnhancementEmblem = enhancement ? getOfficialEnhancementEmblem(enhancement.name) : null;'''
+          if old not in s:
+              raise SystemExit('enhancement info marker not found')
+          s = s.replace(old, new, 1)
+
+          old2 = '''          id: enhancementInfo?.id ?? enhancementOption?.id ?? null,\n          emblemUrl: enhancementInfo?.emblemUrl ?? enhancementOption?.emblemUrl ?? null,'''
+          new2 = '''          id: officialEnhancementEmblem?.id ?? enhancementInfo?.id ?? enhancementOption?.id ?? null,\n          emblemUrl:\n            officialEnhancementEmblem?.emblemUrl ??\n            enhancementInfo?.emblemUrl ??\n            enhancementOption?.emblemUrl ??\n            null,'''
+          if old2 not in s:
+              raise SystemExit('enhancement output marker not found')
+          s = s.replace(old2, new2, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Lint route
+        run: npx eslint app/api/squad/team-color/route.ts
+      - name: Commit fix and cleanup
+        run: |
+          rm .github/workflows/one-time-enhancement-emblem-fix.yml
+          git config user.name "susung5202"
+          git config user.email "74191151+susung5202@users.noreply.github.com"
+          git add app/api/squad/team-color/route.ts .github/workflows/one-time-enhancement-emblem-fix.yml
+          git commit -m "fix: use official enhancement team color emblems"
+          git push

@@ -1,0 +1,43 @@
+name: Inspect official enhancement assets
+
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-official-enhancement-assets.yml
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect FC Online player page and CSS
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=8&spid=840001625'
+          curl -L -A 'Mozilla/5.0' -sS "$URL" -o /tmp/page.html
+          echo '=== HTML around enhancement/strong ==='
+          grep -Ein -C 3 'strong|enhance|강화|n1Strong' /tmp/page.html | head -n 300 || true
+          echo '=== Stylesheet URLs ==='
+          python3 - <<'PY'
+          import re, urllib.parse
+          html=open('/tmp/page.html',encoding='utf-8',errors='ignore').read()
+          base='https://fconline.nexon.com'
+          urls=[]
+          for href in re.findall(r'<link[^>]+href=["\']([^"\']+\.css[^"\']*)',html,re.I):
+              u=urllib.parse.urljoin(base,href)
+              if u not in urls: urls.append(u)
+          print('\n'.join(urls))
+          open('/tmp/cssurls.txt','w').write('\n'.join(urls))
+          PY
+          : > /tmp/all.css
+          while IFS= read -r css; do
+            [ -z "$css" ] && continue
+            echo "FETCH $css"
+            curl -L -A 'Mozilla/5.0' -sS "$css" >> /tmp/all.css || true
+            printf '\n' >> /tmp/all.css
+          done < /tmp/cssurls.txt
+          echo '=== CSS matches ==='
+          grep -Eio '.{0,160}(strong|enhance|upgrade|grade|reinforce|player[^,{ ]*card|card[^,{ ]*strong).{0,260}' /tmp/all.css | head -n 400 || true
+          echo '=== Candidate image URLs ==='
+          grep -Eo 'url\([^)]*\)' /tmp/all.css | grep -Ei 'strong|enhance|upgrade|grade|reinforce|card|player' | head -n 300 || true

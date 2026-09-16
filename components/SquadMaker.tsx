@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import PlayerArtwork from "@/components/PlayerArtwork";
 import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 
@@ -11,6 +17,7 @@ type SearchPlayer = {
   seasonImg: string | null;
   ovr: number | null;
   position: string | null;
+  newTraits: string[];
 };
 
 type SquadPlayer = SearchPlayer & {
@@ -27,6 +34,21 @@ type Slot = {
 type Formation = {
   name: string;
   slots: Slot[];
+};
+
+type CustomPosition = {
+  x: number;
+  y: number;
+};
+
+type PositionsByFormation = Record<string, Record<string, CustomPosition>>;
+
+type DragState = {
+  slotId: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
 };
 
 const FORMATIONS: Record<string, Formation> = {
@@ -130,9 +152,21 @@ const FORMATIONS: Record<string, Formation> = {
 
 const STORAGE_KEY = "fc-help-squad-v1";
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function withTraitDefaults(player: SquadPlayer): SquadPlayer {
+  return {
+    ...player,
+    newTraits: Array.isArray(player.newTraits) ? player.newTraits : [],
+  };
+}
+
 export default function SquadMaker() {
   const [formationKey, setFormationKey] = useState("4-2-3-1");
   const [players, setPlayers] = useState<Record<string, SquadPlayer>>({});
+  const [positionsByFormation, setPositionsByFormation] = useState<PositionsByFormation>({});
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchPlayer[]>([]);
@@ -140,10 +174,16 @@ export default function SquadMaker() {
   const [error, setError] = useState("");
   const [grade, setGrade] = useState(1);
   const [hydrated, setHydrated] = useState(false);
+  const [draggingSlotId, setDraggingSlotId] = useState<string | null>(null);
+
+  const pitchRef = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const skipClickRef = useRef<string | null>(null);
 
   const formation = FORMATIONS[formationKey] ?? FORMATIONS["4-2-3-1"];
   const selectedSlot = formation.slots.find((slot) => slot.slotId === selectedSlotId) ?? null;
   const selectedPlayer = selectedSlotId ? players[selectedSlotId] ?? null : null;
+  const currentPositions = positionsByFormation[formationKey] ?? {};
 
   useEffect(() => {
     try {
@@ -152,11 +192,27 @@ export default function SquadMaker() {
         const saved = JSON.parse(raw) as {
           formationKey?: string;
           players?: Record<string, SquadPlayer>;
+          positionsByFormation?: PositionsByFormation;
         };
+
         if (saved.formationKey && FORMATIONS[saved.formationKey]) {
           setFormationKey(saved.formationKey);
         }
-        if (saved.players) setPlayers(saved.players);
+
+        if (saved.players) {
+          setPlayers(
+            Object.fromEntries(
+              Object.entries(saved.players).map(([slotId, player]) => [
+                slotId,
+                withTraitDefaults(player),
+              ])
+            )
+          );
+        }
+
+        if (saved.positionsByFormation) {
+          setPositionsByFormation(saved.positionsByFormation);
+        }
       }
     } catch {
       // 잘못된 로컬 저장값은 무시한다.
@@ -169,9 +225,9 @@ export default function SquadMaker() {
     if (!hydrated) return;
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ formationKey, players })
+      JSON.stringify({ formationKey, players, positionsByFormation })
     );
-  }, [formationKey, players, hydrated]);
+  }, [formationKey, players, positionsByFormation, hydrated]);
 
   useEffect(() => {
     if (!selectedSlotId || query.trim().length < 1) {
@@ -185,16 +241,29 @@ export default function SquadMaker() {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError("");
+
       try {
-        const response = await fetch(`/api/squad/search?q=${encodeURIComponent(query.trim())}`, {
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          `/api/squad/search?q=${encodeURIComponent(query.trim())}`,
+          { signal: controller.signal }
+        );
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "선수 검색 실패");
-        setResults(data.items ?? []);
+
+        const items = (data.items ?? []) as SearchPlayer[];
+        setResults(
+          items.map((player) => ({
+            ...player,
+            newTraits: Array.isArray(player.newTraits) ? player.newTraits : [],
+          }))
+        );
       } catch (requestError) {
         if (controller.signal.aborted) return;
-        setError(requestError instanceof Error ? requestError.message : "선수 검색에 실패했습니다.");
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "선수 검색에 실패했습니다."
+        );
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -206,11 +275,12 @@ export default function SquadMaker() {
     };
   }, [query, selectedSlotId]);
 
-  const selectedPlayers = Object.values(players);
+  const selectedPlayers = Object.values(players) as SquadPlayer[];
   const averageOvr = useMemo(() => {
     const ovrs = selectedPlayers
       .map((player) => player.ovr)
       .filter((value): value is number => value !== null);
+
     if (ovrs.length === 0) return null;
     return Math.round((ovrs.reduce((sum, value) => sum + value, 0) / ovrs.length) * 10) / 10;
   }, [selectedPlayers]);
@@ -233,16 +303,23 @@ export default function SquadMaker() {
 
   function choosePlayer(player: SearchPlayer) {
     if (!selectedSlotId) return;
+
     setPlayers((current) => ({
       ...current,
-      [selectedSlotId]: { ...player, grade },
+      [selectedSlotId]: {
+        ...player,
+        newTraits: player.newTraits ?? [],
+        grade,
+      },
     }));
+
     closePanel();
   }
 
   function updateCurrentGrade(nextGrade: number) {
     setGrade(nextGrade);
     if (!selectedSlotId || !players[selectedSlotId]) return;
+
     setPlayers((current) => ({
       ...current,
       [selectedSlotId]: {
@@ -254,18 +331,104 @@ export default function SquadMaker() {
 
   function removeCurrentPlayer() {
     if (!selectedSlotId) return;
+
     setPlayers((current) => {
       const next = { ...current };
       delete next[selectedSlotId];
       return next;
     });
+
     closePanel();
   }
 
   function clearSquad() {
     if (!window.confirm("현재 스쿼드를 모두 비울까요?")) return;
     setPlayers({});
+    setPositionsByFormation({});
     closePanel();
+  }
+
+  function resetCurrentPositions() {
+    setPositionsByFormation((current) => {
+      const next = { ...current };
+      delete next[formationKey];
+      return next;
+    });
+  }
+
+  function handleFormationChange(nextFormation: string) {
+    setFormationKey(nextFormation);
+    closePanel();
+  }
+
+  function getRenderedSlot(slot: Slot): Slot {
+    const custom = currentPositions[slot.slotId];
+    return custom ? { ...slot, ...custom } : slot;
+  }
+
+  function beginDrag(slotId: string, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!players[slotId]) return;
+
+    dragStateRef.current = {
+      slotId,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
+
+    setDraggingSlotId(slotId);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveDrag(slotId: string, event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = dragStateRef.current;
+    if (!drag || drag.slotId !== slotId || drag.pointerId !== event.pointerId) return;
+
+    const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (!drag.moved && distance < 5) return;
+    drag.moved = true;
+
+    const rect = pitchRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
+    const x = clamp(((event.clientX - rect.left) / rect.width) * 100, 8, 92);
+    const y = clamp(((event.clientY - rect.top) / rect.height) * 100, 7, 93);
+
+    setPositionsByFormation((current) => ({
+      ...current,
+      [formationKey]: {
+        ...(current[formationKey] ?? {}),
+        [slotId]: { x, y },
+      },
+    }));
+
+    event.preventDefault();
+  }
+
+  function endDrag(slotId: string, event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = dragStateRef.current;
+    if (!drag || drag.slotId !== slotId || drag.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (drag.moved) {
+      skipClickRef.current = slotId;
+    }
+
+    dragStateRef.current = null;
+    setDraggingSlotId(null);
+  }
+
+  function handleSlotClick(slotId: string) {
+    if (skipClickRef.current === slotId) {
+      skipClickRef.current = null;
+      return;
+    }
+
+    openSlot(slotId);
   }
 
   const panel = selectedSlot ? (
@@ -289,6 +452,7 @@ export default function SquadMaker() {
       <h2 className="mt-2 text-xl font-bold">포지션을 선택하세요</h2>
       <p className="mt-3 text-sm leading-6 text-gray-500">
         경기장 위 포지션을 누르면 선수를 검색하고 시즌과 강화 단계를 선택할 수 있습니다.
+        배치한 선수는 마우스나 터치로 끌어서 위치를 자유롭게 조정할 수 있습니다.
       </p>
     </div>
   );
@@ -301,7 +465,7 @@ export default function SquadMaker() {
             <span className="text-xs font-semibold text-gray-500">포메이션</span>
             <select
               value={formationKey}
-              onChange={(event) => setFormationKey(event.target.value)}
+              onChange={(event) => handleFormationChange(event.target.value)}
               className="bg-transparent text-sm font-bold text-white outline-none"
             >
               {Object.keys(FORMATIONS).map((key) => (
@@ -316,8 +480,15 @@ export default function SquadMaker() {
           <SummaryBadge label="평균 OVR" value={averageOvr === null ? "-" : String(averageOvr)} />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <span className="text-xs text-gray-600">이 기기에 자동 저장</span>
+          <button
+            type="button"
+            onClick={resetCurrentPositions}
+            className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-bold text-gray-300 transition hover:bg-white/5"
+          >
+            위치 초기화
+          </button>
           <button
             type="button"
             onClick={clearSquad}
@@ -328,20 +499,40 @@ export default function SquadMaker() {
         </div>
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
+          배치한 선수 드래그 → 자유 위치 조정
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
+          선수 카드 클릭 → 선수/강화 변경
+        </span>
+      </div>
+
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_410px]">
         <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#101b14] p-3 sm:p-5">
-          <div className="relative mx-auto aspect-[0.78] w-full max-w-[760px] overflow-hidden rounded-2xl border-2 border-white/20 bg-[linear-gradient(180deg,#1c6b3a_0%,#185f34_50%,#14532d_100%)] shadow-inner shadow-black/30">
+          <div
+            ref={pitchRef}
+            className="relative mx-auto aspect-[0.78] w-full max-w-[760px] overflow-hidden rounded-2xl border-2 border-white/20 bg-[linear-gradient(180deg,#1c6b3a_0%,#185f34_50%,#14532d_100%)] shadow-inner shadow-black/30"
+          >
             <PitchLines />
 
-            {formation.slots.map((slot) => (
-              <SquadSlotButton
-                key={slot.slotId}
-                slot={slot}
-                player={players[slot.slotId]}
-                active={slot.slotId === selectedSlotId}
-                onClick={() => openSlot(slot.slotId)}
-              />
-            ))}
+            {formation.slots.map((slot) => {
+              const renderedSlot = getRenderedSlot(slot);
+              return (
+                <SquadSlotButton
+                  key={slot.slotId}
+                  slot={renderedSlot}
+                  player={players[slot.slotId]}
+                  active={slot.slotId === selectedSlotId}
+                  dragging={slot.slotId === draggingSlotId}
+                  onClick={() => handleSlotClick(slot.slotId)}
+                  onPointerDown={(event) => beginDrag(slot.slotId, event)}
+                  onPointerMove={(event) => moveDrag(slot.slotId, event)}
+                  onPointerUp={(event) => endDrag(slot.slotId, event)}
+                  onPointerCancel={(event) => endDrag(slot.slotId, event)}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -385,23 +576,48 @@ function SquadSlotButton({
   slot,
   player,
   active,
+  dragging,
   onClick,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
 }: {
   slot: Slot;
   player?: SquadPlayer;
   active: boolean;
+  dragging: boolean;
   onClick: () => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 }) {
+  const traitCount = player?.newTraits?.length ?? 0;
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition ${active ? "scale-105" : "hover:scale-105"}`}
-      style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      className={`group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center select-none ${
+        dragging ? "z-30 scale-105 cursor-grabbing" : active ? "scale-105" : "hover:scale-105"
+      } ${player ? "cursor-grab" : "cursor-pointer"}`}
+      style={{
+        left: `${slot.x}%`,
+        top: `${slot.y}%`,
+        touchAction: player ? "none" : "auto",
+      }}
+      aria-label={player ? `${player.name} 위치 이동 또는 선택` : `${slot.label} 선수 선택`}
     >
       {player ? (
         <div className="relative w-[74px] sm:w-[92px]">
-          <div className="relative h-[78px] overflow-hidden rounded-2xl border border-white/20 bg-black/35 shadow-xl sm:h-[96px]">
+          <div className={`relative h-[78px] overflow-hidden rounded-2xl border bg-black/35 shadow-xl sm:h-[96px] ${
+            dragging ? "border-lime-300/70" : "border-white/20"
+          }`}>
             {player.seasonImg && (
               <img
                 src={player.seasonImg}
@@ -426,6 +642,11 @@ function SquadSlotButton({
             <p className="mt-0.5 text-[9px] font-bold text-lime-300 sm:text-[10px]">
               {slot.label} · OVR {player.ovr ?? "-"}
             </p>
+            {traitCount > 0 && (
+              <p className="mt-0.5 truncate text-[8px] font-bold text-cyan-200 sm:text-[9px]">
+                신규특성 {traitCount}
+              </p>
+            )}
           </div>
         </div>
       ) : (
@@ -439,6 +660,25 @@ function SquadSlotButton({
         </>
       )}
     </button>
+  );
+}
+
+function TraitChips({ traits, compactMode = false }: { traits: string[]; compactMode?: boolean }) {
+  if (traits.length === 0) return null;
+
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${compactMode ? "mt-1.5" : "mt-3"}`}>
+      {traits.map((trait) => (
+        <span
+          key={trait}
+          className={`rounded-md border border-cyan-400/25 bg-cyan-400/10 font-bold text-cyan-200 ${
+            compactMode ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[11px]"
+          }`}
+        >
+          {trait}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -486,24 +726,49 @@ function PlayerPickerPanel({
       </div>
 
       {currentPlayer && (
-        <div className="mt-5 flex items-center gap-3 rounded-2xl border border-lime-400/20 bg-lime-400/5 p-3">
-          {currentPlayer.seasonImg && (
-            <img src={currentPlayer.seasonImg} alt={currentPlayer.seasonName} className="h-8 w-10 object-contain" />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-bold">{currentPlayer.name}</p>
-            <p className="text-xs text-gray-500">{currentPlayer.seasonName} · OVR {currentPlayer.ovr ?? "-"}</p>
+        <div className="mt-5 rounded-2xl border border-lime-400/20 bg-lime-400/5 p-3">
+          <div className="flex items-center gap-3">
+            {currentPlayer.seasonImg && (
+              <img
+                src={currentPlayer.seasonImg}
+                alt={currentPlayer.seasonName}
+                className="h-8 w-10 object-contain"
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-bold">{currentPlayer.name}</p>
+              <p className="text-xs text-gray-500">
+                {currentPlayer.seasonName} · OVR {currentPlayer.ovr ?? "-"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="text-xs font-bold text-red-300 hover:text-red-200"
+            >
+              제거
+            </button>
           </div>
-          <button type="button" onClick={onRemove} className="text-xs font-bold text-red-300 hover:text-red-200">
-            제거
-          </button>
+
+          {(currentPlayer.newTraits?.length ?? 0) > 0 ? (
+            <div className="mt-3 border-t border-white/[0.07] pt-3">
+              <p className="text-[11px] font-bold text-cyan-200">고유 신규 특성</p>
+              <TraitChips traits={currentPlayer.newTraits ?? []} />
+            </div>
+          ) : (
+            <p className="mt-3 border-t border-white/[0.07] pt-3 text-[11px] text-gray-600">
+              확인된 고유 신규 특성 없음
+            </p>
+          )}
         </div>
       )}
 
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-bold">강화 단계</p>
-          <span className={`rounded-md border px-2 py-1 text-xs font-black ${getEnhancementBadgeTone(grade)}`}>+{grade}</span>
+          <span className={`rounded-md border px-2 py-1 text-xs font-black ${getEnhancementBadgeTone(grade)}`}>
+            +{grade}
+          </span>
         </div>
         <div className="grid grid-cols-7 gap-1.5">
           {Array.from({ length: 13 }, (_, index) => index + 1).map((level) => (
@@ -511,7 +776,9 @@ function PlayerPickerPanel({
               key={level}
               type="button"
               onClick={() => onGradeChange(level)}
-              className={`rounded-lg border py-2 text-xs font-black transition ${getEnhancementBadgeTone(level)} ${grade === level ? "ring-2 ring-white/60 opacity-100" : "opacity-65 hover:opacity-100"}`}
+              className={`rounded-lg border py-2 text-xs font-black transition ${getEnhancementBadgeTone(level)} ${
+                grade === level ? "ring-2 ring-white/60 opacity-100" : "opacity-65 hover:opacity-100"
+              }`}
             >
               +{level}
             </button>
@@ -527,39 +794,54 @@ function PlayerPickerPanel({
           autoFocus
           className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-lime-400/50"
         />
-        <p className="mt-2 text-[11px] text-gray-600">검색 결과는 기본 OVR 높은 순으로 표시됩니다.</p>
+        <p className="mt-2 text-[11px] text-gray-600">
+          검색 결과는 기본 OVR 높은 순이며, 시즌별 고유 신규 특성도 함께 표시됩니다.
+        </p>
       </div>
 
       <div className="mt-4 max-h-[48vh] space-y-2 overflow-y-auto pr-1 xl:max-h-[580px]">
-        {loading && <p className="py-8 text-center text-sm text-gray-500">선수 정보를 불러오는 중...</p>}
-        {!loading && error && <p className="rounded-xl bg-red-400/5 p-4 text-sm text-red-300">{error}</p>}
+        {loading && (
+          <p className="py-8 text-center text-sm text-gray-500">선수 정보를 불러오는 중...</p>
+        )}
+        {!loading && error && (
+          <p className="rounded-xl bg-red-400/5 p-4 text-sm text-red-300">{error}</p>
+        )}
         {!loading && !error && query.trim() && results.length === 0 && (
           <p className="py-8 text-center text-sm text-gray-500">검색 결과가 없습니다.</p>
         )}
-        {!loading && !error && results.map((player) => (
-          <button
-            key={player.id}
-            type="button"
-            onClick={() => onChoose(player)}
-            className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-black/10 p-3 text-left transition hover:border-lime-400/30 hover:bg-lime-400/[0.04]"
-          >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/[0.04]">
-              {player.seasonImg ? (
-                <img src={player.seasonImg} alt={player.seasonName} className="max-h-9 max-w-10 object-contain" />
-              ) : (
-                <span className="text-xs text-gray-700">-</span>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black">{player.name}</p>
-              <p className="mt-1 truncate text-xs text-gray-500">{player.seasonName}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-black text-lime-300">{player.ovr ?? "-"}</p>
-              <p className="text-[10px] font-bold text-gray-500">{player.position ?? "OVR"}</p>
-            </div>
-          </button>
-        ))}
+        {!loading &&
+          !error &&
+          results.map((player) => (
+            <button
+              key={player.id}
+              type="button"
+              onClick={() => onChoose(player)}
+              className="flex w-full items-start gap-3 rounded-xl border border-white/[0.08] bg-black/10 p-3 text-left transition hover:border-lime-400/30 hover:bg-lime-400/[0.04]"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/[0.04]">
+                {player.seasonImg ? (
+                  <img
+                    src={player.seasonImg}
+                    alt={player.seasonName}
+                    className="max-h-9 max-w-10 object-contain"
+                  />
+                ) : (
+                  <span className="text-xs text-gray-700">-</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-black">{player.name}</p>
+                <p className="mt-1 truncate text-xs text-gray-500">{player.seasonName}</p>
+                {(player.newTraits?.length ?? 0) > 0 && (
+                  <TraitChips traits={player.newTraits ?? []} compactMode />
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-lg font-black text-lime-300">{player.ovr ?? "-"}</p>
+                <p className="text-[10px] font-bold text-gray-500">{player.position ?? "OVR"}</p>
+              </div>
+            </button>
+          ))}
       </div>
     </div>
   );

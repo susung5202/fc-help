@@ -26,54 +26,51 @@ jobs:
 
           path = Path("components/SquadMaker.tsx")
           source = path.read_text(encoding="utf-8")
+          lines = source.splitlines()
 
-          old = '''        if (target) {
-          const targetPosition = getSlotPosition(target);
-          setPositionsByFormation((current) => ({
-            ...current,
-            [formationKey]: {
-              ...(current[formationKey] ?? {}),
-              [slotId]: targetPosition,
-              [target.slotId]: drag.originPosition,
-            },
-          }));
-        }'''
+          start = next((i for i, line in enumerate(lines) if line == "        if (target) {"), None)
+          if start is None:
+              raise SystemExit("Target swap block start not found")
 
-          new = '''        if (target) {
-          // 슬롯의 포지션/라벨은 고정하고, 슬롯 안의 선수만 서로 교환한다.
-          // 빈 슬롯으로 옮긴 경우 기존 슬롯은 원래 포지션의 빈칸으로 남는다.
-          setPositionsByFormation((current) => ({
-            ...current,
-            [formationKey]: {
-              ...(current[formationKey] ?? {}),
-              [slotId]: drag.originPosition,
-            },
-          }));
+          end = next((i for i in range(start + 1, len(lines)) if lines[i] == "        }"), None)
+          if end is None:
+              raise SystemExit("Target swap block end not found")
 
-          setPlayers((current) => {
-            const movingPlayer = current[slotId];
-            if (!movingPlayer) return current;
+          replacement = [
+              "        if (target) {",
+              "          // 포지션 슬롯의 라벨/좌표는 유지하고 선수만 슬롯 사이에서 교환한다.",
+              "          // 빈 슬롯으로 이동하면 출발 슬롯은 원래 포지션의 빈칸으로 남는다.",
+              "          setPositionsByFormation((current) => ({",
+              "            ...current,",
+              "            [formationKey]: {",
+              "              ...(current[formationKey] ?? {}),",
+              "              [slotId]: drag.originPosition,",
+              "            },",
+              "          }));",
+              "",
+              "          setPlayers((current) => {",
+              "            const movingPlayer = current[slotId];",
+              "            if (!movingPlayer) return current;",
+              "",
+              "            const targetPlayer = current[target.slotId];",
+              "            const next = { ...current };",
+              "            next[target.slotId] = movingPlayer;",
+              "",
+              "            if (targetPlayer) {",
+              "              next[slotId] = targetPlayer;",
+              "            } else {",
+              "              delete next[slotId];",
+              "            }",
+              "",
+              "            return next;",
+              "          });",
+              "",
+              "          closePanel();",
+              "        }",
+          ]
 
-            const targetPlayer = current[target.slotId];
-            const next = { ...current };
-            next[target.slotId] = movingPlayer;
-
-            if (targetPlayer) {
-              next[slotId] = targetPlayer;
-            } else {
-              delete next[slotId];
-            }
-
-            return next;
-          });
-
-          closePanel();
-        }'''
-
-          if old not in source:
-              raise SystemExit("Expected squad swap block was not found; refusing to patch.")
-
-          source = source.replace(old, new, 1)
+          lines[start:end + 1] = replacement
+          source = "\n".join(lines) + "\n"
           source = source.replace(
               "다른 선수나 빈 포지션 위에 놓으면 두 위치가 서로 바뀝니다.",
               "다른 선수 위에 놓으면 두 선수가 자리를 바꾸고, 빈 포지션 위에 놓으면 기존 자리는 원래 포지션의 빈칸으로 남습니다.",
@@ -84,7 +81,6 @@ jobs:
               "선수/빈 포지션에 겹쳐 놓기 → 선수 배치 교환",
               1,
           )
-
           path.write_text(source, encoding="utf-8")
           PY
 

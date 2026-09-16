@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - .github/workflows/inspect-teamcolor-ovr.yml
+      - .github/scripts/fix-teamcolor-ovr.py
 permissions:
   contents: write
 jobs:

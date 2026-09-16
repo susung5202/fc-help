@@ -163,6 +163,22 @@ function withTraitDefaults(player: SquadPlayer): SquadPlayer {
   };
 }
 
+function getPositionBadgeTone(label: string) {
+  if (["ST", "CF", "LW", "RW"].includes(label)) {
+    return "border-rose-300/50 bg-rose-500 text-white";
+  }
+
+  if (["GK"].includes(label)) {
+    return "border-amber-200/50 bg-amber-500 text-black";
+  }
+
+  if (["LB", "CB", "RB", "LWB", "RWB"].includes(label)) {
+    return "border-blue-300/50 bg-blue-500 text-white";
+  }
+
+  return "border-emerald-200/50 bg-emerald-500 text-white";
+}
+
 export default function SquadMaker() {
   const [formationKey, setFormationKey] = useState("4-2-3-1");
   const [players, setPlayers] = useState<Record<string, SquadPlayer>>({});
@@ -565,22 +581,23 @@ export default function SquadMaker() {
         </span>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_410px]">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,760px)_410px] xl:justify-center">
         <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#101b14] p-3 sm:p-5">
           <div
             ref={pitchRef}
-            className="relative mx-auto aspect-[0.78] w-full max-w-[760px] overflow-hidden rounded-2xl border-2 border-white/20 bg-[linear-gradient(180deg,#1c6b3a_0%,#185f34_50%,#14532d_100%)] shadow-inner shadow-black/30"
+            className="relative mx-auto aspect-[0.7] w-full max-w-[600px] overflow-hidden rounded-2xl border-2 border-white/25 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner shadow-black/40"
           >
             <PitchLines />
 
-            {draggingSlotId &&
-              formation.slots.map((slot) => (
-                <PositionHitbox
-                  key={`hitbox-${slot.slotId}`}
-                  slot={slot}
-                  active={slot.slotId === dropTargetSlotId}
-                />
-              ))}
+            {formation.slots.map((slot) => (
+              <PositionHitbox
+                key={`hitbox-${slot.slotId}`}
+                slot={slot}
+                dragActive={draggingSlotId !== null}
+                active={draggingSlotId !== null && slot.slotId === dropTargetSlotId}
+                occupied={Boolean(players[slot.slotId])}
+              />
+            ))}
 
             {formation.slots.map((slot) => {
               const renderedSlot =
@@ -603,6 +620,14 @@ export default function SquadMaker() {
                 />
               );
             })}
+
+            {formation.slots.map((slot) => (
+              <PositionBadge
+                key={`badge-${slot.slotId}`}
+                slot={slot}
+                active={draggingSlotId !== null && slot.slotId === dropTargetSlotId}
+              />
+            ))}
           </div>
         </div>
 
@@ -629,45 +654,68 @@ function SummaryBadge({ label, value }: { label: string; value: string }) {
 
 function PitchLines() {
   return (
-    <div className="pointer-events-none absolute inset-5 opacity-70">
+    <div className="pointer-events-none absolute inset-3 opacity-70 sm:inset-5">
       <div className="absolute inset-0 rounded-sm border-2 border-white/45" />
       <div className="absolute left-0 right-0 top-1/2 border-t-2 border-white/45" />
-      <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/45 sm:h-32 sm:w-32" />
+      <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/45 sm:h-28 sm:w-28" />
       <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/60" />
-      <div className="absolute left-1/2 top-0 h-[15%] w-[54%] -translate-x-1/2 border-x-2 border-b-2 border-white/45" />
-      <div className="absolute bottom-0 left-1/2 h-[15%] w-[54%] -translate-x-1/2 border-x-2 border-t-2 border-white/45" />
-      <div className="absolute left-1/2 top-0 h-[6%] w-[25%] -translate-x-1/2 border-x-2 border-b-2 border-white/45" />
-      <div className="absolute bottom-0 left-1/2 h-[6%] w-[25%] -translate-x-1/2 border-x-2 border-t-2 border-white/45" />
+      <div className="absolute left-1/2 top-0 h-[16%] w-[56%] -translate-x-1/2 border-x-2 border-b-2 border-white/45" />
+      <div className="absolute bottom-0 left-1/2 h-[16%] w-[56%] -translate-x-1/2 border-x-2 border-t-2 border-white/45" />
+      <div className="absolute left-1/2 top-0 h-[7%] w-[27%] -translate-x-1/2 border-x-2 border-b-2 border-white/45" />
+      <div className="absolute bottom-0 left-1/2 h-[7%] w-[27%] -translate-x-1/2 border-x-2 border-t-2 border-white/45" />
     </div>
   );
 }
 
-function PositionHitbox({ slot, active }: { slot: Slot; active: boolean }) {
+function PositionHitbox({
+  slot,
+  dragActive,
+  active,
+  occupied,
+}: {
+  slot: Slot;
+  dragActive: boolean;
+  active: boolean;
+  occupied: boolean;
+}) {
   return (
     <div
-      className={`pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-start justify-center rounded-2xl border-2 border-dashed pt-1.5 transition sm:pt-2 ${
+      className={`pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-lg border transition-all duration-150 ${
         active
-          ? "border-lime-300 bg-lime-300/20 shadow-[0_0_30px_rgba(190,242,100,0.25)]"
-          : "border-white/35 bg-black/10"
+          ? "scale-105 border-lime-200 bg-lime-300/25 shadow-[0_0_28px_rgba(190,242,100,0.35)]"
+          : dragActive
+            ? "border-white/45 bg-black/35"
+            : occupied
+              ? "border-white/10 bg-black/10"
+              : "border-white/[0.08] bg-black/35"
       }`}
       style={{
         left: `${slot.x}%`,
         top: `${slot.y}%`,
-        width: "clamp(88px, 24%, 170px)",
-        height: "clamp(72px, 14%, 118px)",
+        width: dragActive ? "clamp(88px, 24%, 170px)" : "clamp(48px, 15%, 86px)",
+        height: dragActive ? "clamp(72px, 14%, 118px)" : "clamp(48px, 10%, 76px)",
       }}
       aria-hidden="true"
     >
-      <span
-        className={`rounded-full border px-2 py-0.5 text-[9px] font-black backdrop-blur sm:text-[10px] ${
-          active
-            ? "border-lime-200/70 bg-lime-300/25 text-lime-50"
-            : "border-white/20 bg-black/35 text-white/65"
-        }`}
-      >
-        {slot.label}
-      </span>
+      {!occupied && <span className="text-lg font-light text-white/90 sm:text-2xl">+</span>}
     </div>
+  );
+}
+
+function PositionBadge({ slot, active }: { slot: Slot; active: boolean }) {
+  return (
+    <span
+      className={`pointer-events-none absolute z-50 -translate-x-1/2 rounded border px-1.5 py-0.5 text-[8px] font-black leading-none shadow-md transition sm:text-[10px] ${getPositionBadgeTone(
+        slot.label
+      )} ${active ? "scale-110 ring-2 ring-lime-100/80" : ""}`}
+      style={{
+        left: `${slot.x}%`,
+        top: `calc(${slot.y}% - clamp(25px, 5%, 38px))`,
+      }}
+      aria-hidden="true"
+    >
+      {slot.label}
+    </span>
   );
 }
 
@@ -704,6 +752,7 @@ function SquadSlotButton({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onDragStart={(event) => event.preventDefault()}
       className={`group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center select-none transition ${
         dragging
           ? "z-40 scale-105 cursor-grabbing opacity-90"
@@ -721,25 +770,25 @@ function SquadSlotButton({
       aria-label={player ? `${player.name} 위치 이동 또는 선택` : `${slot.label} 선수 선택`}
     >
       {player ? (
-        <div className="relative w-[74px] sm:w-[92px]">
+        <div className="relative w-[68px] sm:w-[88px]">
           <div
-            className={`relative h-[78px] overflow-hidden rounded-2xl border bg-black/35 shadow-xl transition sm:h-[96px] ${
+            className={`relative h-[70px] overflow-hidden rounded-xl border bg-black/10 drop-shadow-xl transition sm:h-[88px] ${
               dragging
                 ? "border-lime-300/70"
                 : dropTarget
                   ? "border-lime-300 ring-2 ring-lime-300/35"
-                  : "border-white/20"
+                  : "border-transparent"
             }`}
           >
             {player.seasonImg && (
               <img
                 src={player.seasonImg}
                 alt={player.seasonName}
-                className="absolute left-1.5 top-1.5 z-20 h-5 max-w-8 object-contain sm:h-6 sm:max-w-10"
+                className="absolute left-1 top-1 z-20 h-4 max-w-7 object-contain sm:h-5 sm:max-w-8"
               />
             )}
             <span
-              className={`absolute right-1.5 top-1.5 z-20 rounded-md border px-1.5 py-0.5 text-[10px] font-black ${getEnhancementBadgeTone(player.grade)}`}
+              className={`absolute right-1 top-1 z-20 rounded border px-1 py-0.5 text-[9px] font-black ${getEnhancementBadgeTone(player.grade)}`}
             >
               +{player.grade}
             </span>
@@ -747,42 +796,26 @@ function SquadSlotButton({
               key={player.id}
               spid={player.id}
               alt={player.name}
-              className="absolute bottom-0 left-1/2 max-h-[80px] max-w-[125%] -translate-x-1/2 object-contain sm:max-h-[98px]"
+              className="absolute bottom-0 left-1/2 max-h-[70px] max-w-[130%] -translate-x-1/2 object-contain sm:max-h-[88px]"
             />
           </div>
-          <div className="mt-1 rounded-lg bg-black/75 px-1.5 py-1 shadow-lg backdrop-blur">
-            <p className="truncate text-[10px] font-black text-white sm:text-xs">{player.name}</p>
-            <p className="mt-0.5 text-[9px] font-bold text-lime-300 sm:text-[10px]">
-              {slot.label} · OVR {player.ovr ?? "-"}
+          <div className="-mt-0.5 rounded-md bg-black/75 px-1 py-1 text-center shadow-lg backdrop-blur">
+            <p className="truncate text-[9px] font-black text-white sm:text-[11px]">{player.name}</p>
+            <p className="mt-0.5 text-[8px] font-black text-lime-300 sm:text-[9px]">
+              OVR {player.ovr ?? "-"}
             </p>
             {traitCount > 0 && (
-              <p className="mt-0.5 truncate text-[8px] font-bold text-cyan-200 sm:text-[9px]">
+              <p className="mt-0.5 truncate text-[7px] font-bold text-cyan-200 sm:text-[8px]">
                 신규특성 {traitCount}
               </p>
             )}
           </div>
         </div>
       ) : (
-        <>
-          <div
-            className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed bg-black/25 text-xl font-light shadow-lg transition sm:h-14 sm:w-14 ${
-              dropTarget
-                ? "border-lime-300 bg-lime-300/10 text-lime-100 ring-2 ring-lime-300/35"
-                : "border-white/45 text-white/80"
-            }`}
-          >
-            +
-          </div>
-          <span
-            className={`mt-1 rounded-md px-2 py-0.5 text-[10px] font-black sm:text-xs ${
-              dropTarget
-                ? "bg-lime-300/15 text-lime-100 ring-1 ring-lime-300/30"
-                : "bg-black/55 text-white"
-            }`}
-          >
-            {slot.label}
-          </span>
-        </>
+        <span
+          className="block h-[clamp(48px,10%,76px)] w-[clamp(48px,15%,86px)]"
+          aria-hidden="true"
+        />
       )}
     </button>
   );

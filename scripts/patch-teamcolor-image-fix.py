@@ -3,8 +3,10 @@ import re
 
 maker_path = Path('components/SquadMaker.tsx')
 card_path = Path('components/SquadPlayerCard.tsx')
+api_path = Path('app/api/squad/team-color/route.ts')
 maker = maker_path.read_text(encoding='utf-8')
 card = card_path.read_text(encoding='utf-8')
+api = api_path.read_text(encoding='utf-8')
 
 old_types = '''type TeamColorSummary = {
   name: string;
@@ -23,7 +25,7 @@ type TeamColorState = {
   appliedBySlot: Record<string, string | null>;
   loading: boolean;
 };'''
-new_types = '''type TeamColorCategory = "affiliation" | "enhancement" | "trait";
+new_types = '''type TeamColorCategory = "affiliation" | "enhancement" | "relationship";
 
 type TeamColorSummary = {
   name: string;
@@ -42,7 +44,7 @@ type TeamColorState = {
   ovrBySlot: Record<string, number | null>;
   appliedBySlot: Record<
     string,
-    { affiliation: string | null; enhancement: string | null; trait: string | null }
+    { affiliation: string | null; enhancement: string | null; relationship: string | null }
   >;
   loading: boolean;
 };'''
@@ -50,14 +52,12 @@ if old_types not in maker:
     raise SystemExit('team color types block not found')
 maker = maker.replace(old_types, new_types, 1)
 
-# Remove obsolete SVG capture helpers.
 start = maker.find('function inlineComputedStyles(')
 end = maker.find('function withTraitDefaults(', start)
 if start < 0 or end < 0:
     raise SystemExit('capture helpers block not found')
 maker = maker[:start] + maker[end:]
 
-# Add enhancement OVR fallback bonuses near STORAGE_KEY.
 needle = 'const STORAGE_KEY = "fc-help-squad-v1";\nconst SUMMARY_CARD_CACHE = new Map<string, SquadCardDetails>();'
 replacement = '''const STORAGE_KEY = "fc-help-squad-v1";
 const SUMMARY_CARD_CACHE = new Map<string, SquadCardDetails>();
@@ -69,7 +69,6 @@ if needle not in maker:
     raise SystemExit('storage marker not found')
 maker = maker.replace(needle, replacement, 1)
 
-# Fallback average now also reflects enhancement + adaptation 5.
 old_avg = '''        const officialSlotOvr = cardDetails[slotId]?.positionOvr;
         if (officialSlotOvr !== null && officialSlotOvr !== undefined) {
           return officialSlotOvr;
@@ -90,7 +89,6 @@ if old_avg not in maker:
     raise SystemExit('average fallback block not found')
 maker = maker.replace(old_avg, new_avg, 1)
 
-# Replace image saving with html2canvas + iOS share sheet.
 pattern = re.compile(r'  async function saveSquadImage\(\) \{[\s\S]*?\n  \}\n\n  const panel =', re.M)
 match = pattern.search(maker)
 if not match:
@@ -185,7 +183,6 @@ new_save = '''  async function saveSquadImage() {
   const panel ='''
 maker = maker[:match.start()] + new_save + maker[match.end():]
 
-# Replace team-color display with three fixed category boxes.
 start_marker = '            {teamColorState.teamColors.length > 0 && ('
 end_marker = '            {formation.slots.map((slot) => ('
 start = maker.find(start_marker)
@@ -196,7 +193,7 @@ new_ui = '''            <div className="absolute bottom-2 right-2 z-[55] flex ga
               {([
                 ["affiliation", "소속"],
                 ["enhancement", "강화"],
-                ["trait", "특성"],
+                ["relationship", "관계"],
               ] as const).map(([category, label]) => {
                 const colors = teamColorState.teamColors.filter((color) => color.category === category);
                 if (colors.length === 0) {
@@ -269,7 +266,6 @@ new_ui = '''            <div className="absolute bottom-2 right-2 z-[55] flex ga
 '''
 maker = maker[:start] + new_ui + maker[end:]
 
-# Fallback card OVR always includes adaptation 5.
 old_card = '''  const enhancedOvr =
     calculatedOvr !== null && calculatedOvr !== undefined
       ? calculatedOvr
@@ -286,5 +282,30 @@ if old_card not in card:
     raise SystemExit('card OVR block not found')
 card = card.replace(old_card, new_card, 1)
 
+# The official page calls this category 관계 팀컬러. Keep the parser section,
+# but expose it as relationship rather than trait throughout the API contract.
+api = api.replace('type TeamColorCategory = "affiliation" | "enhancement" | "trait";', 'type TeamColorCategory = "affiliation" | "enhancement" | "relationship";')
+api = api.replace('traitOptions', 'relationshipOptions')
+api = api.replace('"affiliation" | "trait"', '"affiliation" | "relationship"')
+api = api.replace('category === "affiliation" ? item.affiliationOptions : item.relationshipOptions', 'category === "affiliation" ? item.affiliationOptions : item.relationshipOptions')
+api = api.replace('traitCandidates', 'relationshipCandidates')
+api = api.replace('buildCandidates(basePlayers, "trait")', 'buildCandidates(basePlayers, "relationship")')
+api = api.replace('{ affiliation: string | null; enhancement: string | null; trait: string | null }', '{ affiliation: string | null; enhancement: string | null; relationship: string | null }')
+api = api.replace('const trait = chooseCandidateForPlayer(item, relationshipCandidates);', 'const relationship = chooseCandidateForPlayer(item, relationshipCandidates);')
+api = api.replace('if (trait) {', 'if (relationship) {')
+api = api.replace('effectForLevel(trait.info, trait.level)', 'effectForLevel(relationship.info, relationship.level)')
+api = api.replace('`trait:${trait.option.name}`', '`relationship:${relationship.option.name}`')
+api = api.replace('name: trait.option.name', 'name: relationship.option.name')
+api = api.replace('category: "trait"', 'category: "relationship"')
+api = api.replace('id: trait.info.id ?? trait.option.id', 'id: relationship.info.id ?? relationship.option.id')
+api = api.replace('emblemUrl: trait.info.emblemUrl ?? trait.option.emblemUrl', 'emblemUrl: relationship.info.emblemUrl ?? relationship.option.emblemUrl')
+api = api.replace('count: trait.count', 'count: relationship.count')
+api = api.replace('level: trait.level', 'level: relationship.level')
+api = api.replace('maxLevel: trait.info.maxLevel', 'maxLevel: relationship.info.maxLevel')
+api = api.replace('maxRequired: trait.info.maxRequired', 'maxRequired: relationship.info.maxRequired')
+api = api.replace('trait: trait?.option.name ?? null', 'relationship: relationship?.option.name ?? null')
+api = api.replace('trait: null', 'relationship: null')
+
 maker_path.write_text(maker, encoding='utf-8')
 card_path.write_text(card, encoding='utf-8')
+api_path.write_text(api, encoding='utf-8')

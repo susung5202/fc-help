@@ -1,0 +1,86 @@
+name: One-time mobile squad layout
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/one-time-mobile-squad-layout.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply mobile-first squad layout
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          maker = Path("components/SquadMaker.tsx")
+          source = maker.read_text(encoding="utf-8")
+
+          replacements = [
+            ('<div className="mt-8">', '<div className="mt-0 md:mt-8">'),
+            ('<div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#181b21] p-5 lg:flex-row lg:items-center lg:justify-between">', '<div className="sticky top-0 z-50 flex flex-col gap-2 border-b border-white/10 bg-[#11151a]/95 p-2 backdrop-blur md:static md:gap-4 md:rounded-2xl md:border md:bg-[#181b21] md:p-5 lg:flex-row lg:items-center lg:justify-between">'),
+            ('<div className="flex flex-wrap gap-3">', '<div className="flex flex-wrap gap-2 md:gap-3">', 1),
+            ('<label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 px-4 py-3">', '<label className="flex min-w-[150px] flex-1 items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 md:flex-none md:gap-3 md:bg-black/10 md:px-4 md:py-3">'),
+            ('<div className="flex flex-wrap items-center gap-2 sm:gap-3">', '<div className="flex w-full flex-wrap items-center gap-2 md:w-auto sm:gap-3">'),
+            ('<span className="text-xs text-gray-600">이 기기에 자동 저장</span>', '<span className="hidden text-xs text-gray-600 md:inline">이 기기에 자동 저장</span>'),
+            ('className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-bold text-gray-300 transition hover:bg-white/5"', 'className="flex-1 rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-white/5 md:flex-none md:px-4 md:py-2.5 md:text-sm"'),
+            ('className="rounded-xl border border-red-400/20 px-4 py-2.5 text-sm font-bold text-red-300 transition hover:bg-red-400/5"', 'className="flex-1 rounded-xl border border-red-400/20 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-400/5 md:flex-none md:px-4 md:py-2.5 md:text-sm"'),
+            ('<div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">', '<div className="mt-3 hidden flex-wrap items-center gap-2 text-xs text-gray-500 md:flex">'),
+            ('<div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,760px)_410px] xl:justify-center">', '<div className="mt-0 grid gap-6 md:mt-6 xl:grid-cols-[minmax(0,760px)_410px] xl:justify-center">'),
+            ('<div className="overflow-hidden rounded-3xl border border-white/10 bg-[#101b14] p-3 sm:p-5">', '<div className="overflow-hidden border-y border-white/10 bg-[#101b14] p-0 md:rounded-3xl md:border md:p-5">'),
+            ('className="relative mx-auto aspect-[0.7] w-full max-w-[600px] overflow-hidden rounded-2xl border-2 border-white/25 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner shadow-black/40"', 'className="relative mx-auto aspect-[0.64] w-full max-w-none overflow-hidden border-y border-white/25 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] md:aspect-[0.7] md:max-w-[600px] md:rounded-2xl md:border-2"'),
+            ('            <PitchLines />\n', '            <PitchLines />\n\n            <div className="pointer-events-none absolute left-3 top-3 z-40 rounded-xl bg-black/60 px-3 py-2 backdrop-blur md:hidden">\n              <p className="text-[9px] font-bold text-gray-400">선수</p>\n              <p className="text-sm font-black text-white">{selectedPlayers.length}/11</p>\n            </div>\n            <div className="pointer-events-none absolute right-3 top-3 z-40 rounded-xl bg-black/60 px-3 py-2 text-right backdrop-blur md:hidden">\n              <p className="text-[9px] font-bold text-gray-400">평균 OVR</p>\n              <p className="text-sm font-black text-white">{averageOvr === null ? "-" : averageOvr}</p>\n            </div>\n', 1),
+            ('    <div className="min-w-24 rounded-xl border border-white/10 bg-black/10 px-4 py-3">', '    <div className="hidden min-w-24 rounded-xl border border-white/10 bg-black/10 px-4 py-3 md:block">'),
+            ('<div className="fixed inset-0 z-50 flex items-end bg-black/70 px-3 pt-10 xl:hidden">', '<div className="fixed inset-0 z-[70] flex items-end bg-black/70 px-0 pt-10 xl:hidden">'),
+            ('<div className="max-h-[88vh] w-full overflow-y-auto rounded-t-3xl">{panel}</div>', '<div className="max-h-[86svh] w-full overflow-y-auto rounded-t-3xl pb-[env(safe-area-inset-bottom)]">{panel}</div>'),
+          ]
+
+          for item in replacements:
+              old, new, *count = item
+              n = count[0] if count else 0
+              if old not in source:
+                  raise SystemExit(f"Expected SquadMaker fragment not found: {old[:90]}")
+              source = source.replace(old, new, n)
+
+          maker.write_text(source, encoding="utf-8")
+
+          card = Path("components/SquadPlayerCard.tsx")
+          source = card.read_text(encoding="utf-8")
+          card_replacements = [
+            ('className={`relative h-[130px] w-[92px] transition sm:h-[156px] sm:w-[116px] ${', 'className={`relative h-[112px] w-[76px] transition sm:h-[156px] sm:w-[116px] ${'),
+            ('className="h-7 w-7 object-contain sm:h-9 sm:w-9"', 'className="h-6 w-6 object-contain sm:h-9 sm:w-9"'),
+            ('className="absolute left-0 top-[31px] z-30 flex flex-col items-start sm:top-[39px]"', 'className="absolute left-0 top-[26px] z-30 flex flex-col items-start sm:top-[39px]"'),
+            ('text-[12px] font-black leading-none sm:text-base', 'text-[10px] font-black leading-none sm:text-base'),
+            ('text-[20px] font-black leading-none text-white sm:text-[27px]', 'text-[17px] font-black leading-none text-white sm:text-[27px]'),
+            ('className="relative flex h-8 w-8 items-center justify-center bg-white/85 sm:h-10 sm:w-10"', 'className="relative flex h-7 w-7 items-center justify-center bg-white/85 sm:h-10 sm:w-10"'),
+            ('className="relative z-10 text-[11px] font-black text-white sm:text-sm"', 'className="relative z-10 text-[10px] font-black text-white sm:text-sm"'),
+            ('className="pointer-events-none absolute bottom-[32px] left-1/2 z-10 max-h-[96px] max-w-[150%] -translate-x-1/2 object-contain sm:bottom-[39px] sm:max-h-[120px]"', 'className="pointer-events-none absolute bottom-[28px] left-1/2 z-10 max-h-[82px] max-w-[150%] -translate-x-1/2 object-contain sm:bottom-[39px] sm:max-h-[120px]"'),
+            ('className="absolute bottom-[35px] left-0 z-30 h-5 max-w-8 object-contain sm:bottom-[42px] sm:h-6 sm:max-w-10"', 'className="absolute bottom-[31px] left-0 z-30 h-4 max-w-7 object-contain sm:bottom-[42px] sm:h-6 sm:max-w-10"'),
+            ('className="truncate text-[11px] font-black leading-none text-white sm:text-[14px]"', 'className="truncate text-[10px] font-black leading-none text-white sm:text-[14px]"'),
+            ('className="mt-1.5 truncate text-[9px] font-black leading-none text-amber-300 sm:text-[11px]"', 'className="mt-1 truncate text-[8px] font-black leading-none text-amber-300 sm:mt-1.5 sm:text-[11px]"'),
+          ]
+          for old, new in card_replacements:
+              if old not in source:
+                  raise SystemExit(f"Expected SquadPlayerCard fragment not found: {old[:90]}")
+              source = source.replace(old, new, 1)
+          card.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Commit responsive layout and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/SquadMaker.tsx components/SquadPlayerCard.tsx
+          git rm .github/workflows/one-time-mobile-squad-layout.yml
+          git commit -m "style: optimize squad maker for mobile"
+          git push origin HEAD:main

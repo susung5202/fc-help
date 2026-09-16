@@ -832,7 +832,7 @@ export default function SquadMaker() {
       };
       const objectUrl = URL.createObjectURL(blob);
 
-      if (navigator.share && shareNavigator.canShare?.({ files: [file] })) {
+      if (shareNavigator.canShare?.({ files: [file] })) {
         setImagePreview((current) => {
           if (current) URL.revokeObjectURL(current.url);
           return { url: objectUrl, file };
@@ -862,7 +862,7 @@ export default function SquadMaker() {
       canShare?: (data?: ShareData) => boolean;
     };
 
-    if (navigator.share && shareNavigator.canShare?.({ files: [imagePreview.file] })) {
+    if (shareNavigator.canShare?.({ files: [imagePreview.file] })) {
       try {
         await navigator.share({ files: [imagePreview.file], title: "FC Help 스쿼드" });
         return;

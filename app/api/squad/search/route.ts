@@ -67,6 +67,7 @@ export async function GET(request: Request) {
           seasonImg: season?.seasonImg ?? null,
           ovr: ovr?.ovr ?? null,
           position: ovr?.position ?? null,
+          newTraits: ovr?.newTraits ?? [],
         };
       })
       .sort((a, b) => (b.ovr ?? -1) - (a.ovr ?? -1));

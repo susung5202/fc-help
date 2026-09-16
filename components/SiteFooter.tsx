@@ -46,6 +46,9 @@ export default function SiteFooter() {
                 <Link href="/contact" className="text-gray-300 transition hover:text-lime-300">
                   문의
                 </Link>
+                <Link href="/privacy" className="text-gray-300 transition hover:text-lime-300">
+                  개인정보처리방침
+                </Link>
               </div>
             </nav>
           </div>

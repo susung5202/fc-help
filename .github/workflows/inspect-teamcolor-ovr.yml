@@ -8,20 +8,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Inspect team color pages
+      - name: Inspect Real Madrid team color page
         run: |
           python3 - <<'PY'
           import re, urllib.parse, urllib.request, html as htmllib
-          for name in ['아스널','거너스']:
-            url='https://fconline.nexon.com/datacenter/teamcolor?strTeamColorName='+urllib.parse.quote(name)
-            req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept-Language':'ko-KR,ko;q=0.9'})
-            raw=urllib.request.urlopen(req,timeout=20).read().decode('utf-8','ignore')
-            text=htmllib.unescape(re.sub(r'\s+',' ',re.sub(r'<[^>]+>',' ',raw)))
-            print('\n###',name,'html',len(raw),'text',len(text))
-            idxs=[m.start() for m in re.finditer(re.escape(name),text)]
-            print('indexes',idxs[:20], 'count',len(idxs))
-            for idx in idxs[-4:]:
-              print('CTX',text[max(0,idx-140):idx+500])
-            print('stage hits',re.findall(r'[1-4]단계',text)[:20])
-            print('overall hits',re.findall(r'전체 능력치\s*\+\d+',text)[:20])
+          name='레알 마드리드'
+          url='https://fconline.nexon.com/datacenter/teamcolor?strTeamColorName='+urllib.parse.quote(name)
+          req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept-Language':'ko-KR,ko;q=0.9'})
+          raw=urllib.request.urlopen(req,timeout=20).read().decode('utf-8','ignore')
+          text=htmllib.unescape(re.sub(r'\s+',' ',re.sub(r'<[^>]+>',' ',raw)))
+          idxs=[m.start() for m in re.finditer(re.escape(name),text)]
+          print('indexes',idxs,'count',len(idxs))
+          for idx in idxs:
+            print('CTX',text[max(0,idx-120):idx+420])
+          print('stages',re.findall(r'[1-4]단계',text)[:40])
+          print('overall',re.findall(r'전체 능력치\s*\+\d+',text)[:40])
           PY

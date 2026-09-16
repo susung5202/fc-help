@@ -45,6 +45,7 @@ const ENHANCEMENT_OVR_BONUS: Record<number, number> = {
 };
 
 const HEXAGON = "polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0% 50%)";
+const SOFT_SHADOW = "drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]";
 
 function normalizeDigits(value: string | null | undefined) {
   if (!value || !/^\d+$/.test(value)) return null;
@@ -62,7 +63,7 @@ function formatBp(value: string | null | undefined) {
   if (!digits) return "시세 -";
 
   if (digits.length <= 8) {
-    return `${digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} BP`;
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
   const labels = ["", "만", "억", "조", "경", "해"];
@@ -82,7 +83,7 @@ function formatBp(value: string | null | undefined) {
     parts.push(`${amount.toLocaleString("ko-KR")}${labels[unitIndex] ?? ""}`);
   });
 
-  return `${parts.slice(0, 2).join(" ")} BP`;
+  return parts.slice(0, 2).join(" ");
 }
 
 function getPositionTone(position: string) {
@@ -99,7 +100,7 @@ function getPositionTone(position: string) {
 function TraitFallbackIcon() {
   return (
     <div
-      className="flex h-5 w-5 items-center justify-center bg-[#d8c994] text-[10px] font-black text-[#302c1d] sm:h-9 sm:w-9 sm:text-base"
+      className={`flex h-5 w-5 items-center justify-center bg-[#d8c994] text-[10px] font-black text-[#302c1d] sm:h-9 sm:w-9 sm:text-base ${SOFT_SHADOW}`}
       style={{ clipPath: HEXAGON }}
       aria-hidden="true"
     >
@@ -111,7 +112,7 @@ function TraitFallbackIcon() {
 function SalaryHex({ salary }: { salary: number | null | undefined }) {
   return (
     <div
-      className="relative flex h-5 w-5 items-center justify-center bg-white/85 sm:h-10 sm:w-10"
+      className={`relative flex h-5 w-5 items-center justify-center bg-white/85 sm:h-10 sm:w-10 ${SOFT_SHADOW}`}
       style={{ clipPath: HEXAGON }}
       title={salary == null ? "급여 정보 없음" : `급여 ${salary}`}
     >
@@ -210,7 +211,7 @@ export default function SquadPlayerCard({
       )}
 
       {firstNewTrait && (
-        <div className="absolute left-0 top-0 z-30" title={newTraits.join(", ")}>
+        <div className={`absolute left-0 top-0 z-30 ${SOFT_SHADOW}`} title={newTraits.join(", ")}>
           {firstTraitIcon ? (
             <img
               src={firstTraitIcon}
@@ -228,7 +229,7 @@ export default function SquadPlayerCard({
         </div>
       )}
 
-      <div className="absolute left-0 top-[21px] z-30 flex flex-col items-start sm:top-[39px]">
+      <div className={`absolute left-0 top-[21px] z-30 flex flex-col items-start sm:top-[39px] ${SOFT_SHADOW}`}>
         <span className={`text-[8px] font-black leading-none sm:text-base ${getPositionTone(slotPosition)}`}>
           {slotPosition}
         </span>
@@ -241,13 +242,13 @@ export default function SquadPlayerCard({
         <img
           src={seasonImg}
           alt={seasonName}
-          className="absolute bottom-[25px] left-0 z-30 h-3.5 max-w-6 object-contain sm:bottom-[42px] sm:h-6 sm:max-w-10"
+          className={`absolute bottom-[25px] left-0 z-30 h-3.5 max-w-6 object-contain sm:bottom-[42px] sm:h-6 sm:max-w-10 ${SOFT_SHADOW}`}
         />
       )}
 
-      <div className="absolute right-0 top-0 z-30 flex flex-col items-end gap-1">
+      <div className={`absolute right-0 top-0 z-30 flex flex-col items-end gap-1 ${SOFT_SHADOW}`}>
         <span
-          className={`flex h-5 w-5 items-center justify-center rounded-[2px] border p-0 text-[9px] font-black leading-none sm:h-8 sm:w-8 sm:border-2 sm:text-[14px] ${getEnhancementBadgeTone(grade)}`}
+          className={`flex h-5 w-6 items-center justify-center rounded-[2px] border p-0 text-[9px] font-black leading-none sm:h-8 sm:w-9 sm:border-2 sm:text-[14px] ${getEnhancementBadgeTone(grade)}`}
           title={`${grade}강`}
         >
           {grade}
@@ -259,10 +260,10 @@ export default function SquadPlayerCard({
         key={renderedArtworkSpid}
         spid={renderedArtworkSpid}
         alt={name}
-        className="pointer-events-none absolute bottom-[22px] left-1/2 z-10 max-h-[66px] max-w-[142%] -translate-x-1/2 object-contain sm:bottom-[39px] sm:max-h-[120px] sm:max-w-[150%]"
+        className="pointer-events-none absolute bottom-[22px] left-1/2 z-10 max-h-[58px] max-w-[132%] -translate-x-1/2 object-contain sm:bottom-[39px] sm:max-h-[108px] sm:max-w-[140%]"
       />
 
-      <div className="absolute inset-x-[-5px] bottom-0 z-40 text-center sm:inset-x-[-10px]">
+      <div className={`absolute inset-x-[-5px] bottom-0 z-40 text-center sm:inset-x-[-10px] ${SOFT_SHADOW}`}>
         <p className="truncate text-[8px] font-black leading-none text-white sm:text-[14px]">
           {name}
         </p>

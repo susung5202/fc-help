@@ -381,7 +381,7 @@ export default function SquadMaker() {
     let best: { slot: Slot; distance: number } | null = null;
 
     for (const slot of formation.slots) {
-      if (slot.slotId === movingSlotId || !players[slot.slotId]) continue;
+      if (slot.slotId === movingSlotId) continue;
 
       const other = getSlotPosition(slot);
       const dx = ((position.x - other.x) / 100) * rect.width;
@@ -528,7 +528,7 @@ export default function SquadMaker() {
       <p className="mt-3 text-sm leading-6 text-gray-500">
         경기장 위 포지션을 누르면 선수를 검색하고 시즌과 강화 단계를 선택할 수 있습니다.
         배치한 선수는 마우스나 터치로 끌어서 위치를 자유롭게 조정할 수 있고,
-        다른 선수 위에 놓으면 두 선수의 위치가 서로 바뀝니다.
+        다른 선수나 빈 포지션 위에 놓으면 두 위치가 서로 바뀝니다.
       </p>
     </div>
   );
@@ -580,7 +580,7 @@ export default function SquadMaker() {
           배치한 선수 드래그 → 자유 위치 조정
         </span>
         <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
-          선수끼리 겹쳐 놓기 → 서로 위치 교환
+          선수/빈 포지션에 겹쳐 놓기 → 서로 위치 교환
         </span>
         <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
           선수 카드 클릭 → 선수/강화 변경
@@ -745,10 +745,22 @@ function SquadSlotButton({
         </div>
       ) : (
         <>
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-white/45 bg-black/25 text-xl font-light text-white/80 shadow-lg sm:h-14 sm:w-14">
+          <div
+            className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed bg-black/25 text-xl font-light shadow-lg transition sm:h-14 sm:w-14 ${
+              swapTarget
+                ? "border-cyan-300 bg-cyan-300/10 text-cyan-100 ring-2 ring-cyan-300/35"
+                : "border-white/45 text-white/80"
+            }`}
+          >
             +
           </div>
-          <span className="mt-1 rounded-md bg-black/55 px-2 py-0.5 text-[10px] font-black text-white sm:text-xs">
+          <span
+            className={`mt-1 rounded-md px-2 py-0.5 text-[10px] font-black sm:text-xs ${
+              swapTarget
+                ? "bg-cyan-300/15 text-cyan-100 ring-1 ring-cyan-300/30"
+                : "bg-black/55 text-white"
+            }`}
+          >
             {slot.label}
           </span>
         </>

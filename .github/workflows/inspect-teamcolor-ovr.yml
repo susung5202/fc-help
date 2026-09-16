@@ -1,0 +1,42 @@
+name: Inspect team color OVR parsing
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-teamcolor-ovr.yml
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect PlayerAbility response
+        run: |
+          python3 - <<'PY'
+          import re, urllib.parse, urllib.request
+          data = urllib.parse.urlencode({
+            'spid':'840001625',
+            'n1Strong':'8',
+            'n1Grow':'4',
+            'n4TeamColorId':'0',
+            'n4TeamColorLv':'0',
+            'n1Change':'0',
+            'strPlayerImg':'https://fo4.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p840001625.png',
+            'rd':'0',
+          }).encode()
+          req=urllib.request.Request('https://fconline.nexon.com/datacenter/PlayerAbility',data=data,headers={
+            'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36',
+            'Accept':'text/html,application/xhtml+xml',
+            'Accept-Language':'ko-KR,ko;q=0.9',
+            'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8',
+            'Referer':'https://fconline.nexon.com/DataCenter/PlayerInfo?spid=840001625',
+            'X-Requested-With':'XMLHttpRequest',
+          })
+          html=urllib.request.urlopen(req,timeout=20).read().decode('utf-8','ignore')
+          text=re.sub(r'<[^>]+>',' ',html)
+          text=re.sub(r'\s+',' ',text)
+          print('html length',len(html),'text length',len(text))
+          for marker in ['총 능력치','ST ','강화 팀컬러','소속 팀컬러','관계 팀컬러']:
+            print(marker, text.find(marker), text.rfind(marker))
+          idx=text.rfind('총 능력치')
+          print('AROUND TOTAL:', text[idx:idx+2500] if idx>=0 else 'NONE')
+          print('HEAD:', text[:2500])
+          PY

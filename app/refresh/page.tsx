@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type Player = {
   id: number;
@@ -9,6 +11,20 @@ type Season = {
   seasonId: number;
   className: string;
   seasonImg: string;
+};
+
+type SortMode = "default" | "ovr" | "nearest";
+type HourType = "odd" | "even" | "every" | "unknown";
+
+type RefreshReportRow = {
+  player_spid: number | string;
+  hour_type: HourType;
+  refresh_minute: number | null;
+};
+
+type NearestRefreshInfo = {
+  minutesUntil: number;
+  label: string;
 };
 
 async function getPlayers(): Promise<Player[]> {
@@ -37,13 +53,144 @@ async function getSeasons(): Promise<Season[]> {
   return res.json();
 }
 
+function getKstHourMinute(now: Date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const parts = formatter.formatToParts(now);
+
+  return {
+    hour: Number(parts.find((part) => part.type === "hour")?.value ?? 0),
+    minute: Number(parts.find((part) => part.type === "minute")?.value ?? 0),
+  };
+}
+
+function getNextRefreshInfo(
+  hourType: HourType,
+  minute: number,
+  now: Date
+): NearestRefreshInfo | null {
+  const { hour: currentHour, minute: currentMinute } = getKstHourMinute(now);
+
+  for (let hourOffset = 0; hourOffset <= 48; hourOffset++) {
+    const candidateHour = (currentHour + hourOffset) % 24;
+    const matches =
+      hourType === "every" ||
+      (hourType === "odd" && candidateHour % 2 === 1) ||
+      (hourType === "even" && candidateHour % 2 === 0);
+
+    if (!matches) continue;
+
+    const deltaMinutes = hourOffset * 60 + minute - currentMinute;
+    if (deltaMinutes <= 0) continue;
+
+    const candidate = new Date(now.getTime() + deltaMinutes * 60 * 1000);
+    const time = candidate.toLocaleTimeString("ko-KR", {
+      timeZone: "Asia/Seoul",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    return {
+      minutesUntil: deltaMinutes,
+      label: `${time} · ${deltaMinutes}분 후`,
+    };
+  }
+
+  return null;
+}
+
+async function getNearestRefreshMap(spids: number[]) {
+  const result = new Map<number, NearestRefreshInfo | null>();
+  if (spids.length === 0) return result;
+
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("refresh_reports")
+      .select("player_spid, hour_type, refresh_minute")
+      .in("player_spid", spids);
+
+    if (error) {
+      console.error("갱신시간 정렬용 제보 조회 실패", error.message);
+      return result;
+    }
+
+    const grouped = new Map<number, RefreshReportRow[]>();
+    for (const row of (data ?? []) as RefreshReportRow[]) {
+      const spid = Number(row.player_spid);
+      if (!Number.isFinite(spid)) continue;
+      const rows = grouped.get(spid) ?? [];
+      rows.push(row);
+      grouped.set(spid, rows);
+    }
+
+    const now = new Date();
+
+    for (const spid of spids) {
+      const rows = (grouped.get(spid) ?? []).filter(
+        (row) => row.hour_type !== "unknown" && row.refresh_minute !== null
+      );
+
+      if (rows.length === 0) {
+        result.set(spid, null);
+        continue;
+      }
+
+      const counts = new Map<string, { hourType: HourType; minute: number; count: number }>();
+      for (const row of rows) {
+        if (row.refresh_minute === null) continue;
+        const key = `${row.hour_type}-${row.refresh_minute}`;
+        const current = counts.get(key);
+        if (current) {
+          current.count += 1;
+        } else {
+          counts.set(key, {
+            hourType: row.hour_type,
+            minute: row.refresh_minute,
+            count: 1,
+          });
+        }
+      }
+
+      const distribution = Array.from(counts.values()).sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.minute - b.minute;
+      });
+      const topCount = distribution[0]?.count ?? 0;
+      const topCandidates = distribution.filter((item) => item.count === topCount);
+
+      if (topCandidates.length !== 1) {
+        result.set(spid, null);
+        continue;
+      }
+
+      const winner = topCandidates[0];
+      result.set(
+        spid,
+        getNextRefreshInfo(winner.hourType, winner.minute, now)
+      );
+    }
+  } catch (error) {
+    console.error("갱신시간 정렬 계산 실패", error);
+  }
+
+  return result;
+}
+
 export default async function RefreshPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string }>;
 }) {
-  const { q = "" } = await searchParams;
+  const { q = "", sort = "default" } = await searchParams;
   const query = q.trim();
+  const sortMode: SortMode =
+    sort === "ovr" ? "ovr" : sort === "nearest" ? "nearest" : "default";
 
   const [players, seasons] = await Promise.all([
     getPlayers(),
@@ -54,7 +201,7 @@ export default async function RefreshPage({
     seasons.map((season) => [Number(season.seasonId), season])
   );
 
-  const results = query
+  const matchedPlayers = query
     ? players
         .filter((player) =>
           player.name.toLowerCase().includes(query.toLowerCase())
@@ -62,6 +209,31 @@ export default async function RefreshPage({
         .sort((a, b) => b.id - a.id)
         .slice(0, 100)
     : [];
+
+  const [ovrMap, nearestRefreshMap] = await Promise.all([
+    query && sortMode === "ovr"
+      ? getPlayerOvrMap(matchedPlayers.map((player) => player.id))
+      : Promise.resolve(new Map<number, PlayerOvrInfo | null>()),
+    query && sortMode === "nearest"
+      ? getNearestRefreshMap(matchedPlayers.map((player) => player.id))
+      : Promise.resolve(new Map<number, NearestRefreshInfo | null>()),
+  ]);
+
+  const results = [...matchedPlayers].sort((a, b) => {
+    if (sortMode === "ovr") {
+      const aOvr = ovrMap.get(a.id)?.ovr ?? -1;
+      const bOvr = ovrMap.get(b.id)?.ovr ?? -1;
+      if (bOvr !== aOvr) return bOvr - aOvr;
+    }
+
+    if (sortMode === "nearest") {
+      const aMinutes = nearestRefreshMap.get(a.id)?.minutesUntil ?? Number.MAX_SAFE_INTEGER;
+      const bMinutes = nearestRefreshMap.get(b.id)?.minutesUntil ?? Number.MAX_SAFE_INTEGER;
+      if (aMinutes !== bMinutes) return aMinutes - bMinutes;
+    }
+
+    return b.id - a.id;
+  });
 
   return (
     <main className="min-h-screen bg-[#0f1115] text-white">
@@ -107,6 +279,7 @@ export default async function RefreshPage({
           method="GET"
           className="mt-10 flex max-w-3xl rounded-2xl border border-white/10 bg-[#181b21] p-2"
         >
+          <input type="hidden" name="sort" value={sortMode} />
           <input
             type="text"
             name="q"
@@ -141,12 +314,35 @@ export default async function RefreshPage({
             </div>
           ) : (
             <>
-              <div className="mb-6 flex items-end justify-between">
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-sm text-gray-500">검색 결과</p>
                   <h2 className="mt-1 text-2xl font-bold">{query}</h2>
+                  <span className="mt-1 block text-sm text-gray-500">
+                    {results.length}개
+                  </span>
                 </div>
-                <span className="text-sm text-gray-500">{results.length}개</span>
+
+                <div className="flex flex-wrap gap-2">
+                  <SortLink
+                    href={`/refresh?q=${encodeURIComponent(query)}&sort=default`}
+                    active={sortMode === "default"}
+                  >
+                    기본순
+                  </SortLink>
+                  <SortLink
+                    href={`/refresh?q=${encodeURIComponent(query)}&sort=ovr`}
+                    active={sortMode === "ovr"}
+                  >
+                    OVR 높은순
+                  </SortLink>
+                  <SortLink
+                    href={`/refresh?q=${encodeURIComponent(query)}&sort=nearest`}
+                    active={sortMode === "nearest"}
+                  >
+                    가까운 갱신시간순
+                  </SortLink>
+                </div>
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -159,6 +355,8 @@ export default async function RefreshPage({
                       key={player.id}
                       player={player}
                       season={season}
+                      ovrInfo={ovrMap.get(player.id) ?? null}
+                      nearestRefresh={nearestRefreshMap.get(player.id) ?? null}
                     />
                   );
                 })}
@@ -171,12 +369,39 @@ export default async function RefreshPage({
   );
 }
 
+function SortLink({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-lg border px-3 py-2 text-sm font-bold transition ${
+        active
+          ? "border-lime-400 bg-lime-400 text-black"
+          : "border-white/10 bg-white/[0.04] text-gray-300 hover:border-white/30 hover:text-white"
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function RefreshPlayerCard({
   player,
   season,
+  ovrInfo,
+  nearestRefresh,
 }: {
   player: Player;
   season?: Season;
+  ovrInfo?: PlayerOvrInfo | null;
+  nearestRefresh?: NearestRefreshInfo | null;
 }) {
   const imageUrl = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.id}.png`;
 
@@ -202,11 +427,24 @@ function RefreshPlayerCard({
       </div>
 
       <div className="p-5">
-        <span className="rounded-md bg-lime-400/10 px-2 py-1 text-xs font-bold text-lime-400">
-          {season?.className ?? "시즌 미확인"}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-lime-400/10 px-2 py-1 text-xs font-bold text-lime-400">
+            {season?.className ?? "시즌 미확인"}
+          </span>
+          {ovrInfo && (
+            <span className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-xs font-bold text-gray-200">
+              OVR {ovrInfo.ovr} · {ovrInfo.position}
+            </span>
+          )}
+        </div>
         <h3 className="mt-3 text-lg font-bold">{player.name}</h3>
-        <p className="mt-2 text-sm text-gray-500">갱신시간 확인하기 →</p>
+        {nearestRefresh ? (
+          <p className="mt-2 text-sm font-semibold text-lime-300">
+            다음 예상 갱신 {nearestRefresh.label}
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-gray-500">갱신시간 확인하기 →</p>
+        )}
       </div>
     </Link>
   );

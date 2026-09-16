@@ -11,7 +11,7 @@ const POSITION_ALIASES: Record<string, string> = {
   RDM: "CDM",
   LCB: "CB",
   RCB: "CB",
-  LWB: "RB",
+  LWB: "LB",
   RWB: "RB",
   SW: "CB",
 };

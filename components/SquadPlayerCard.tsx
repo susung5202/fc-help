@@ -110,7 +110,7 @@ function TraitFallbackIcon() {
 function SalaryHex({ salary }: { salary: number | null | undefined }) {
   return (
     <div
-      className="relative flex h-8 w-8 items-center justify-center bg-white/85 sm:h-10 sm:w-10"
+      className="relative flex h-7 w-7 items-center justify-center bg-white/85 sm:h-10 sm:w-10"
       style={{ clipPath: HEXAGON }}
       title={salary == null ? "급여 정보 없음" : `급여 ${salary}`}
     >
@@ -118,7 +118,7 @@ function SalaryHex({ salary }: { salary: number | null | undefined }) {
         className="absolute inset-[2px] bg-[#111318]"
         style={{ clipPath: HEXAGON }}
       />
-      <span className="relative z-10 text-[11px] font-black text-white sm:text-sm">
+      <span className="relative z-10 text-[10px] font-black text-white sm:text-sm">
         {salary ?? "-"}
       </span>
     </div>
@@ -194,7 +194,7 @@ export default function SquadPlayerCard({
 
   return (
     <div
-      className={`relative h-[130px] w-[92px] transition sm:h-[156px] sm:w-[116px] ${
+      className={`relative h-[112px] w-[76px] transition sm:h-[156px] sm:w-[116px] ${
         dragging || dropTarget ? "scale-105" : ""
       }`}
     >
@@ -212,7 +212,7 @@ export default function SquadPlayerCard({
             <img
               src={firstTraitIcon}
               alt={firstNewTrait}
-              className="h-7 w-7 object-contain sm:h-9 sm:w-9"
+              className="h-6 w-6 object-contain sm:h-9 sm:w-9"
             />
           ) : (
             <TraitFallbackIcon />
@@ -225,11 +225,11 @@ export default function SquadPlayerCard({
         </div>
       )}
 
-      <div className="absolute left-0 top-[31px] z-30 flex flex-col items-start sm:top-[39px]">
-        <span className={`text-[12px] font-black leading-none sm:text-base ${getPositionTone(slotPosition)}`}>
+      <div className="absolute left-0 top-[26px] z-30 flex flex-col items-start sm:top-[39px]">
+        <span className={`text-[10px] font-black leading-none sm:text-base ${getPositionTone(slotPosition)}`}>
           {slotPosition}
         </span>
-        <span className="mt-0.5 text-[20px] font-black leading-none text-white sm:text-[27px]">
+        <span className="mt-0.5 text-[17px] font-black leading-none text-white sm:text-[27px]">
           {enhancedOvr ?? "-"}
         </span>
       </div>
@@ -238,7 +238,7 @@ export default function SquadPlayerCard({
         <img
           src={seasonImg}
           alt={seasonName}
-          className="absolute bottom-[35px] left-0 z-30 h-5 max-w-8 object-contain sm:bottom-[42px] sm:h-6 sm:max-w-10"
+          className="absolute bottom-[31px] left-0 z-30 h-4 max-w-7 object-contain sm:bottom-[42px] sm:h-6 sm:max-w-10"
         />
       )}
 
@@ -255,16 +255,16 @@ export default function SquadPlayerCard({
         key={spid}
         spid={spid}
         alt={name}
-        className="pointer-events-none absolute bottom-[32px] left-1/2 z-10 max-h-[96px] max-w-[150%] -translate-x-1/2 object-contain sm:bottom-[39px] sm:max-h-[120px]"
+        className="pointer-events-none absolute bottom-[28px] left-1/2 z-10 max-h-[82px] max-w-[150%] -translate-x-1/2 object-contain sm:bottom-[39px] sm:max-h-[120px]"
       />
 
       <div className="absolute inset-x-[-8px] bottom-0 z-40 text-center sm:inset-x-[-10px]">
-        <p className="truncate text-[11px] font-black leading-none text-white sm:text-[14px]">
+        <p className="truncate text-[10px] font-black leading-none text-white sm:text-[14px]">
           {name}
         </p>
         <p
           title={formatExactBp(selectedPrice)}
-          className="mt-1.5 truncate text-[9px] font-black leading-none text-amber-300 sm:text-[11px]"
+          className="mt-1 truncate text-[8px] font-black leading-none text-amber-300 sm:mt-1.5 sm:text-[11px]"
         >
           {formatBp(selectedPrice)}
         </p>

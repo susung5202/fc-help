@@ -530,7 +530,7 @@ export default function SquadMaker() {
   return (
     <div className="mt-8">
       <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#181b21] p-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 md:gap-3">
           <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 px-4 py-3">
             <span className="text-xs font-semibold text-gray-500">포메이션</span>
             <select
@@ -588,6 +588,15 @@ export default function SquadMaker() {
             className="relative mx-auto aspect-[0.7] w-full max-w-[600px] overflow-hidden rounded-2xl border-2 border-white/25 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner shadow-black/40"
           >
             <PitchLines />
+
+            <div className="pointer-events-none absolute left-3 top-3 z-40 rounded-xl bg-black/60 px-3 py-2 backdrop-blur md:hidden">
+              <p className="text-[9px] font-bold text-gray-400">선수</p>
+              <p className="text-sm font-black text-white">{selectedPlayers.length}/11</p>
+            </div>
+            <div className="pointer-events-none absolute right-3 top-3 z-40 rounded-xl bg-black/60 px-3 py-2 text-right backdrop-blur md:hidden">
+              <p className="text-[9px] font-bold text-gray-400">평균 OVR</p>
+              <p className="text-sm font-black text-white">{averageOvr === null ? "-" : averageOvr}</p>
+            </div>
 
             {formation.slots.map((slot) => (
               <PositionHitbox

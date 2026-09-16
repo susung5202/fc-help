@@ -256,7 +256,7 @@ export default function SquadPlayerCard({
         />
       )}
 
-      <div className="absolute right-[-8px] top-[25px] z-30 sm:right-[-10px] sm:top-[36px]">
+      <div className="absolute right-[-8px] top-[31px] z-30 sm:right-[-10px] sm:top-[46px]">
         <SalaryHex salary={details?.salary} />
       </div>
 

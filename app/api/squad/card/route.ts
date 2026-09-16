@@ -171,18 +171,34 @@ function parseTraitIcons(html: string): Record<string, string> {
 }
 
 async function fetchMobilePlayerHtml(spid: number) {
-  const response = await fetch(`${MOBILE_PLAYER_URL}?spid=${spid}`, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "ko-KR,ko;q=0.9",
-    },
-    next: { revalidate: 300 },
-  });
+  let lastError: unknown = null;
 
-  if (!response.ok) throw new Error(`mobile player request failed: ${response.status}`);
-  return response.text();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(`${MOBILE_PLAYER_URL}?spid=${spid}`, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "ko-KR,ko;q=0.9",
+        },
+        next: { revalidate: 300 },
+      });
+
+      if (response.ok) return response.text();
+
+      lastError = new Error(`mobile player request failed: ${response.status}`);
+      if (![429, 500, 502, 503, 504].includes(response.status)) break;
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 180 * (attempt + 1)));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("mobile player request failed");
 }
 
 export async function GET(request: Request) {

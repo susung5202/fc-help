@@ -278,6 +278,7 @@ async function fetchPlayerAbility(player: SquadInput) {
   const cacheKey = `${player.spid}:${player.grade}:4`;
   const cached = abilityCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.html;
+
   const body = new URLSearchParams({
     spid: String(player.spid),
     n1Strong: String(Math.min(13, Math.max(1, player.grade))),
@@ -287,24 +288,43 @@ async function fetchPlayerAbility(player: SquadInput) {
     n1Change: "0",
     strPlayerImg: `https://fo4.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`,
     rd: "0",
-  });
-  const response = await fetch(PLAYER_ABILITY_URL, {
-    method: "POST",
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "ko-KR,ko;q=0.9",
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      Referer: `https://fconline.nexon.com/DataCenter/PlayerInfo?spid=${player.spid}`,
-      "X-Requested-With": "XMLHttpRequest",
-    },
-    body,
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`player ability request failed: ${response.status}`);
-  const html = await response.text();
-  abilityCache.set(cacheKey, { expiresAt: Date.now() + CACHE_MS, html });
-  return html;
+  }).toString();
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(PLAYER_ABILITY_URL, {
+        method: "POST",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "ko-KR,ko;q=0.9",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          Referer: `https://fconline.nexon.com/DataCenter/PlayerInfo?spid=${player.spid}`,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body,
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        const html = await response.text();
+        abilityCache.set(cacheKey, { expiresAt: Date.now() + CACHE_MS, html });
+        return html;
+      }
+
+      lastError = new Error(`player ability request failed: ${response.status}`);
+      if (![429, 500, 502, 503, 504].includes(response.status)) break;
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 220 * (attempt + 1)));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("player ability request failed");
 }
 
 function getLevelFromCount(count: number, maxLevel: number, maxRequired: number) {
@@ -458,19 +478,44 @@ export async function POST(request: Request) {
   }
 
   try {
-    const basePlayers: BasePlayerData[] = await Promise.all(
-      players.map(async (player) => {
-        const html = await fetchPlayerAbility(player);
-        return {
-          player,
-          html,
-          baseOvr: parsePositionOvr(html, player.position),
-          enhancementOptions: parseOptionsBetween(html, "강화 팀컬러", "소속 팀컬러"),
-          affiliationOptions: parseOptionsBetween(html, "소속 팀컬러", "관계 팀컬러"),
-          relationshipOptions: parseOptionsBetween(html, "관계 팀컬러", "클래스 비교"),
-        };
-      })
-    );
+    const basePlayers: BasePlayerData[] = [];
+
+    // FC Online 쪽 요청을 11개 동시에 몰아치면 일부 요청이 간헐적으로 실패할 수 있다.
+    // 3명씩 나눠 요청하고, 끝까지 실패한 선수만 제외해서 한 명의 실패가 전체 스쿼드를 비우지 않게 한다.
+    for (let index = 0; index < players.length; index += 3) {
+      const batch = await Promise.all(
+        players.slice(index, index + 3).map(async (player): Promise<BasePlayerData | null> => {
+          try {
+            const html = await fetchPlayerAbility(player);
+            const abilityBaseOvr = calculatePositionOvrFromAbilities(
+              parseAbilityValues(html),
+              player.position
+            );
+
+            return {
+              player,
+              html,
+              baseOvr: parsePositionOvr(html, player.position) ?? abilityBaseOvr,
+              enhancementOptions: parseOptionsBetween(html, "강화 팀컬러", "소속 팀컬러"),
+              affiliationOptions: parseOptionsBetween(html, "소속 팀컬러", "관계 팀컬러"),
+              relationshipOptions: parseOptionsBetween(html, "관계 팀컬러", "클래스 비교"),
+            };
+          } catch (error) {
+            console.error("Squad player ability fetch failed", {
+              slotId: player.slotId,
+              spid: player.spid,
+              position: player.position,
+              error,
+            });
+            return null;
+          }
+        })
+      );
+
+      basePlayers.push(
+        ...batch.filter((item): item is BasePlayerData => item !== null)
+      );
+    }
 
     const [affiliationCandidates, relationshipCandidates] = await Promise.all([
       buildCandidates(basePlayers, "affiliation"),
@@ -495,6 +540,25 @@ export async function POST(request: Request) {
     > = {};
     const selectedTeamColorMap = new Map<string, TeamColorInfo>();
     const ovrBySlot: Record<string, number | null> = {};
+
+    if (enhancement) {
+      const effect = `전체 능력치 +${enhancement.bonus}`;
+      selectedTeamColorMap.set(`enhancement:${enhancement.name}`, {
+        name: enhancement.name,
+        category: "enhancement",
+        id: officialEnhancementEmblem?.id ?? enhancementInfo?.id ?? enhancementOption?.id ?? null,
+        emblemUrl:
+          officialEnhancementEmblem?.emblemUrl ??
+          enhancementInfo?.emblemUrl ??
+          enhancementOption?.emblemUrl ??
+          null,
+        count: enhancement.count,
+        level: enhancement.level,
+        maxLevel: enhancement.maxLevel,
+        maxRequired: enhancement.required,
+        effect,
+      });
+    }
 
     for (const item of basePlayers) {
       const affiliation = chooseCandidateForPlayer(item, affiliationCandidates);
@@ -535,23 +599,7 @@ export async function POST(request: Request) {
 
       const enhancementApplies = enhancement ? item.player.grade >= enhancement.minGrade : false;
       if (enhancement && enhancementApplies) {
-        const effect = `전체 능력치 +${enhancement.bonus}`;
-        effects.push(effect);
-        selectedTeamColorMap.set(`enhancement:${enhancement.name}`, {
-          name: enhancement.name,
-          category: "enhancement",
-          id: officialEnhancementEmblem?.id ?? enhancementInfo?.id ?? enhancementOption?.id ?? null,
-          emblemUrl:
-            officialEnhancementEmblem?.emblemUrl ??
-            enhancementInfo?.emblemUrl ??
-            enhancementOption?.emblemUrl ??
-            null,
-          count: enhancement.count,
-          level: enhancement.level,
-          maxLevel: enhancement.maxLevel,
-          maxRequired: enhancement.required,
-          effect,
-        });
+        effects.push(`전체 능력치 +${enhancement.bonus}`);
       }
 
       appliedBySlot[item.player.slotId] = {

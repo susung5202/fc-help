@@ -230,7 +230,10 @@ export function calculatePositionOvrFromAbilities(
 }
 
 export function calculatePositionOvrFromText(text: string, position: string): number | null {
-  const abilityMarker = text.indexOf("능력치 전체");
+  const markerIndexes = [text.lastIndexOf("능력치 전체"), text.lastIndexOf("총 능력치")].filter(
+    (index) => index >= 0
+  );
+  const abilityMarker = markerIndexes.length > 0 ? Math.max(...markerIndexes) : -1;
   const birthMarker = text.indexOf("출생", abilityMarker >= 0 ? abilityMarker : 0);
   const section = text.slice(
     abilityMarker >= 0 ? abilityMarker : 0,
@@ -238,10 +241,14 @@ export function calculatePositionOvrFromText(text: string, position: string): nu
   );
 
   const abilities: Record<string, number> = {};
-  for (const name of ABILITY_NAMES) {
-    const match = section.match(new RegExp(`${escapeRegExp(name)}\s+(\d{1,3})(?=\s|$)`));
-    if (!match) continue;
-    const value = Number(match[1]);
+  const abilityPattern = new RegExp(
+    `(?:^|\\s)(${ABILITY_NAMES.map(escapeRegExp).join("|")})\\s+(\\d{1,3})(?=\\s|$)`,
+    "g"
+  );
+
+  for (const match of section.matchAll(abilityPattern)) {
+    const name = match[1];
+    const value = Number(match[2]);
     if (Number.isFinite(value)) abilities[name] = value;
   }
 

@@ -196,7 +196,7 @@ export default function SquadPlayerCard({
       ? calculatedOvr
       : positionOvr === null
         ? null
-        : positionOvr + (ENHANCEMENT_OVR_BONUS[grade] ?? 0);
+        : positionOvr + (ENHANCEMENT_OVR_BONUS[grade] ?? 0) + 4;
   const selectedPrice = details?.prices?.[grade - 1] ?? null;
   const firstNewTrait = newTraits[0] ?? null;
   const firstTraitIcon = firstNewTrait ? details?.traitIcons?.[firstNewTrait] ?? null : null;

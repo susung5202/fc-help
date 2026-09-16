@@ -32,8 +32,11 @@ type SquadCardDetails = {
   positionOvr: number | null;
 };
 
+type TeamColorCategory = "affiliation" | "enhancement" | "relationship";
+
 type TeamColorSummary = {
   name: string;
+  category: TeamColorCategory;
   count: number;
   level: number;
   maxLevel: number;
@@ -46,7 +49,10 @@ type TeamColorState = {
   adaptation: number;
   teamColors: TeamColorSummary[];
   ovrBySlot: Record<string, number | null>;
-  appliedBySlot: Record<string, string | null>;
+  appliedBySlot: Record<
+    string,
+    { affiliation: string | null; enhancement: string | null; relationship: string | null }
+  >;
   loading: boolean;
 };
 
@@ -182,6 +188,10 @@ const FORMATIONS: Record<string, Formation> = {
 
 const STORAGE_KEY = "fc-help-squad-v1";
 const SUMMARY_CARD_CACHE = new Map<string, SquadCardDetails>();
+const SQUAD_ENHANCEMENT_OVR_BONUS: Record<number, number> = {
+  1: 0, 2: 1, 3: 2, 4: 4, 5: 6, 6: 8, 7: 11,
+  8: 15, 9: 17, 10: 19, 11: 21, 12: 24, 13: 27,
+};
 
 function isGoalkeeperSlot(label: string) {
   return label === "GK";
@@ -234,45 +244,6 @@ function initials(value: string) {
   if (parts.length === 0) return "TC";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-}
-
-function inlineComputedStyles(source: Element, target: Element) {
-  if (source instanceof HTMLElement && target instanceof HTMLElement) {
-    const computed = window.getComputedStyle(source);
-    for (const property of Array.from(computed)) {
-      target.style.setProperty(
-        property,
-        computed.getPropertyValue(property),
-        computed.getPropertyPriority(property)
-      );
-    }
-  }
-
-  const sourceChildren = Array.from(source.children);
-  const targetChildren = Array.from(target.children);
-  sourceChildren.forEach((child, index) => {
-    const targetChild = targetChildren[index];
-    if (targetChild) inlineComputedStyles(child, targetChild);
-  });
-}
-
-function blobToDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () =>
-      typeof reader.result === "string"
-        ? resolve(reader.result)
-        : reject(new Error("image conversion failed"));
-    reader.onerror = () => reject(reader.error ?? new Error("image conversion failed"));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function imageToDataUrl(src: string) {
-  if (src.startsWith("data:")) return src;
-  const response = await fetch(`/api/squad/image-proxy?url=${encodeURIComponent(src)}`);
-  if (!response.ok) throw new Error("image proxy failed");
-  return blobToDataUrl(await response.blob());
 }
 
 function withTraitDefaults(player: SquadPlayer): SquadPlayer {
@@ -549,11 +520,13 @@ export default function SquadMaker() {
 
         const officialSlotOvr = cardDetails[slotId]?.positionOvr;
         if (officialSlotOvr !== null && officialSlotOvr !== undefined) {
-          return officialSlotOvr;
+          return officialSlotOvr + (SQUAD_ENHANCEMENT_OVR_BONUS[player.grade] ?? 0) + 4;
         }
 
         const slot = formation.slots.find((item) => item.slotId === slotId);
-        return slot?.label === player.position ? player.ovr : null;
+        return slot?.label === player.position && player.ovr !== null
+          ? player.ovr + (SQUAD_ENHANCEMENT_OVR_BONUS[player.grade] ?? 0) + 4
+          : null;
       })
       .filter((value): value is number => value !== null);
 
@@ -800,51 +773,49 @@ export default function SquadMaker() {
     const pitch = pitchRef.current;
     if (!pitch || savingImage) return;
     setSavingImage(true);
+    let captureRoot: HTMLDivElement | null = null;
 
     try {
       const rect = pitch.getBoundingClientRect();
-      const clone = pitch.cloneNode(true) as HTMLDivElement;
-      inlineComputedStyles(pitch, clone);
-      clone.querySelectorAll("[data-capture-hide='true']").forEach((element) => element.remove());
-      clone.querySelectorAll("[data-capture-tooltip='true']").forEach((element) => element.remove());
-      clone.style.width = `${rect.width}px`;
-      clone.style.height = `${rect.height}px`;
-      clone.style.maxWidth = "none";
-      clone.style.margin = "0";
+      captureRoot = pitch.cloneNode(true) as HTMLDivElement;
+      captureRoot.querySelectorAll("[data-capture-hide='true']").forEach((element) => element.remove());
+      captureRoot.querySelectorAll("[data-capture-tooltip='true']").forEach((element) => element.remove());
+      captureRoot.style.position = "fixed";
+      captureRoot.style.left = "-10000px";
+      captureRoot.style.top = "0";
+      captureRoot.style.width = `${rect.width}px`;
+      captureRoot.style.height = `${rect.height}px`;
+      captureRoot.style.maxWidth = "none";
+      captureRoot.style.margin = "0";
+      document.body.appendChild(captureRoot);
 
-      const originalImages = Array.from(pitch.querySelectorAll("img"));
-      const clonedImages = Array.from(clone.querySelectorAll("img"));
+      const images = Array.from(captureRoot.querySelectorAll("img"));
       await Promise.all(
-        clonedImages.map(async (image, index) => {
-          const source = originalImages[index];
-          if (!source?.src) return;
+        images.map(async (image) => {
+          const src = image.src;
+          if (!src || src.startsWith("data:") || src.startsWith(window.location.origin)) return;
+          image.src = `/api/squad/image-proxy?url=${encodeURIComponent(src)}`;
           try {
-            image.src = await imageToDataUrl(source.src);
+            await image.decode();
           } catch {
-            image.remove();
+            await new Promise<void>((resolve) => {
+              image.onload = () => resolve();
+              image.onerror = () => resolve();
+            });
           }
         })
       );
 
-      const serialized = new XMLSerializer().serializeToString(clone);
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}" viewBox="0 0 ${rect.width} ${rect.height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="width:${rect.width}px;height:${rect.height}px;overflow:hidden">${serialized}</div></foreignObject></svg>`;
-      const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-      const image = new Image();
-      await new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = () => reject(new Error("squad image render failed"));
-        image.src = svgUrl;
+      const { default: html2canvas } = await import("html2canvas");
+      const canvas = await html2canvas(captureRoot, {
+        backgroundColor: null,
+        scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)),
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
       });
-
-      const scale = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(rect.width * scale);
-      canvas.height = Math.round(rect.height * scale);
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("canvas unavailable");
-      context.scale(scale, scale);
-      context.drawImage(image, 0, 0, rect.width, rect.height);
-      URL.revokeObjectURL(svgUrl);
 
       const blob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob(
@@ -853,18 +824,34 @@ export default function SquadMaker() {
           1
         )
       );
-      const downloadUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `fc-help-squad-${formationKey}-${new Date().toISOString().slice(0, 10)}.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      const filename = `fc-help-squad-${formationKey}-${new Date().toISOString().slice(0, 10)}.png`;
+      const file = new File([blob], filename, { type: "image/png" });
+      const shareNavigator = navigator as Navigator & {
+        canShare?: (data?: ShareData) => boolean;
+      };
+
+      if (navigator.share && shareNavigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "FC Help 스쿼드" });
+        } catch (shareError) {
+          if (shareError instanceof DOMException && shareError.name === "AbortError") return;
+          throw shareError;
+        }
+      } else {
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1500);
+      }
     } catch (captureError) {
       console.error("Squad image capture failed", captureError);
-      window.alert("스쿼드 이미지 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      window.alert("스쿼드 이미지 저장에 실패했습니다. 다시 시도해주세요.");
     } finally {
+      captureRoot?.remove();
       setSavingImage(false);
     }
   }
@@ -995,44 +982,76 @@ export default function SquadMaker() {
               {savingImage ? "저장 중..." : "이미지 저장"}
             </button>
 
-            {teamColorState.teamColors.length > 0 && (
-              <div className="absolute bottom-2 right-2 z-[55] flex max-w-[55%] flex-row-reverse gap-1.5 sm:bottom-3 sm:right-3 sm:gap-2">
-                {teamColorState.teamColors.map((color) => (
-                  <details key={color.name} className="group relative">
+            <div className="absolute bottom-2 right-2 z-[55] flex gap-1.5 sm:bottom-3 sm:right-3 sm:gap-2">
+              {([
+                ["affiliation", "소속"],
+                ["enhancement", "강화"],
+                ["relationship", "관계"],
+              ] as const).map(([category, label]) => {
+                const colors = teamColorState.teamColors.filter((color) => color.category === category);
+                if (colors.length === 0) {
+                  return (
+                    <div key={category} className="flex flex-col items-center gap-0.5">
+                      <div
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-dashed border-white/35 bg-black/25 text-[9px] font-black text-white/35 sm:h-10 sm:w-10"
+                        title={`${label} 팀컬러 없음`}
+                      >
+                        -
+                      </div>
+                      <span className="text-[7px] font-bold text-white/45 sm:text-[8px]">{label}</span>
+                    </div>
+                  );
+                }
+
+                const primary = colors[0];
+                return (
+                  <details key={category} className="group relative flex flex-col items-center">
                     <summary
-                      className="relative flex h-8 w-8 cursor-pointer list-none items-center justify-center overflow-visible rounded-full border border-white/20 bg-black/70 shadow-lg backdrop-blur transition hover:scale-105 sm:h-10 sm:w-10 [&::-webkit-details-marker]:hidden"
-                      title={`${color.name} · ${color.count}명 · ${color.level}단계`}
+                      className="relative flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-white/20 bg-black/70 shadow-lg backdrop-blur transition hover:scale-105 sm:h-10 sm:w-10 [&::-webkit-details-marker]:hidden"
+                      title={`${label} 팀컬러 · ${colors.map((color) => color.name).join(", ")}`}
                     >
-                      <span className="absolute inset-1 flex items-center justify-center rounded-full bg-white/10 text-[8px] font-black text-white sm:text-[10px]">
-                        {initials(color.name)}
-                      </span>
-                      {color.emblemUrl && (
+                      {primary.emblemUrl ? (
                         <img
-                          src={color.emblemUrl}
-                          alt={color.name}
-                          className="relative z-10 h-6 w-6 object-contain drop-shadow sm:h-8 sm:w-8"
+                          src={primary.emblemUrl}
+                          alt={primary.name}
+                          className="h-6 w-6 object-contain drop-shadow sm:h-8 sm:w-8"
                         />
+                      ) : (
+                        <span className="text-[9px] font-black text-white sm:text-[11px]">{initials(primary.name)}</span>
+                      )}
+                      {colors.length > 1 && (
+                        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-lime-300 px-1 text-[7px] font-black text-black">
+                          {colors.length}
+                        </span>
                       )}
                     </summary>
+                    <span className="mt-0.5 block text-center text-[7px] font-bold text-white/70 sm:text-[8px]">{label}</span>
                     <div
                       data-capture-tooltip="true"
-                      className="pointer-events-none invisible absolute bottom-full right-0 z-[70] mb-2 w-52 translate-y-1 rounded-xl border border-white/15 bg-[#111318]/95 p-3 text-left opacity-0 shadow-2xl backdrop-blur transition group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-open:visible group-open:translate-y-0 group-open:opacity-100 sm:w-60"
+                      className="pointer-events-none invisible absolute bottom-full right-0 z-[70] mb-2 w-56 translate-y-1 rounded-xl border border-white/15 bg-[#111318]/95 p-3 text-left opacity-0 shadow-2xl backdrop-blur transition group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-open:visible group-open:translate-y-0 group-open:opacity-100 sm:w-64"
                     >
-                      <p className="text-xs font-black text-white">{color.name}</p>
-                      <p className="mt-1 text-[10px] font-bold text-lime-300">
-                        {color.count}명 · {color.level}단계 · 적응도 {teamColorState.adaptation}
-                      </p>
-                      <p className="mt-1.5 text-[10px] leading-4 text-gray-300">
-                        {color.effect || `팀컬러 ${color.level}단계 적용`}
-                      </p>
+                      <p className="text-[10px] font-black text-lime-300">{label} 팀컬러</p>
+                      <div className="mt-2 space-y-2">
+                        {colors.map((color) => (
+                          <div key={`${category}-${color.name}`} className="border-t border-white/10 pt-2 first:border-t-0 first:pt-0">
+                            <p className="text-xs font-black text-white">{color.name}</p>
+                            <p className="mt-0.5 text-[9px] font-bold text-gray-400">
+                              {color.count}명 · {color.level}단계 · 적응도 {teamColorState.adaptation}
+                            </p>
+                            <p className="mt-1 text-[9px] leading-4 text-gray-300">
+                              {color.effect || `${label} 팀컬러 적용`}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </details>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
 
-            {teamColorState.loading && teamColorState.teamColors.length === 0 && (
-              <div data-capture-hide="true" className="pointer-events-none absolute bottom-2 right-2 z-[55] rounded-lg bg-black/55 px-2 py-1 text-[8px] font-bold text-gray-300 backdrop-blur sm:bottom-3 sm:right-3 sm:text-[10px]">
+            {teamColorState.loading && (
+              <div data-capture-hide="true" className="pointer-events-none absolute bottom-14 right-2 z-[55] rounded-md bg-black/55 px-2 py-1 text-[8px] font-bold text-gray-300 backdrop-blur sm:bottom-16 sm:right-3 sm:text-[9px]">
                 팀컬러 계산 중
               </div>
             )}

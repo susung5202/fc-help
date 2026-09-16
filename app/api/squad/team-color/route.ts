@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { calculatePositionOvrFromText } from "@/lib/fconline/positionOvr";
 
-type TeamColorCategory = "affiliation" | "enhancement" | "trait";
+type TeamColorCategory = "affiliation" | "enhancement" | "relationship";
 
 type SquadInput = {
   slotId: string;
@@ -30,7 +30,7 @@ type BasePlayerData = {
   html: string;
   baseOvr: number | null;
   affiliationOptions: TeamColorOption[];
-  traitOptions: TeamColorOption[];
+  relationshipOptions: TeamColorOption[];
 };
 
 type Candidate = {
@@ -39,7 +39,7 @@ type Candidate = {
   eligibleSlots: Set<string>;
   info: Awaited<ReturnType<typeof fetchTeamInfo>>;
   level: number;
-  category: "affiliation" | "trait";
+  category: "affiliation" | "relationship";
 };
 
 const PLAYER_ABILITY_URL = "https://fconline.nexon.com/datacenter/PlayerAbility";
@@ -361,10 +361,10 @@ function gainForEffect(item: BasePlayerData, effect: string) {
   return adjusted - item.baseOvr;
 }
 
-async function buildCandidates(basePlayers: BasePlayerData[], category: "affiliation" | "trait") {
+async function buildCandidates(basePlayers: BasePlayerData[], category: "affiliation" | "relationship") {
   const map = new Map<string, { option: TeamColorOption; count: number; eligibleSlots: Set<string> }>();
   for (const item of basePlayers) {
-    const options = category === "affiliation" ? item.affiliationOptions : item.traitOptions;
+    const options = category === "affiliation" ? item.affiliationOptions : item.relationshipOptions;
     const seen = new Set<string>();
     for (const option of options) {
       if (seen.has(option.name)) continue;
@@ -442,27 +442,27 @@ export async function POST(request: Request) {
           html,
           baseOvr: parsePositionOvr(html, player.position),
           affiliationOptions: parseOptionsBetween(html, "소속 팀컬러", "관계 팀컬러"),
-          traitOptions: parseOptionsBetween(html, "관계 팀컬러", "클래스 비교"),
+          relationshipOptions: parseOptionsBetween(html, "관계 팀컬러", "클래스 비교"),
         };
       })
     );
 
-    const [affiliationCandidates, traitCandidates] = await Promise.all([
+    const [affiliationCandidates, relationshipCandidates] = await Promise.all([
       buildCandidates(basePlayers, "affiliation"),
-      buildCandidates(basePlayers, "trait"),
+      buildCandidates(basePlayers, "relationship"),
     ]);
     const enhancement = selectEnhancement(players);
 
     const appliedBySlot: Record<
       string,
-      { affiliation: string | null; enhancement: string | null; trait: string | null }
+      { affiliation: string | null; enhancement: string | null; relationship: string | null }
     > = {};
     const selectedTeamColorMap = new Map<string, TeamColorInfo>();
     const ovrBySlot: Record<string, number | null> = {};
 
     for (const item of basePlayers) {
       const affiliation = chooseCandidateForPlayer(item, affiliationCandidates);
-      const trait = chooseCandidateForPlayer(item, traitCandidates);
+      const relationship = chooseCandidateForPlayer(item, relationshipCandidates);
       const effects: string[] = [];
 
       if (affiliation) {
@@ -481,18 +481,18 @@ export async function POST(request: Request) {
         });
       }
 
-      if (trait) {
-        const effect = effectForLevel(trait.info, trait.level);
+      if (relationship) {
+        const effect = effectForLevel(relationship.info, relationship.level);
         if (effect) effects.push(effect);
-        selectedTeamColorMap.set(`trait:${trait.option.name}`, {
-          name: trait.option.name,
-          category: "trait",
-          id: trait.info.id ?? trait.option.id,
-          emblemUrl: trait.info.emblemUrl ?? trait.option.emblemUrl,
-          count: trait.count,
-          level: trait.level,
-          maxLevel: trait.info.maxLevel,
-          maxRequired: trait.info.maxRequired,
+        selectedTeamColorMap.set(`relationship:${relationship.option.name}`, {
+          name: relationship.option.name,
+          category: "relationship",
+          id: relationship.info.id ?? relationship.option.id,
+          emblemUrl: relationship.info.emblemUrl ?? relationship.option.emblemUrl,
+          count: relationship.count,
+          level: relationship.level,
+          maxLevel: relationship.info.maxLevel,
+          maxRequired: relationship.info.maxRequired,
           effect,
         });
       }
@@ -517,7 +517,7 @@ export async function POST(request: Request) {
       appliedBySlot[item.player.slotId] = {
         affiliation: affiliation?.option.name ?? null,
         enhancement: enhancement && enhancementApplies ? enhancement.name : null,
-        trait: trait?.option.name ?? null,
+        relationship: relationship?.option.name ?? null,
       };
       ovrBySlot[item.player.slotId] = applyEffectsToOvr(
         item.html,

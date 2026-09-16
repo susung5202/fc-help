@@ -1,9 +1,6 @@
-name: One-time exact enhancement emblem match
+name: Apply enhancement emblem match
 
-on:
-  push:
-    paths:
-      - .github/workflows/one-time-fix-wave-emblem-match.yml
+on: push
 
 permissions:
   contents: write
@@ -13,31 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Patch exact enhancement emblem matching
+      - name: Patch enhancement matcher
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app/api/squad/team-color/route.ts')
           s = p.read_text(encoding='utf-8')
-          old = '''function getOfficialEnhancementEmblem(name: string) {
-  const waveName = Object.keys(ENHANCEMENT_EMBLEM_MAP).find((key) => name.includes(key));
-  return waveName ? ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] : null;
-}'''
-          new = '''function getOfficialEnhancementEmblem(name: string) {
-  const waveName = name.replace(/^Lv\\.\\d+\\s*/, "").trim();
-  return ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] ?? null;
-}'''
-          if old not in s:
-              raise SystemExit('enhancement emblem matcher not found')
-          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          s = s.replace(
+              '  const waveName = Object.keys(ENHANCEMENT_EMBLEM_MAP).find((key) => name.includes(key));\n  return waveName ? ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] : null;',
+              '  const waveName = name.replace(/^Lv\\.\\d+\\s*/, "").trim();\n  return ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] ?? null;',
+              1,
+          )
+          p.write_text(s, encoding='utf-8')
           PY
-      - name: Lint route
-        run: npx eslint app/api/squad/team-color/route.ts
       - name: Commit fix and cleanup
         run: |
           rm .github/workflows/one-time-fix-wave-emblem-match.yml

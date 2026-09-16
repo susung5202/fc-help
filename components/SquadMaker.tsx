@@ -518,13 +518,6 @@ export default function SquadMaker() {
     closePanel();
   }
 
-  function resetCurrentPositions() {
-    dragStateRef.current = null;
-    setDraggingSlotId(null);
-    setDropTargetSlotId(null);
-    setDragPosition(null);
-  }
-
   function handleFormationChange(nextFormation: string) {
     setFormationKey(nextFormation);
     closePanel();
@@ -693,8 +686,37 @@ export default function SquadMaker() {
   );
 
   return (
-    <div className="mt-8">
-      <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#181b21] p-5 lg:flex-row lg:items-center lg:justify-between">
+    <div className="mt-0 md:mt-8">
+      <div className="border-b border-white/10 bg-[#111318] px-2 py-2 md:hidden">
+        <div className="grid grid-cols-[42px_minmax(0,1fr)] gap-2">
+          <div className="flex h-10 items-center justify-center rounded-lg border border-lime-400/25 bg-lime-400/[0.06] text-[12px] font-black tracking-tight text-white">
+            FC<span className="text-lime-400">H</span>
+          </div>
+          <label className="flex h-10 items-center rounded-lg border border-white/15 bg-[#202522] px-3">
+            <span className="sr-only">포메이션</span>
+            <select
+              value={formationKey}
+              onChange={(event) => handleFormationChange(event.target.value)}
+              className="h-full w-full bg-transparent text-[14px] font-black text-white outline-none"
+            >
+              {Object.keys(FORMATIONS).map((key) => (
+                <option key={key} value={key} className="bg-[#181b21]">
+                  {key}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={clearSquad}
+          className="mt-1.5 h-9 w-full rounded-lg border border-red-400/20 bg-[#202522] px-3 text-[11px] font-bold text-red-300 active:bg-red-400/10"
+        >
+          전체 초기화
+        </button>
+      </div>
+
+      <div className="hidden flex-col gap-4 rounded-2xl border border-white/10 bg-[#181b21] p-5 md:flex lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2 md:gap-3">
           <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 px-4 py-3">
             <span className="text-xs font-semibold text-gray-500">포메이션</span>
@@ -721,13 +743,6 @@ export default function SquadMaker() {
           <span className="text-xs text-gray-600">이 기기에 자동 저장</span>
           <button
             type="button"
-            onClick={resetCurrentPositions}
-            className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-bold text-gray-300 transition hover:bg-white/5"
-          >
-            위치 초기화
-          </button>
-          <button
-            type="button"
             onClick={clearSquad}
             className="rounded-xl border border-red-400/20 px-4 py-2.5 text-sm font-bold text-red-300 transition hover:bg-red-400/5"
           >
@@ -736,22 +751,22 @@ export default function SquadMaker() {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-6 xl:grid-cols-[minmax(0,760px)_410px] xl:justify-center">
-        <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#101b14] p-3 sm:p-5">
+      <div className="mt-1 grid gap-6 md:mt-4 xl:grid-cols-[minmax(0,760px)_410px] xl:justify-center">
+        <div className="overflow-hidden border-y border-white/10 bg-[#101b14] p-0.5 md:rounded-3xl md:border md:p-5">
           <div
             ref={pitchRef}
-            className="relative mx-auto aspect-[0.7] w-full max-w-[600px] overflow-hidden rounded-2xl border-2 border-white/25 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner shadow-black/40"
+            className="relative mx-auto aspect-[0.7] w-full max-w-[600px] overflow-hidden rounded-lg border border-white/25 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner shadow-black/40 md:rounded-2xl md:border-2"
           >
             <PitchLines />
 
-            <div className="pointer-events-none absolute left-2 top-2 z-40 rounded-xl bg-black/60 px-2.5 py-1.5 backdrop-blur sm:left-3 sm:top-3 sm:px-3 sm:py-2">
-              <span className="text-[10px] text-gray-300 sm:text-xs">가치 </span>
-              <span className="text-sm font-black text-white sm:text-base">{formatSquadPrice(totalPrice)}</span>
+            <div className="pointer-events-none absolute left-2 top-2 z-40 rounded-lg bg-black/60 px-2 py-1 backdrop-blur sm:left-3 sm:top-3 sm:rounded-xl sm:px-3 sm:py-2">
+              <span className="text-[9px] text-gray-300 sm:text-xs">가치 </span>
+              <span className="text-[12px] font-black text-white sm:text-base">{formatSquadPrice(totalPrice)}</span>
             </div>
-            <div className="pointer-events-none absolute right-2 top-2 z-40 rounded-xl bg-black/60 px-2.5 py-1.5 text-right backdrop-blur sm:right-3 sm:top-3 sm:px-3 sm:py-2">
-              <span className="text-[10px] text-gray-300 sm:text-xs">급여 </span>
-              <span className="text-sm font-black text-white sm:text-base">{totalSalary}</span>
-              <span className="text-[10px] text-gray-300 sm:text-xs">/310</span>
+            <div className="pointer-events-none absolute right-2 top-2 z-40 rounded-lg bg-black/60 px-2 py-1 text-right backdrop-blur sm:right-3 sm:top-3 sm:rounded-xl sm:px-3 sm:py-2">
+              <span className="text-[9px] text-gray-300 sm:text-xs">급여 </span>
+              <span className="text-[12px] font-black text-white sm:text-base">{totalSalary}</span>
+              <span className="text-[9px] text-gray-300 sm:text-xs">/310</span>
             </div>
 
             {formation.slots.map((slot) => (
@@ -955,7 +970,7 @@ function SquadSlotButton({
         />
       ) : (
         <div
-          className={`flex h-[58px] w-[72px] items-center justify-center rounded-xl border bg-black/40 shadow-lg backdrop-blur-sm transition sm:h-[70px] sm:w-[88px] ${
+          className={`flex h-[48px] w-[60px] items-center justify-center rounded-lg border bg-black/40 shadow-lg backdrop-blur-sm transition sm:h-[70px] sm:w-[88px] sm:rounded-xl ${
             active
               ? "border-lime-300/80 bg-lime-300/10 ring-2 ring-lime-300/30"
               : dropTarget
@@ -963,7 +978,7 @@ function SquadSlotButton({
                 : "border-white/20 hover:border-white/40 hover:bg-black/50"
           }`}
         >
-          <span className="text-3xl font-light leading-none text-white/90 sm:text-4xl">+</span>
+          <span className="text-2xl font-light leading-none text-white/90 sm:text-4xl">+</span>
         </div>
       )}
     </button>

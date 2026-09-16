@@ -699,7 +699,9 @@ function PositionHitbox({
       }}
       aria-hidden="true"
     >
-      {!occupied && <span className="text-lg font-light text-white/90 sm:text-2xl">+</span>}
+      {dragActive && !occupied && (
+        <span className="text-lg font-light text-white/65 sm:text-2xl">+</span>
+      )}
     </div>
   );
 }
@@ -753,14 +755,16 @@ function SquadSlotButton({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       onDragStart={(event) => event.preventDefault()}
-      className={`group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center select-none transition ${
+      className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center select-none transition ${
         dragging
           ? "z-40 scale-105 cursor-grabbing opacity-90"
           : dropTarget
             ? "z-30 scale-105"
             : active
-              ? "scale-105"
-              : "hover:scale-105"
+              ? "z-30 scale-105"
+              : player
+                ? "z-20 hover:scale-105"
+                : "z-30 hover:scale-105"
       } ${player ? "cursor-grab" : "cursor-pointer"}`}
       style={{
         left: `${slot.x}%`,
@@ -784,10 +788,17 @@ function SquadSlotButton({
           dropTarget={dropTarget}
         />
       ) : (
-        <span
-          className="block h-[clamp(48px,10%,76px)] w-[clamp(48px,15%,86px)]"
-          aria-hidden="true"
-        />
+        <div
+          className={`flex h-[58px] w-[72px] items-center justify-center rounded-xl border bg-black/40 shadow-lg backdrop-blur-sm transition sm:h-[70px] sm:w-[88px] ${
+            active
+              ? "border-lime-300/80 bg-lime-300/10 ring-2 ring-lime-300/30"
+              : dropTarget
+                ? "border-lime-300/80 bg-lime-300/10"
+                : "border-white/20 hover:border-white/40 hover:bg-black/50"
+          }`}
+        >
+          <span className="text-3xl font-light leading-none text-white/90 sm:text-4xl">+</span>
+        </div>
       )}
     </button>
   );

@@ -21,6 +21,7 @@ type SquadPlayerCardProps = {
   baseOvr: number | null;
   slotPosition: string;
   grade: number;
+  calculatedOvr?: number | null;
   newTraits: string[];
   dragging: boolean;
   dropTarget: boolean;
@@ -137,6 +138,7 @@ export default function SquadPlayerCard({
   baseOvr,
   slotPosition,
   grade,
+  calculatedOvr,
   newTraits,
   dragging,
   dropTarget,
@@ -190,7 +192,11 @@ export default function SquadPlayerCard({
   }, [baseOvr, details?.positionOvr, primaryPosition, slotPosition]);
 
   const enhancedOvr =
-    positionOvr === null ? null : positionOvr + (ENHANCEMENT_OVR_BONUS[grade] ?? 0);
+    calculatedOvr !== null && calculatedOvr !== undefined
+      ? calculatedOvr
+      : positionOvr === null
+        ? null
+        : positionOvr + (ENHANCEMENT_OVR_BONUS[grade] ?? 0);
   const selectedPrice = details?.prices?.[grade - 1] ?? null;
   const firstNewTrait = newTraits[0] ?? null;
   const firstTraitIcon = firstNewTrait ? details?.traitIcons?.[firstNewTrait] ?? null : null;

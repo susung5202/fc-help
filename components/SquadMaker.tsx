@@ -32,6 +32,24 @@ type SquadCardDetails = {
   positionOvr: number | null;
 };
 
+type TeamColorSummary = {
+  name: string;
+  count: number;
+  level: number;
+  maxLevel: number;
+  maxRequired: number;
+  effect: string;
+  emblemUrl: string | null;
+};
+
+type TeamColorState = {
+  adaptation: number;
+  teamColors: TeamColorSummary[];
+  ovrBySlot: Record<string, number | null>;
+  appliedBySlot: Record<string, string | null>;
+  loading: boolean;
+};
+
 type PlayerVariant = SearchPlayer & {
   salary: number | null;
 };
@@ -211,6 +229,52 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function initials(value: string) {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "TC";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
+function inlineComputedStyles(source: Element, target: Element) {
+  if (source instanceof HTMLElement && target instanceof HTMLElement) {
+    const computed = window.getComputedStyle(source);
+    for (const property of Array.from(computed)) {
+      target.style.setProperty(
+        property,
+        computed.getPropertyValue(property),
+        computed.getPropertyPriority(property)
+      );
+    }
+  }
+
+  const sourceChildren = Array.from(source.children);
+  const targetChildren = Array.from(target.children);
+  sourceChildren.forEach((child, index) => {
+    const targetChild = targetChildren[index];
+    if (targetChild) inlineComputedStyles(child, targetChild);
+  });
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      typeof reader.result === "string"
+        ? resolve(reader.result)
+        : reject(new Error("image conversion failed"));
+    reader.onerror = () => reject(reader.error ?? new Error("image conversion failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function imageToDataUrl(src: string) {
+  if (src.startsWith("data:")) return src;
+  const response = await fetch(`/api/squad/image-proxy?url=${encodeURIComponent(src)}`);
+  if (!response.ok) throw new Error("image proxy failed");
+  return blobToDataUrl(await response.blob());
+}
+
 function withTraitDefaults(player: SquadPlayer): SquadPlayer {
   return {
     ...player,
@@ -249,6 +313,14 @@ export default function SquadMaker() {
   const [dropTargetSlotId, setDropTargetSlotId] = useState<string | null>(null);
   const [dragPosition, setDragPosition] = useState<CustomPosition | null>(null);
   const [cardDetails, setCardDetails] = useState<Record<string, SquadCardDetails>>({});
+  const [teamColorState, setTeamColorState] = useState<TeamColorState>({
+    adaptation: 5,
+    teamColors: [],
+    ovrBySlot: {},
+    appliedBySlot: {},
+    loading: false,
+  });
+  const [savingImage, setSavingImage] = useState(false);
 
   const pitchRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<DragState | null>(null);
@@ -394,6 +466,69 @@ export default function SquadMaker() {
     return () => controller.abort();
   }, [players, formationKey]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    const entries = Object.entries(players);
+    if (entries.length === 0) {
+      setTeamColorState({
+        adaptation: 5,
+        teamColors: [],
+        ovrBySlot: {},
+        appliedBySlot: {},
+        loading: false,
+      });
+      return;
+    }
+
+    const payload = entries
+      .map(([slotId, player]) => {
+        const slot = formation.slots.find((item) => item.slotId === slotId);
+        if (!slot) return null;
+        return {
+          slotId,
+          spid: player.id,
+          position: slot.label,
+          grade: player.grade,
+        };
+      })
+      .filter((item): item is { slotId: string; spid: number; position: string; grade: number } => item !== null);
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setTeamColorState((current) => ({ ...current, loading: true }));
+      try {
+        const response = await fetch("/api/squad/team-color", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ players: payload }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("team color request failed");
+        const data = await response.json();
+        if (controller.signal.aborted) return;
+        setTeamColorState({
+          adaptation: Number(data.adaptation) || 5,
+          teamColors: Array.isArray(data.teamColors) ? data.teamColors : [],
+          ovrBySlot:
+            data.ovrBySlot && typeof data.ovrBySlot === "object" ? data.ovrBySlot : {},
+          appliedBySlot:
+            data.appliedBySlot && typeof data.appliedBySlot === "object"
+              ? data.appliedBySlot
+              : {},
+          loading: false,
+        });
+      } catch {
+        if (controller.signal.aborted) return;
+        setTeamColorState((current) => ({ ...current, loading: false }));
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [players, formationKey, hydrated]);
+
   const selectedPlayers = Object.values(players) as SquadPlayer[];
   const totalSalary = Object.entries(players).reduce(
     (sum, [slotId]) => sum + (cardDetails[slotId]?.salary ?? 0),
@@ -407,6 +542,11 @@ export default function SquadMaker() {
   const averageOvr = useMemo(() => {
     const ovrs = Object.entries(players)
       .map(([slotId, player]) => {
+        const adjustedSlotOvr = teamColorState.ovrBySlot[slotId];
+        if (adjustedSlotOvr !== null && adjustedSlotOvr !== undefined) {
+          return adjustedSlotOvr;
+        }
+
         const officialSlotOvr = cardDetails[slotId]?.positionOvr;
         if (officialSlotOvr !== null && officialSlotOvr !== undefined) {
           return officialSlotOvr;
@@ -419,7 +559,7 @@ export default function SquadMaker() {
 
     if (ovrs.length === 0) return null;
     return Math.round((ovrs.reduce((sum, value) => sum + value, 0) / ovrs.length) * 10) / 10;
-  }, [players, cardDetails, formation.slots]);
+  }, [players, cardDetails, formation.slots, teamColorState.ovrBySlot]);
 
   function openSlot(slotId: string) {
     const current = players[slotId];
@@ -656,6 +796,79 @@ export default function SquadMaker() {
     openSlot(slotId);
   }
 
+  async function saveSquadImage() {
+    const pitch = pitchRef.current;
+    if (!pitch || savingImage) return;
+    setSavingImage(true);
+
+    try {
+      const rect = pitch.getBoundingClientRect();
+      const clone = pitch.cloneNode(true) as HTMLDivElement;
+      inlineComputedStyles(pitch, clone);
+      clone.querySelectorAll("[data-capture-hide='true']").forEach((element) => element.remove());
+      clone.querySelectorAll("[data-capture-tooltip='true']").forEach((element) => element.remove());
+      clone.style.width = `${rect.width}px`;
+      clone.style.height = `${rect.height}px`;
+      clone.style.maxWidth = "none";
+      clone.style.margin = "0";
+
+      const originalImages = Array.from(pitch.querySelectorAll("img"));
+      const clonedImages = Array.from(clone.querySelectorAll("img"));
+      await Promise.all(
+        clonedImages.map(async (image, index) => {
+          const source = originalImages[index];
+          if (!source?.src) return;
+          try {
+            image.src = await imageToDataUrl(source.src);
+          } catch {
+            image.remove();
+          }
+        })
+      );
+
+      const serialized = new XMLSerializer().serializeToString(clone);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}" viewBox="0 0 ${rect.width} ${rect.height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="width:${rect.width}px;height:${rect.height}px;overflow:hidden">${serialized}</div></foreignObject></svg>`;
+      const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("squad image render failed"));
+        image.src = svgUrl;
+      });
+
+      const scale = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(rect.width * scale);
+      canvas.height = Math.round(rect.height * scale);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("canvas unavailable");
+      context.scale(scale, scale);
+      context.drawImage(image, 0, 0, rect.width, rect.height);
+      URL.revokeObjectURL(svgUrl);
+
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (result) => (result ? resolve(result) : reject(new Error("png export failed"))),
+          "image/png",
+          1
+        )
+      );
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `fc-help-squad-${formationKey}-${new Date().toISOString().slice(0, 10)}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (captureError) {
+      console.error("Squad image capture failed", captureError);
+      window.alert("스쿼드 이미지 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setSavingImage(false);
+    }
+  }
+
   const panel = selectedSlot ? (
     <PlayerPickerPanel
       slot={selectedSlot}
@@ -769,6 +982,61 @@ export default function SquadMaker() {
               <span className="text-[9px] text-gray-300 sm:text-xs">/310</span>
             </div>
 
+            <button
+              type="button"
+              data-capture-hide="true"
+              onClick={(event) => {
+                event.stopPropagation();
+                void saveSquadImage();
+              }}
+              disabled={savingImage}
+              className="absolute bottom-2 left-2 z-[55] rounded-lg border border-white/15 bg-black/65 px-2.5 py-1.5 text-[9px] font-black text-white shadow-lg backdrop-blur transition hover:bg-black/80 disabled:opacity-50 sm:bottom-3 sm:left-3 sm:px-3 sm:py-2 sm:text-xs"
+            >
+              {savingImage ? "저장 중..." : "이미지 저장"}
+            </button>
+
+            {teamColorState.teamColors.length > 0 && (
+              <div className="absolute bottom-2 right-2 z-[55] flex max-w-[55%] flex-row-reverse gap-1.5 sm:bottom-3 sm:right-3 sm:gap-2">
+                {teamColorState.teamColors.map((color) => (
+                  <details key={color.name} className="group relative">
+                    <summary
+                      className="relative flex h-8 w-8 cursor-pointer list-none items-center justify-center overflow-visible rounded-full border border-white/20 bg-black/70 shadow-lg backdrop-blur transition hover:scale-105 sm:h-10 sm:w-10 [&::-webkit-details-marker]:hidden"
+                      title={`${color.name} · ${color.count}명 · ${color.level}단계`}
+                    >
+                      <span className="absolute inset-1 flex items-center justify-center rounded-full bg-white/10 text-[8px] font-black text-white sm:text-[10px]">
+                        {initials(color.name)}
+                      </span>
+                      {color.emblemUrl && (
+                        <img
+                          src={color.emblemUrl}
+                          alt={color.name}
+                          className="relative z-10 h-6 w-6 object-contain drop-shadow sm:h-8 sm:w-8"
+                        />
+                      )}
+                    </summary>
+                    <div
+                      data-capture-tooltip="true"
+                      className="pointer-events-none invisible absolute bottom-full right-0 z-[70] mb-2 w-52 translate-y-1 rounded-xl border border-white/15 bg-[#111318]/95 p-3 text-left opacity-0 shadow-2xl backdrop-blur transition group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-open:visible group-open:translate-y-0 group-open:opacity-100 sm:w-60"
+                    >
+                      <p className="text-xs font-black text-white">{color.name}</p>
+                      <p className="mt-1 text-[10px] font-bold text-lime-300">
+                        {color.count}명 · {color.level}단계 · 적응도 {teamColorState.adaptation}
+                      </p>
+                      <p className="mt-1.5 text-[10px] leading-4 text-gray-300">
+                        {color.effect || `팀컬러 ${color.level}단계 적용`}
+                      </p>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+
+            {teamColorState.loading && teamColorState.teamColors.length === 0 && (
+              <div data-capture-hide="true" className="pointer-events-none absolute bottom-2 right-2 z-[55] rounded-lg bg-black/55 px-2 py-1 text-[8px] font-bold text-gray-300 backdrop-blur sm:bottom-3 sm:right-3 sm:text-[10px]">
+                팀컬러 계산 중
+              </div>
+            )}
+
             {formation.slots.map((slot) => (
               <PositionHitbox
                 key={`hitbox-${slot.slotId}`}
@@ -792,6 +1060,7 @@ export default function SquadMaker() {
                   active={slot.slotId === selectedSlotId}
                   dragging={slot.slotId === draggingSlotId}
                   dropTarget={slot.slotId === dropTargetSlotId}
+                  calculatedOvr={teamColorState.ovrBySlot[slot.slotId] ?? null}
                   onClick={() => handleSlotClick(slot.slotId)}
                   onPointerDown={(event) => beginDrag(slot.slotId, event)}
                   onPointerMove={(event) => moveDrag(slot.slotId, event)}
@@ -909,6 +1178,7 @@ function SquadSlotButton({
   active,
   dragging,
   dropTarget,
+  calculatedOvr,
   onClick,
   onPointerDown,
   onPointerMove,
@@ -920,6 +1190,7 @@ function SquadSlotButton({
   active: boolean;
   dragging: boolean;
   dropTarget: boolean;
+  calculatedOvr?: number | null;
   onClick: () => void;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -964,6 +1235,7 @@ function SquadSlotButton({
           baseOvr={player.ovr}
           slotPosition={slot.label}
           grade={player.grade}
+          calculatedOvr={calculatedOvr}
           newTraits={player.newTraits ?? []}
           dragging={dragging}
           dropTarget={dropTarget}

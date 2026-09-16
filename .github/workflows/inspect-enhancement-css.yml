@@ -1,0 +1,39 @@
+name: Inspect enhancement CSS
+
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-enhancement-css.yml
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Find en_level CSS
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re, urllib.request, urllib.parse
+          req=urllib.request.Request('https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=8&spid=840001625',headers={'User-Agent':'Mozilla/5.0'})
+          html=urllib.request.urlopen(req,timeout=15).read().decode('utf-8','ignore')
+          urls=[]
+          for href in re.findall(r'<link[^>]+href=["\']([^"\']+)["\']',html,re.I):
+              if '.css' not in href: continue
+              u=urllib.parse.urljoin('https://fconline.nexon.com',href)
+              if u not in urls: urls.append(u)
+          print('CSS COUNT',len(urls))
+          for u in urls: print('CSS',u)
+          for u in urls:
+              try:
+                  req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
+                  css=urllib.request.urlopen(req,timeout=8).read().decode('utf-8','ignore')
+              except Exception as e:
+                  print('ERR',u,type(e).__name__,e); continue
+              if re.search(r'en_level(?:8|[0-9])',css,re.I):
+                  print('\n=== MATCH FILE',u,'===')
+                  for m in re.finditer(r'en_level(?:8|[0-9]+)',css,re.I):
+                      a=max(0,m.start()-700); b=min(len(css),m.end()+1200)
+                      print(css[a:b].replace('\n',' '))
+                      print('\n---')
+          PY

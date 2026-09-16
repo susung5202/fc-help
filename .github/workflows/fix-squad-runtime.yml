@@ -1,0 +1,29 @@
+name: Fix squad runtime
+on:
+  push:
+    paths:
+      - .github/workflows/fix-squad-runtime.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: python3 .github/scripts/fix-squad-runtime.py
+      - run: npx eslint lib/fconline/positionOvr.ts app/api/squad/card/route.ts app/api/squad/team-color/route.ts
+      - name: Commit fix
+        run: |
+          rm .github/workflows/fix-squad-runtime.yml
+          rm .github/scripts/fix-squad-runtime.py
+          git config user.name "susung5202"
+          git config user.email "74191151+susung5202@users.noreply.github.com"
+          git add lib/fconline/positionOvr.ts app/api/squad/card/route.ts app/api/squad/team-color/route.ts .github/workflows/fix-squad-runtime.yml .github/scripts/fix-squad-runtime.py
+          git commit -m "fix: stabilize squad team color OVR"
+          git push

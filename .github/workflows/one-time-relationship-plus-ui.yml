@@ -27,7 +27,8 @@ jobs:
           p.write_text(s, encoding='utf-8')
           PY
       - name: Lint component
-        run: npx eslint components/SquadMaker.tsx --rule 'react-hooks/set-state-in-effect: off'
+        run: |
+          npx eslint components/SquadMaker.tsx --rule 'react-hooks/set-state-in-effect: off'
       - name: Commit fix and cleanup
         run: |
           rm .github/workflows/one-time-relationship-plus-ui.yml

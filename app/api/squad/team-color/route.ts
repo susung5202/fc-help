@@ -87,6 +87,18 @@ const STAT_NAMES = [
   "속력",
 ] as const;
 
+const ENHANCEMENT_EMBLEM_MAP = {
+  "금빛 물결": { id: 10001, emblemUrl: "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/teamcolor/tc_u_g.png" },
+  "은빛 물결": { id: 10002, emblemUrl: "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/teamcolor/tc_u_s.png" },
+  "동빛 물결": { id: 10003, emblemUrl: "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/teamcolor/tc_u_b.png" },
+  "백금빛 물결": { id: 10004, emblemUrl: "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/teamcolor/tc_u_p.png" },
+} as const;
+
+function getOfficialEnhancementEmblem(name: string) {
+  const waveName = Object.keys(ENHANCEMENT_EMBLEM_MAP).find((key) => name.includes(key));
+  return waveName ? ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] : null;
+}
+
 const ENHANCEMENT_RULES = [
   { name: "Lv.2 백금빛 물결", minGrade: 11, required: 8, level: 2, maxLevel: 2, bonus: 5 },
   { name: "Lv.1 백금빛 물결", minGrade: 11, required: 5, level: 1, maxLevel: 2, bonus: 4 },
@@ -464,6 +476,7 @@ export async function POST(request: Request) {
         }
       : null;
     const enhancementInfo = enhancementOption ? await fetchTeamInfo(enhancementOption) : null;
+    const officialEnhancementEmblem = enhancement ? getOfficialEnhancementEmblem(enhancement.name) : null;
 
     const appliedBySlot: Record<
       string,
@@ -516,8 +529,12 @@ export async function POST(request: Request) {
         selectedTeamColorMap.set(`enhancement:${enhancement.name}`, {
           name: enhancement.name,
           category: "enhancement",
-          id: enhancementInfo?.id ?? enhancementOption?.id ?? null,
-          emblemUrl: enhancementInfo?.emblemUrl ?? enhancementOption?.emblemUrl ?? null,
+          id: officialEnhancementEmblem?.id ?? enhancementInfo?.id ?? enhancementOption?.id ?? null,
+          emblemUrl:
+            officialEnhancementEmblem?.emblemUrl ??
+            enhancementInfo?.emblemUrl ??
+            enhancementOption?.emblemUrl ??
+            null,
           count: enhancement.count,
           level: enhancement.level,
           maxLevel: enhancement.maxLevel,

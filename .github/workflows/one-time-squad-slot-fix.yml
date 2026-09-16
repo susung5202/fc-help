@@ -1,0 +1,98 @@
+name: One-time squad slot swap fix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/one-time-squad-slot-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch squad slot swapping
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("components/SquadMaker.tsx")
+          source = path.read_text(encoding="utf-8")
+
+          old = '''        if (target) {
+          const targetPosition = getSlotPosition(target);
+          setPositionsByFormation((current) => ({
+            ...current,
+            [formationKey]: {
+              ...(current[formationKey] ?? {}),
+              [slotId]: targetPosition,
+              [target.slotId]: drag.originPosition,
+            },
+          }));
+        }'''
+
+          new = '''        if (target) {
+          // 슬롯의 포지션/라벨은 고정하고, 슬롯 안의 선수만 서로 교환한다.
+          // 빈 슬롯으로 옮긴 경우 기존 슬롯은 원래 포지션의 빈칸으로 남는다.
+          setPositionsByFormation((current) => ({
+            ...current,
+            [formationKey]: {
+              ...(current[formationKey] ?? {}),
+              [slotId]: drag.originPosition,
+            },
+          }));
+
+          setPlayers((current) => {
+            const movingPlayer = current[slotId];
+            if (!movingPlayer) return current;
+
+            const targetPlayer = current[target.slotId];
+            const next = { ...current };
+            next[target.slotId] = movingPlayer;
+
+            if (targetPlayer) {
+              next[slotId] = targetPlayer;
+            } else {
+              delete next[slotId];
+            }
+
+            return next;
+          });
+
+          closePanel();
+        }'''
+
+          if old not in source:
+              raise SystemExit("Expected squad swap block was not found; refusing to patch.")
+
+          source = source.replace(old, new, 1)
+          source = source.replace(
+              "다른 선수나 빈 포지션 위에 놓으면 두 위치가 서로 바뀝니다.",
+              "다른 선수 위에 놓으면 두 선수가 자리를 바꾸고, 빈 포지션 위에 놓으면 기존 자리는 원래 포지션의 빈칸으로 남습니다.",
+              1,
+          )
+          source = source.replace(
+              "선수/빈 포지션에 겹쳐 놓기 → 서로 위치 교환",
+              "선수/빈 포지션에 겹쳐 놓기 → 선수 배치 교환",
+              1,
+          )
+
+          path.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Commit fix and remove one-time workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/SquadMaker.tsx
+          git rm .github/workflows/one-time-squad-slot-fix.yml
+          git commit -m "fix: swap players between squad slots"
+          git push origin HEAD:main

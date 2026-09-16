@@ -4,6 +4,7 @@ import {
   getPlayerRankings,
   type PlayerRankingItem,
 } from "@/lib/fconline/playerRankings";
+import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
 import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 
 type Player = {
@@ -16,6 +17,8 @@ type Season = {
   className: string;
   seasonImg: string;
 };
+
+type SortMode = "default" | "ovr";
 
 async function getPlayers(): Promise<Player[]> {
   const res = await fetch(
@@ -46,10 +49,11 @@ async function getSeasons(): Promise<Season[]> {
 export default async function PlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string }>;
 }) {
-  const { q = "" } = await searchParams;
+  const { q = "", sort = "default" } = await searchParams;
   const query = q.trim();
+  const sortMode: SortMode = sort === "ovr" ? "ovr" : "default";
 
   const [players, seasons, rankings] = await Promise.all([
     getPlayers(),
@@ -62,7 +66,7 @@ export default async function PlayersPage({
   );
   const playerMap = new Map(players.map((player) => [player.id, player]));
 
-  const results = query
+  const matchedPlayers = query
     ? players
         .filter((player) =>
           player.name.toLowerCase().includes(query.toLowerCase())
@@ -70,6 +74,21 @@ export default async function PlayersPage({
         .sort((a, b) => b.id - a.id)
         .slice(0, 100)
     : [];
+
+  const ovrMap =
+    query && sortMode === "ovr"
+      ? await getPlayerOvrMap(matchedPlayers.map((player) => player.id))
+      : new Map<number, PlayerOvrInfo | null>();
+
+  const results = [...matchedPlayers].sort((a, b) => {
+    if (sortMode !== "ovr") return 0;
+
+    const aOvr = ovrMap.get(a.id)?.ovr ?? -1;
+    const bOvr = ovrMap.get(b.id)?.ovr ?? -1;
+
+    if (bOvr !== aOvr) return bOvr - aOvr;
+    return b.id - a.id;
+  });
 
   return (
     <main className="min-h-screen bg-[#0f1115] text-white">
@@ -115,6 +134,7 @@ export default async function PlayersPage({
           method="GET"
           className="mt-10 flex max-w-3xl rounded-2xl border border-white/10 bg-[#181b21] p-2"
         >
+          <input type="hidden" name="sort" value={sortMode} />
           <input
             type="text"
             name="q"
@@ -169,12 +189,29 @@ export default async function PlayersPage({
             </div>
           ) : (
             <>
-              <div className="mb-6 flex items-end justify-between">
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-sm text-gray-500">검색 결과</p>
                   <h2 className="mt-1 text-2xl font-bold">{query}</h2>
+                  <span className="mt-1 block text-sm text-gray-500">
+                    {results.length}개
+                  </span>
                 </div>
-                <span className="text-sm text-gray-500">{results.length}개</span>
+
+                <div className="flex flex-wrap gap-2">
+                  <SortLink
+                    href={`/players?q=${encodeURIComponent(query)}&sort=default`}
+                    active={sortMode === "default"}
+                  >
+                    기본순
+                  </SortLink>
+                  <SortLink
+                    href={`/players?q=${encodeURIComponent(query)}&sort=ovr`}
+                    active={sortMode === "ovr"}
+                  >
+                    OVR 높은순
+                  </SortLink>
+                </div>
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -187,6 +224,7 @@ export default async function PlayersPage({
                       key={player.id}
                       player={player}
                       season={season}
+                      ovrInfo={ovrMap.get(player.id) ?? null}
                     />
                   );
                 })}
@@ -196,6 +234,29 @@ export default async function PlayersPage({
         </div>
       </section>
     </main>
+  );
+}
+
+function SortLink({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-lg border px-3 py-2 text-sm font-bold transition ${
+        active
+          ? "border-lime-400 bg-lime-400 text-black"
+          : "border-white/10 bg-white/[0.04] text-gray-300 hover:border-white/30 hover:text-white"
+      }`}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -359,9 +420,11 @@ function RankingBlock({
 function PlayerCard({
   player,
   season,
+  ovrInfo,
 }: {
   player: Player;
   season?: Season;
+  ovrInfo?: PlayerOvrInfo | null;
 }) {
   return (
     <Link
@@ -385,9 +448,16 @@ function PlayerCard({
       </div>
 
       <div className="p-5">
-        <span className="rounded-md bg-lime-400/10 px-2 py-1 text-xs font-bold text-lime-400">
-          {season?.className ?? "시즌 미확인"}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-lime-400/10 px-2 py-1 text-xs font-bold text-lime-400">
+            {season?.className ?? "시즌 미확인"}
+          </span>
+          {ovrInfo && (
+            <span className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-xs font-bold text-gray-200">
+              OVR {ovrInfo.ovr} · {ovrInfo.position}
+            </span>
+          )}
+        </div>
         <h3 className="mt-3 text-lg font-bold">{player.name}</h3>
       </div>
     </Link>

@@ -29,6 +29,7 @@ type SquadPlayer = SearchPlayer & {
 type SquadCardDetails = {
   salary: number | null;
   prices: Array<string | null>;
+  positionOvr: number | null;
 };
 
 type PlayerVariant = SearchPlayer & {
@@ -375,6 +376,7 @@ export default function SquadMaker() {
           const details: SquadCardDetails = {
             salary: Number.isFinite(data.salary) ? data.salary : null,
             prices: Array.isArray(data.prices) ? data.prices : [],
+            positionOvr: Number.isFinite(data.positionOvr) ? data.positionOvr : null,
           };
           SUMMARY_CARD_CACHE.set(cacheKey, details);
           return [slotId, details] as const;
@@ -403,13 +405,21 @@ export default function SquadMaker() {
   }, "0");
 
   const averageOvr = useMemo(() => {
-    const ovrs = selectedPlayers
-      .map((player) => player.ovr)
+    const ovrs = Object.entries(players)
+      .map(([slotId, player]) => {
+        const officialSlotOvr = cardDetails[slotId]?.positionOvr;
+        if (officialSlotOvr !== null && officialSlotOvr !== undefined) {
+          return officialSlotOvr;
+        }
+
+        const slot = formation.slots.find((item) => item.slotId === slotId);
+        return slot?.label === player.position ? player.ovr : null;
+      })
       .filter((value): value is number => value !== null);
 
     if (ovrs.length === 0) return null;
     return Math.round((ovrs.reduce((sum, value) => sum + value, 0) / ovrs.length) * 10) / 10;
-  }, [selectedPlayers]);
+  }, [players, cardDetails, formation.slots]);
 
   function openSlot(slotId: string) {
     const current = players[slotId];

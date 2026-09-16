@@ -20,7 +20,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: python3 .github/scripts/add-squad-player-confirmation.py
-      - run: npx eslint components/SquadMaker.tsx --rule 'react-hooks/set-state-in-effect: off'
+      - name: Lint SquadMaker
+        run: |
+          npx eslint components/SquadMaker.tsx --rule 'react-hooks/set-state-in-effect: off'
       - name: Commit changes
         run: |
           git config user.name "susung5202"

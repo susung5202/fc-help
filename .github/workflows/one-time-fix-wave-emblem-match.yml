@@ -1,0 +1,49 @@
+name: One-time exact enhancement emblem match
+
+on:
+  push:
+    paths:
+      - .github/workflows/one-time-fix-wave-emblem-match.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Patch exact enhancement emblem matching
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/api/squad/team-color/route.ts')
+          s = p.read_text(encoding='utf-8')
+          old = '''function getOfficialEnhancementEmblem(name: string) {
+  const waveName = Object.keys(ENHANCEMENT_EMBLEM_MAP).find((key) => name.includes(key));
+  return waveName ? ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] : null;
+}'''
+          new = '''function getOfficialEnhancementEmblem(name: string) {
+  const waveName = name.replace(/^Lv\\.\\d+\\s*/, "").trim();
+  return ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] ?? null;
+}'''
+          if old not in s:
+              raise SystemExit('enhancement emblem matcher not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Lint route
+        run: npx eslint app/api/squad/team-color/route.ts
+      - name: Commit fix and cleanup
+        run: |
+          rm .github/workflows/one-time-fix-wave-emblem-match.yml
+          git config user.name "susung5202"
+          git config user.email "74191151+susung5202@users.noreply.github.com"
+          git add app/api/squad/team-color/route.ts .github/workflows/one-time-fix-wave-emblem-match.yml
+          git commit -m "fix: match enhancement wave emblems exactly"
+          git push

@@ -14,11 +14,28 @@ self.addEventListener("push", (event) => {
     },
   };
 
+  const showNotification = self.registration.showNotification(
+    data.title || "FC Help",
+    options
+  );
+
+  const notifyOpenClients = clients
+    .matchAll({
+      type: "window",
+      includeUncontrolled: true,
+    })
+    .then((clientList) =>
+      Promise.all(
+        clientList.map((client) =>
+          client.postMessage({
+            type: "FC_HELP_PUSH_SOUND",
+          })
+        )
+      )
+    );
+
   event.waitUntil(
-    self.registration.showNotification(
-      data.title || "FC Help",
-      options
-    )
+    Promise.all([showNotification, notifyOpenClients])
   );
 });
 

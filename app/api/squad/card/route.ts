@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
-
-type PositionMeta = {
-  spposition: number;
-  desc: string;
-};
+import {
+  calculatePositionOvrFromText,
+  normalizeSquadPosition,
+} from "@/lib/fconline/positionOvr";
 
 type CardData = {
   salary: number | null;
   prices: Array<string | null>;
   positionOvr: number | null;
+  traitIcons: Record<string, string>;
 };
 
 const MOBILE_PLAYER_URL = "https://m.fconline.nexon.com/datacenter/playerinfo";
-const PLAYER_LIST_URL = "https://fconline.nexon.com/datacenter/PlayerList";
-const POSITION_META_URL = "https://open.api.nexon.com/static/fconline/meta/spposition.json";
 const ALL_POSITIONS = [
   "GK",
   "SW",
@@ -125,6 +123,35 @@ function parseMobilePositionOvr(html: string, position: string): number | null {
   return null;
 }
 
+function normalizeAssetUrl(src: string) {
+  if (src.startsWith("//")) return `https:${src}`;
+  if (src.startsWith("/")) return `https://m.fconline.nexon.com${src}`;
+  return src;
+}
+
+function getTagAttribute(tag: string, attribute: string) {
+  const match = tag.match(
+    new RegExp(`${attribute}\\s*=\\s*["']([^"']+)["']`, "i")
+  );
+  return match ? decodeHtmlEntities(match[1]).trim() : null;
+}
+
+function parseTraitIcons(html: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const tags = html.match(/<img\b[^>]*>/gi) ?? [];
+
+  for (const tag of tags) {
+    const src = getTagAttribute(tag, "src");
+    if (!src || !/\/traits\/trait_icon_/i.test(src)) continue;
+
+    const alt = getTagAttribute(tag, "alt") ?? getTagAttribute(tag, "title");
+    if (!alt) continue;
+    result[alt] = normalizeAssetUrl(src);
+  }
+
+  return result;
+}
+
 async function fetchMobilePlayerHtml(spid: number) {
   const response = await fetch(`${MOBILE_PLAYER_URL}?spid=${spid}`, {
     headers: {
@@ -140,91 +167,6 @@ async function fetchMobilePlayerHtml(spid: number) {
   return response.text();
 }
 
-async function getPositionCode(position: string): Promise<number | null> {
-  try {
-    const response = await fetch(POSITION_META_URL, { next: { revalidate: 86400 } });
-    if (!response.ok) return null;
-    const items = (await response.json()) as PositionMeta[];
-    return items.find((item) => item.desc === position)?.spposition ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function extractPlayerRow(html: string, spid: number) {
-  const markerPattern = new RegExp(`\\.val\\(['\"]${spid}['\"]\\)`);
-  const marker = markerPattern.exec(html);
-  if (!marker) return null;
-
-  const start = html.lastIndexOf('<div class="tr', marker.index);
-  const next = html.indexOf('<div class="tr', marker.index + marker[0].length);
-  const safeStart = start >= 0 ? start : Math.max(0, marker.index - 5000);
-  const safeEnd = next >= 0 ? next : Math.min(html.length, marker.index + 20000);
-  return html.slice(safeStart, safeEnd);
-}
-
-function parsePlayerListPositionOvr(row: string, spid: number, position: string) {
-  const escapedPosition = escapeRegExp(position);
-  const directPattern = new RegExp(
-    `<span[^>]*class=["'][^"']*position[^"']*["'][^>]*>[\\s\\S]{0,1200}?` +
-      `<span[^>]*class=["'][^"']*txt[^"']*["'][^>]*>\\s*${escapedPosition}\\s*<\\/span>` +
-      `[\\s\\S]{0,1200}?<span[^>]*class=["'][^"']*skillData_${spid}[^"']*["'][^>]*>\\s*(\\d{2,3})`,
-    "i"
-  );
-  const direct = row.match(directPattern);
-  if (direct) return Number(direct[1]);
-
-  const skillPattern = new RegExp(
-    `<span[^>]*class=["'][^"']*skillData_${spid}[^"']*["'][^>]*>\\s*(\\d{2,3})\\s*<\\/span>`,
-    "gi"
-  );
-
-  for (const match of row.matchAll(skillPattern)) {
-    const index = match.index ?? 0;
-    const before = htmlToText(row.slice(Math.max(0, index - 700), index));
-    if (new RegExp(`(?:^|\\s)${escapedPosition}(?=\\s|$)`).test(before)) {
-      return Number(match[1]);
-    }
-  }
-
-  return null;
-}
-
-async function fetchPositionOvr(spid: number, playerName: string, position: string) {
-  const positionCode = await getPositionCode(position);
-  if (positionCode === null) return null;
-
-  try {
-    const body = new URLSearchParams({
-      strPlayerName: playerName,
-      strSeason: "",
-      strPosition: `,${positionCode},`,
-      n4SalaryMin: "0",
-      n4SalaryMax: "99",
-      n4OvrMin: "0",
-      n4OvrMax: "200",
-    });
-
-    const response = await fetch(PLAYER_LIST_URL, {
-      method: "POST",
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        Referer: "https://fconline.nexon.com/datacenter/",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      },
-      body,
-      cache: "no-store",
-    });
-
-    if (!response.ok) return null;
-    const html = await response.text();
-    const row = extractPlayerRow(html, spid);
-    return row ? parsePlayerListPositionOvr(row, spid, position) : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const spid = Number(searchParams.get("spid"));
@@ -232,19 +174,24 @@ export async function GET(request: Request) {
   const position = (searchParams.get("position") ?? "").trim().toUpperCase();
 
   if (!Number.isInteger(spid) || spid <= 0 || !playerName || !position) {
-    return NextResponse.json({ error: "선수 또는 포지션 정보가 올바르지 않습니다." }, { status: 400 });
+    return NextResponse.json(
+      { error: "선수 또는 포지션 정보가 올바르지 않습니다." },
+      { status: 400 }
+    );
   }
 
   try {
-    const [mobileHtml, listOvr] = await Promise.all([
-      fetchMobilePlayerHtml(spid),
-      fetchPositionOvr(spid, playerName, position),
-    ]);
+    const mobileHtml = await fetchMobilePlayerHtml(spid);
+    const text = htmlToText(mobileHtml);
+    const normalizedPosition = normalizeSquadPosition(position);
 
     const data: CardData = {
       salary: parseSalary(mobileHtml, playerName),
       prices: parsePrices(mobileHtml),
-      positionOvr: listOvr ?? parseMobilePositionOvr(mobileHtml, position),
+      positionOvr:
+        parseMobilePositionOvr(mobileHtml, normalizedPosition) ??
+        calculatePositionOvrFromText(text, normalizedPosition),
+      traitIcons: parseTraitIcons(mobileHtml),
     };
 
     return NextResponse.json(data, {
@@ -255,7 +202,12 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Squad card data failed", { spid, playerName, position, error });
     return NextResponse.json(
-      { salary: null, prices: Array.from({ length: 13 }, () => null), positionOvr: null },
+      {
+        salary: null,
+        prices: Array.from({ length: 13 }, () => null),
+        positionOvr: null,
+        traitIcons: {},
+      },
       { status: 200 }
     );
   }

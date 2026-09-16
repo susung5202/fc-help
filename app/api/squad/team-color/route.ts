@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { calculatePositionOvrFromText } from "@/lib/fconline/positionOvr";
+import { calculatePositionOvrFromAbilities } from "@/lib/fconline/positionOvr";
 
 type TeamColorCategory = "affiliation" | "enhancement" | "relationship";
 
@@ -342,11 +342,21 @@ function parseAbilityValues(html: string) {
 
 function applyEffectsToOvr(html: string, position: string, exactBaseOvr: number | null, effects: string[]) {
   if (effects.length === 0) return exactBaseOvr;
+
+  const overallBonus = effects.reduce(
+    (sum, effect) => sum + Number(effect.match(/전체 능력치\s*\+(\d+)/)?.[1] ?? 0),
+    0
+  );
   const base = parseAbilityValues(html);
   const stats = Object.keys(base);
-  if (stats.length === 0) return exactBaseOvr;
-  const adjusted = { ...base };
 
+  // 전체 능력치 보너스는 모든 포지션 가중치에 동일하게 적용되므로,
+  // 세부 능력치 파싱이 실패해도 최종 OVR에서 절대 누락시키지 않는다.
+  if (stats.length === 0) {
+    return exactBaseOvr === null ? null : exactBaseOvr + overallBonus;
+  }
+
+  const adjusted = { ...base };
   for (const effect of effects) {
     const overall = Number(effect.match(/전체 능력치\s*\+(\d+)/)?.[1] ?? 0);
     if (overall > 0) {
@@ -354,16 +364,17 @@ function applyEffectsToOvr(html: string, position: string, exactBaseOvr: number 
     }
     for (const stat of STAT_NAMES) {
       if (stat === "전체 능력치") continue;
-      const amount = Number(effect.match(new RegExp(`${escapeRegExp(stat)}\\s*\\+(\\d+)`))?.[1] ?? 0);
+      const amount = Number(effect.match(new RegExp(`${escapeRegExp(stat)}\s*\+(\d+)`))?.[1] ?? 0);
       if (amount > 0 && adjusted[stat] !== undefined) adjusted[stat] += amount;
     }
   }
 
-  const toText = (values: Record<string, number>) =>
-    `능력치 전체 ${Object.entries(values).map(([name, value]) => `${name} ${value}`).join(" ")} 출생`;
-  const weightedBase = calculatePositionOvrFromText(toText(base), position);
-  const weightedAdjusted = calculatePositionOvrFromText(toText(adjusted), position);
-  if (weightedBase === null || weightedAdjusted === null) return exactBaseOvr;
+  const weightedBase = calculatePositionOvrFromAbilities(base, position);
+  const weightedAdjusted = calculatePositionOvrFromAbilities(adjusted, position);
+  if (weightedBase === null || weightedAdjusted === null) {
+    return exactBaseOvr === null ? null : exactBaseOvr + overallBonus;
+  }
+
   const delta = weightedAdjusted - weightedBase;
   return exactBaseOvr === null ? weightedAdjusted : exactBaseOvr + delta;
 }

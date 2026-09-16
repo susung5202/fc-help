@@ -211,25 +211,13 @@ export function normalizeSquadPosition(position: string) {
   return POSITION_ALIASES[normalized] ?? normalized;
 }
 
-export function calculatePositionOvrFromText(text: string, position: string): number | null {
+export function calculatePositionOvrFromAbilities(
+  abilities: Record<string, number>,
+  position: string
+): number | null {
   const normalizedPosition = normalizeSquadPosition(position);
   const weights = POSITION_WEIGHTS[normalizedPosition];
   if (!weights) return null;
-
-  const abilityMarker = text.indexOf("능력치 전체");
-  const birthMarker = text.indexOf("출생", abilityMarker >= 0 ? abilityMarker : 0);
-  const section = text.slice(
-    abilityMarker >= 0 ? abilityMarker : 0,
-    birthMarker >= 0 ? birthMarker : text.length
-  );
-
-  const abilities: Record<string, number> = {};
-  for (const name of ABILITY_NAMES) {
-    const match = section.match(new RegExp(`${escapeRegExp(name)}\\s+(\\d{1,3})(?=\\s|$)`));
-    if (!match) continue;
-    const value = Number(match[1]);
-    if (Number.isFinite(value)) abilities[name] = value;
-  }
 
   let weightedTotal = 0;
   for (const [ability, weight] of Object.entries(weights)) {
@@ -239,4 +227,23 @@ export function calculatePositionOvrFromText(text: string, position: string): nu
   }
 
   return Math.floor(weightedTotal / 100);
+}
+
+export function calculatePositionOvrFromText(text: string, position: string): number | null {
+  const abilityMarker = text.indexOf("능력치 전체");
+  const birthMarker = text.indexOf("출생", abilityMarker >= 0 ? abilityMarker : 0);
+  const section = text.slice(
+    abilityMarker >= 0 ? abilityMarker : 0,
+    birthMarker >= 0 ? birthMarker : text.length
+  );
+
+  const abilities: Record<string, number> = {};
+  for (const name of ABILITY_NAMES) {
+    const match = section.match(new RegExp(`${escapeRegExp(name)}\s+(\d{1,3})(?=\s|$)`));
+    if (!match) continue;
+    const value = Number(match[1]);
+    if (Number.isFinite(value)) abilities[name] = value;
+  }
+
+  return calculatePositionOvrFromAbilities(abilities, position);
 }

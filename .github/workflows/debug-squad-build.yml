@@ -1,4 +1,4 @@
-name: Debug squad deployment build
+name: Apply validated squad share fix
 
 on:
   push:
@@ -9,16 +9,11 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  apply:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Fix Web Share type guard
+      - name: Apply validated type guard fix
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -30,21 +25,9 @@ jobs:
           d = 'if (shareNavigator.canShare?.({ files: [imagePreview.file] }))'
           if a not in s or c not in s:
               raise SystemExit('share guards not found')
-          s = s.replace(a, b, 1).replace(c, d, 1)
-          p.write_text(s, encoding='utf-8')
+          p.write_text(s.replace(a, b, 1).replace(c, d, 1), encoding='utf-8')
           PY
-      - name: Create temporary VAPID build env
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const webpush = require('web-push');
-          const keys = webpush.generateVAPIDKeys();
-          fs.appendFileSync(process.env.GITHUB_ENV, `VAPID_SUBJECT=mailto:build@example.com\n`);
-          fs.appendFileSync(process.env.GITHUB_ENV, `NEXT_PUBLIC_VAPID_PUBLIC_KEY=${keys.publicKey}\n`);
-          fs.appendFileSync(process.env.GITHUB_ENV, `VAPID_PRIVATE_KEY=${keys.privateKey}\n`);
-          NODE
-      - run: npm run build
-      - name: Commit validated fix
+      - name: Commit fix and cleanup
         run: |
           rm -f .github/workflows/debug-squad-build.yml
           git config user.name "susung5202"

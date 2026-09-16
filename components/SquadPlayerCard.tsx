@@ -81,6 +81,17 @@ function formatBp(value: string | null | undefined) {
   return `${parts.slice(0, 2).join(" ")} BP`;
 }
 
+function getPositionTone(position: string) {
+  if (["ST", "CF", "LS", "RS", "LW", "RW", "LF", "RF"].includes(position)) {
+    return "text-rose-400";
+  }
+  if (["GK"].includes(position)) return "text-amber-300";
+  if (["LB", "LCB", "CB", "RCB", "RB", "LWB", "RWB", "SW"].includes(position)) {
+    return "text-blue-300";
+  }
+  return "text-emerald-300";
+}
+
 export default function SquadPlayerCard({
   spid,
   name,
@@ -136,7 +147,6 @@ export default function SquadPlayerCard({
     if (details?.positionOvr !== null && details?.positionOvr !== undefined) {
       return details.positionOvr;
     }
-
     if (primaryPosition === slotPosition) return baseOvr;
     return null;
   }, [baseOvr, details?.positionOvr, primaryPosition, slotPosition]);
@@ -144,65 +154,82 @@ export default function SquadPlayerCard({
   const enhancedOvr =
     positionOvr === null ? null : positionOvr + (ENHANCEMENT_OVR_BONUS[grade] ?? 0);
   const selectedPrice = details?.prices?.[grade - 1] ?? null;
-  const traitLabel = newTraits.length > 0 ? `신규특성 ${newTraits.length}` : "신규특성 -";
+  const traitTitle = newTraits.length > 0 ? newTraits.join(", ") : "확인된 신규특성 없음";
 
   return (
-    <div className="relative w-[82px] sm:w-[104px]">
+    <div
+      className={`relative h-[132px] w-[92px] transition sm:h-[158px] sm:w-[116px] ${
+        dragging ? "scale-105 opacity-90" : dropTarget ? "scale-105" : ""
+      }`}
+    >
       <div
-        className={`relative h-[104px] overflow-hidden rounded-xl border bg-[linear-gradient(180deg,rgba(12,18,15,0.72),rgba(7,11,9,0.88))] shadow-xl backdrop-blur transition sm:h-[126px] ${
+        className={`pointer-events-none absolute inset-0 rounded-2xl transition ${
           dragging
-            ? "border-lime-300/80 ring-2 ring-lime-300/25"
+            ? "bg-lime-300/10 ring-2 ring-lime-300/70"
             : dropTarget
-              ? "border-lime-300/90 ring-2 ring-lime-300/35"
-              : "border-white/15"
+              ? "bg-lime-300/10 ring-2 ring-lime-300/80"
+              : ""
         }`}
-      >
-        <div className="absolute left-1 top-1 z-30 flex max-w-[45px] flex-col items-start gap-0.5 sm:left-1.5 sm:top-1.5 sm:max-w-[56px] sm:gap-1">
-          <span
-            title={newTraits.length > 0 ? newTraits.join(", ") : "확인된 신규특성 없음"}
-            className="max-w-full truncate rounded bg-cyan-400/15 px-1 py-0.5 text-[6px] font-black text-cyan-100 ring-1 ring-cyan-300/25 sm:text-[7px]"
-          >
-            {traitLabel}
-          </span>
-          <span className="rounded bg-emerald-500 px-1 py-0.5 text-[7px] font-black leading-none text-white shadow sm:text-[9px]">
-            {slotPosition}
-          </span>
-          <span className="text-[14px] font-black leading-none text-white drop-shadow sm:text-[18px]">
-            {enhancedOvr ?? "-"}
-          </span>
-        </div>
+      />
 
-        <div className="absolute right-1 top-1 z-30 flex flex-col items-end gap-0.5 sm:right-1.5 sm:top-1.5 sm:gap-1">
-          <span
-            className={`rounded border px-1 py-0.5 text-[7px] font-black sm:text-[9px] ${getEnhancementBadgeTone(grade)}`}
-          >
-            +{grade}
-          </span>
-          <span className="rounded bg-black/65 px-1 py-0.5 text-[6px] font-bold text-amber-200 ring-1 ring-white/10 sm:text-[7px]">
-            급여 {details?.salary ?? "-"}
-          </span>
-        </div>
+      <div className="absolute left-0 top-1 z-30 flex flex-col items-start gap-0.5 sm:top-2 sm:gap-1">
+        <span
+          title={traitTitle}
+          className="relative flex h-5 w-5 items-center justify-center rounded border border-amber-200/70 bg-[#17170d]/90 text-[9px] font-black text-amber-200 shadow-md sm:h-6 sm:w-6 sm:text-[10px]"
+        >
+          특
+          {newTraits.length > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-cyan-400 px-0.5 text-[7px] font-black text-black">
+              {newTraits.length}
+            </span>
+          )}
+        </span>
+        <span className={`text-[12px] font-black leading-none drop-shadow sm:text-[15px] ${getPositionTone(slotPosition)}`}>
+          {slotPosition}
+        </span>
+        <span className="text-[19px] font-black leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] sm:text-[24px]">
+          {enhancedOvr ?? "-"}
+        </span>
+      </div>
 
-        {seasonImg && (
-          <img
-            src={seasonImg}
-            alt={seasonName}
-            className="absolute bottom-[25px] left-1 z-30 h-4 max-w-7 object-contain drop-shadow sm:bottom-[31px] sm:left-1.5 sm:h-5 sm:max-w-9"
-          />
-        )}
+      <div className="absolute right-0 top-1 z-30 flex flex-col items-end gap-1 sm:top-2">
+        <span
+          className={`min-w-7 rounded border px-1.5 py-1 text-center text-[11px] font-black shadow-lg sm:min-w-8 sm:text-[13px] ${getEnhancementBadgeTone(grade)}`}
+        >
+          +{grade}
+        </span>
+        <span
+          className="flex h-7 min-w-8 items-center justify-center bg-black/85 px-1.5 text-[10px] font-black text-white shadow-lg ring-1 ring-white/20 sm:h-8 sm:min-w-9 sm:text-[12px]"
+          style={{ clipPath: "polygon(50% 0, 95% 24%, 95% 76%, 50% 100%, 5% 76%, 5% 24%)" }}
+          title="급여"
+        >
+          {details?.salary ?? "-"}
+        </span>
+      </div>
 
-        <PlayerArtwork
-          key={spid}
-          spid={spid}
-          alt={name}
-          className="absolute bottom-[22px] left-1/2 z-10 max-h-[78px] max-w-[132%] -translate-x-1/2 object-contain sm:bottom-[27px] sm:max-h-[98px]"
+      <PlayerArtwork
+        key={spid}
+        spid={spid}
+        alt={name}
+        className="pointer-events-none absolute bottom-[34px] left-1/2 z-10 max-h-[96px] max-w-[142%] -translate-x-1/2 object-contain drop-shadow-[0_8px_8px_rgba(0,0,0,0.35)] sm:bottom-[41px] sm:max-h-[118px]"
+      />
+
+      {seasonImg && (
+        <img
+          src={seasonImg}
+          alt={seasonName}
+          className="pointer-events-none absolute bottom-[40px] left-0 z-30 h-5 max-w-8 object-contain drop-shadow-md sm:bottom-[49px] sm:h-6 sm:max-w-10"
         />
+      )}
 
-        <div className="absolute inset-x-0 bottom-0 z-40 bg-black/80 px-1 py-1 text-center backdrop-blur sm:px-1.5 sm:py-1.5">
-          <p className="truncate text-[8px] font-black leading-none text-white sm:text-[10px]">{name}</p>
+      <div className="absolute inset-x-[-4px] bottom-0 z-40 text-center sm:inset-x-[-8px]">
+        <div className="bg-gradient-to-t from-black/85 via-black/65 to-transparent px-1 pb-1 pt-3">
+          <p className="truncate text-[11px] font-black leading-tight text-white drop-shadow sm:text-[14px]">
+            {name}
+          </p>
           <p
             title={formatExactBp(selectedPrice)}
-            className="mt-1 truncate text-[6px] font-bold leading-none text-lime-300 sm:text-[8px]"
+            className="mt-0.5 truncate text-[9px] font-black leading-tight text-amber-300 drop-shadow sm:text-[11px]"
           >
             {formatBp(selectedPrice)}
           </p>

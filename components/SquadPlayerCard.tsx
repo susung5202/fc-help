@@ -13,6 +13,7 @@ type CardDetails = {
 
 type SquadPlayerCardProps = {
   spid: number;
+  artworkSpid?: number;
   name: string;
   seasonName: string;
   seasonImg: string | null;
@@ -127,6 +128,7 @@ function SalaryHex({ salary }: { salary: number | null | undefined }) {
 
 export default function SquadPlayerCard({
   spid,
+  artworkSpid,
   name,
   seasonName,
   seasonImg,
@@ -191,6 +193,7 @@ export default function SquadPlayerCard({
   const selectedPrice = details?.prices?.[grade - 1] ?? null;
   const firstNewTrait = newTraits[0] ?? null;
   const firstTraitIcon = firstNewTrait ? details?.traitIcons?.[firstNewTrait] ?? null : null;
+  const renderedArtworkSpid = artworkSpid ?? spid;
 
   return (
     <div
@@ -252,8 +255,8 @@ export default function SquadPlayerCard({
       </div>
 
       <PlayerArtwork
-        key={spid}
-        spid={spid}
+        key={renderedArtworkSpid}
+        spid={renderedArtworkSpid}
         alt={name}
         className="pointer-events-none absolute bottom-[28px] left-1/2 z-10 max-h-[82px] max-w-[150%] -translate-x-1/2 object-contain sm:bottom-[39px] sm:max-h-[120px]"
       />

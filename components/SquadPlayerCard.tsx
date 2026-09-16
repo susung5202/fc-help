@@ -256,12 +256,12 @@ export default function SquadPlayerCard({
         />
       )}
 
-      <div className="absolute right-[-8px] top-[22px] z-30 sm:right-[-10px] sm:top-[32px]">
+      <div className="absolute right-[-8px] top-[25px] z-30 sm:right-[-10px] sm:top-[36px]">
         <SalaryHex salary={details?.salary} />
       </div>
 
       <span
-        className={`absolute bottom-[25px] right-[-8px] z-30 flex h-[18px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:bottom-[42px] sm:right-[-10px] sm:h-7 sm:w-8 sm:border-2 sm:text-[13px] ${getEnhancementBadgeTone(grade)} ${SOFT_SHADOW}`}
+        className={`absolute bottom-[25px] right-[-8px] z-30 flex h-[15px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:bottom-[42px] sm:right-[-10px] sm:h-6 sm:w-8 sm:border-2 sm:text-xs ${getEnhancementBadgeTone(grade)} ${SOFT_SHADOW}`}
         title={`${grade}강`}
       >
         {grade}

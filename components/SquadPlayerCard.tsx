@@ -211,7 +211,7 @@ export default function SquadPlayerCard({
       )}
 
       {firstNewTrait && (
-        <div className={`absolute left-0 top-0 z-30 ${SOFT_SHADOW}`} title={newTraits.join(", ")}>
+        <div className={`absolute left-[-5px] top-0 z-30 sm:left-[-6px] ${SOFT_SHADOW}`} title={newTraits.join(", ")}>
           {firstTraitIcon ? (
             <img
               src={firstTraitIcon}
@@ -229,7 +229,7 @@ export default function SquadPlayerCard({
         </div>
       )}
 
-      <div className={`absolute left-0 top-[21px] z-30 flex flex-col items-start sm:top-[39px] ${SOFT_SHADOW}`}>
+      <div className={`absolute left-[-5px] top-[21px] z-30 flex flex-col items-start sm:left-[-6px] sm:top-[39px] ${SOFT_SHADOW}`}>
         <span className={`text-[8px] font-black leading-none sm:text-base ${getPositionTone(slotPosition)}`}>
           {slotPosition}
         </span>
@@ -242,13 +242,13 @@ export default function SquadPlayerCard({
         <img
           src={seasonImg}
           alt={seasonName}
-          className={`absolute bottom-[25px] left-0 z-30 h-3.5 max-w-6 object-contain sm:bottom-[42px] sm:h-6 sm:max-w-10 ${SOFT_SHADOW}`}
+          className={`absolute bottom-[25px] left-[-5px] z-30 h-3.5 max-w-6 object-contain sm:bottom-[42px] sm:left-[-6px] sm:h-6 sm:max-w-10 ${SOFT_SHADOW}`}
         />
       )}
 
-      <div className={`absolute right-0 top-0 z-30 flex flex-col items-end gap-1 ${SOFT_SHADOW}`}>
+      <div className={`absolute right-[-5px] top-0 z-30 flex flex-col items-end gap-1 sm:right-[-6px] ${SOFT_SHADOW}`}>
         <span
-          className={`flex h-5 w-6 items-center justify-center rounded-[2px] border p-0 text-[9px] font-black leading-none sm:h-8 sm:w-9 sm:border-2 sm:text-[14px] ${getEnhancementBadgeTone(grade)}`}
+          className={`flex h-[18px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:h-7 sm:w-8 sm:border-2 sm:text-[13px] ${getEnhancementBadgeTone(grade)}`}
           title={`${grade}강`}
         >
           {grade}

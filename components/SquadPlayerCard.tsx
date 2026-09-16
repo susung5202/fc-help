@@ -217,7 +217,7 @@ export default function SquadPlayerCard({
       )}
 
       {firstNewTrait && (
-        <div className={`absolute left-[-5px] top-0 z-30 sm:left-[-6px] ${SOFT_SHADOW}`} title={newTraits.join(", ")}>
+        <div className={`absolute left-[-8px] top-0 z-30 sm:left-[-10px] ${SOFT_SHADOW}`} title={newTraits.join(", ")}>
           {firstTraitIcon ? (
             <img
               src={firstTraitIcon}
@@ -235,7 +235,7 @@ export default function SquadPlayerCard({
         </div>
       )}
 
-      <div className={`absolute left-[-5px] top-[21px] z-30 flex flex-col items-start sm:left-[-6px] sm:top-[39px] ${SOFT_SHADOW}`}>
+      <div className={`absolute left-[-8px] top-[21px] z-30 flex flex-col items-start sm:left-[-10px] sm:top-[39px] ${SOFT_SHADOW}`}>
         <span className={`text-[8px] font-black leading-none sm:text-base ${getPositionTone(slotPosition)}`}>
           {slotPosition}
         </span>
@@ -248,16 +248,16 @@ export default function SquadPlayerCard({
         <img
           src={seasonImg}
           alt={seasonName}
-          className={`absolute bottom-[25px] left-[-5px] z-30 h-3.5 max-w-6 object-contain sm:bottom-[42px] sm:left-[-6px] sm:h-6 sm:max-w-10 ${SOFT_SHADOW}`}
+          className={`absolute bottom-[25px] left-[-8px] z-30 h-3.5 max-w-6 object-contain sm:bottom-[42px] sm:left-[-10px] sm:h-6 sm:max-w-10 ${SOFT_SHADOW}`}
         />
       )}
 
-      <div className="absolute right-[-5px] top-[22px] z-30 sm:right-[-6px] sm:top-[32px]">
+      <div className="absolute right-[-8px] top-[22px] z-30 sm:right-[-10px] sm:top-[32px]">
         <SalaryHex salary={details?.salary} />
       </div>
 
       <span
-        className={`absolute bottom-[25px] right-[-5px] z-30 flex h-[18px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:bottom-[42px] sm:right-[-6px] sm:h-7 sm:w-8 sm:border-2 sm:text-[13px] ${getEnhancementBadgeTone(grade)} ${SOFT_SHADOW}`}
+        className={`absolute bottom-[25px] right-[-8px] z-30 flex h-[18px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:bottom-[42px] sm:right-[-10px] sm:h-7 sm:w-8 sm:border-2 sm:text-[13px] ${getEnhancementBadgeTone(grade)} ${SOFT_SHADOW}`}
         title={`${grade}강`}
       >
         {grade}

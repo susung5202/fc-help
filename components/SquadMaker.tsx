@@ -1036,7 +1036,12 @@ export default function SquadMaker() {
                   );
                 }
 
-                const primary = colors[0];
+                const primary =
+                  category === "relationship"
+                    ? [...colors].sort(
+                        (a, b) => b.count - a.count || b.level - a.level
+                      )[0]
+                    : colors[0];
                 return (
                   <details key={category} className="group relative flex flex-col items-center">
                     <summary
@@ -1052,9 +1057,13 @@ export default function SquadMaker() {
                       ) : (
                         <span className="text-[9px] font-black text-white sm:text-[11px]">{initials(primary.name)}</span>
                       )}
-                      {colors.length > 1 && (
-                        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-lime-300 px-1 text-[7px] font-black text-black">
-                          {colors.length}
+                      {category === "relationship" && colors.length > 1 && (
+                        <span
+                          className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-lime-300 text-[10px] font-black leading-none text-black shadow"
+                          aria-label={`관계 팀컬러 ${colors.length}개 적용 중`}
+                          title={`관계 팀컬러 ${colors.length}개 적용 중`}
+                        >
+                          +
                         </span>
                       )}
                     </summary>

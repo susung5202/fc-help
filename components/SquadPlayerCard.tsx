@@ -42,34 +42,43 @@ const ENHANCEMENT_OVR_BONUS: Record<number, number> = {
   13: 27,
 };
 
+function normalizeDigits(value: string | null | undefined) {
+  if (!value || !/^\d+$/.test(value)) return null;
+  return value.replace(/^0+(?=\d)/, "");
+}
+
+function formatExactBp(value: string | null | undefined) {
+  const digits = normalizeDigits(value);
+  if (!digits) return "시세 정보 없음";
+  return `${digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} BP`;
+}
+
 function formatBp(value: string | null | undefined) {
-  if (!value || !/^\d+$/.test(value)) return "시세 -";
+  const digits = normalizeDigits(value);
+  if (!digits) return "시세 -";
 
-  try {
-    const amount = BigInt(value);
-    if (amount < 100_000_000n) return `${amount.toLocaleString("ko-KR")} BP`;
-
-    const units: Array<[bigint, string]> = [
-      [10_000_000_000_000_000n, "경"],
-      [1_000_000_000_000n, "조"],
-      [100_000_000n, "억"],
-    ];
-
-    let rest = amount;
-    const parts: string[] = [];
-
-    for (const [unit, label] of units) {
-      if (rest < unit) continue;
-      const count = rest / unit;
-      rest %= unit;
-      parts.push(`${count.toLocaleString("ko-KR")}${label}`);
-      if (parts.length === 2) break;
-    }
-
-    return `${parts.join(" ")} BP`;
-  } catch {
-    return "시세 -";
+  if (digits.length <= 8) {
+    return `${digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} BP`;
   }
+
+  const labels = ["", "만", "억", "조", "경", "해"];
+  const padLength = Math.ceil(digits.length / 4) * 4;
+  const padded = digits.padStart(padLength, "0");
+  const groups: string[] = [];
+
+  for (let index = 0; index < padded.length; index += 4) {
+    groups.push(padded.slice(index, index + 4));
+  }
+
+  const parts: string[] = [];
+  groups.forEach((group, index) => {
+    const amount = Number(group);
+    if (amount === 0) return;
+    const unitIndex = groups.length - index - 1;
+    parts.push(`${amount.toLocaleString("ko-KR")}${labels[unitIndex] ?? ""}`);
+  });
+
+  return `${parts.slice(0, 2).join(" ")} BP`;
 }
 
 export default function SquadPlayerCard({
@@ -192,7 +201,7 @@ export default function SquadPlayerCard({
         <div className="absolute inset-x-0 bottom-0 z-40 bg-black/80 px-1 py-1 text-center backdrop-blur sm:px-1.5 sm:py-1.5">
           <p className="truncate text-[8px] font-black leading-none text-white sm:text-[10px]">{name}</p>
           <p
-            title={selectedPrice ? `${BigInt(selectedPrice).toLocaleString("ko-KR")} BP` : "시세 정보 없음"}
+            title={formatExactBp(selectedPrice)}
             className="mt-1 truncate text-[6px] font-bold leading-none text-lime-300 sm:text-[8px]"
           >
             {formatBp(selectedPrice)}

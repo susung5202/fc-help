@@ -5,6 +5,9 @@ on:
     paths:
       - .github/workflows/debug-squad-build.yml
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,6 +18,21 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Fix Web Share type guard
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('components/SquadMaker.tsx')
+          s = p.read_text(encoding='utf-8')
+          a = 'if (navigator.share && shareNavigator.canShare?.({ files: [file] }))'
+          b = 'if (shareNavigator.canShare?.({ files: [file] }))'
+          c = 'if (navigator.share && shareNavigator.canShare?.({ files: [imagePreview.file] }))'
+          d = 'if (shareNavigator.canShare?.({ files: [imagePreview.file] }))'
+          if a not in s or c not in s:
+              raise SystemExit('share guards not found')
+          s = s.replace(a, b, 1).replace(c, d, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
       - name: Create temporary VAPID build env
         run: |
           node - <<'NODE'
@@ -26,3 +44,11 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_ENV, `VAPID_PRIVATE_KEY=${keys.privateKey}\n`);
           NODE
       - run: npm run build
+      - name: Commit validated fix
+        run: |
+          rm -f .github/workflows/debug-squad-build.yml
+          git config user.name "susung5202"
+          git config user.email "74191151+susung5202@users.noreply.github.com"
+          git add components/SquadMaker.tsx .github/workflows/debug-squad-build.yml
+          git commit -m "fix: make squad image share build-safe"
+          git push

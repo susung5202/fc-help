@@ -105,7 +105,7 @@ function getPositionTone(position: string) {
 function TraitFallbackIcon() {
   return (
     <div
-      className={`flex h-5 w-5 items-center justify-center bg-[#d8c994] text-[10px] font-black text-[#302c1d] sm:h-9 sm:w-9 sm:text-base ${SOFT_SHADOW}`}
+      className={`flex h-5 w-5 items-center justify-center bg-[#d8c994] text-[10px] font-black text-[#302c1d] sm:h-8 sm:w-8 sm:text-sm ${SOFT_SHADOW}`}
       style={{ clipPath: HEXAGON }}
       aria-hidden="true"
     >
@@ -117,7 +117,7 @@ function TraitFallbackIcon() {
 function SalaryHex({ salary }: { salary: number | null | undefined }) {
   return (
     <div
-      className={`relative flex h-5 w-5 items-center justify-center bg-white/85 sm:h-10 sm:w-10 ${SOFT_SHADOW}`}
+      className={`relative flex h-5 w-5 items-center justify-center bg-white/85 sm:h-9 sm:w-9 ${SOFT_SHADOW}`}
       style={{ clipPath: HEXAGON }}
       title={salary == null ? "급여 정보 없음" : `급여 ${salary}`}
     >
@@ -125,7 +125,7 @@ function SalaryHex({ salary }: { salary: number | null | undefined }) {
         className="absolute inset-[2px] bg-[#111318]"
         style={{ clipPath: HEXAGON }}
       />
-      <span className="relative z-10 text-[8px] font-black text-white sm:text-sm">
+      <span className="relative z-10 text-[8px] font-black text-white sm:text-xs">
         {salary ?? "-"}
       </span>
     </div>
@@ -208,7 +208,7 @@ export default function SquadPlayerCard({
 
   return (
     <div
-      className={`relative h-[94px] w-[64px] transition sm:h-[156px] sm:w-[116px] ${
+      className={`relative h-[94px] w-[64px] transition sm:h-[138px] sm:w-[102px] ${
         dragging || dropTarget ? "scale-105" : ""
       }`}
     >
@@ -221,29 +221,29 @@ export default function SquadPlayerCard({
       )}
 
       {firstNewTrait && (
-        <div className={`absolute left-[-8px] top-0 z-30 sm:left-[-10px] ${SOFT_SHADOW}`} title={newTraits.join(", ")}>
+        <div className={`absolute left-[-8px] top-0 z-30 sm:left-[-8px] ${SOFT_SHADOW}`} title={newTraits.join(", ")}>
           {firstTraitIcon ? (
             <img
               src={firstTraitIcon}
               alt={firstNewTrait}
-              className="h-5 w-5 object-contain sm:h-9 sm:w-9"
+              className="h-5 w-5 object-contain sm:h-8 sm:w-8"
             />
           ) : (
             <TraitFallbackIcon />
           )}
           {newTraits.length > 1 && (
-            <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-300 px-1 text-[8px] font-black text-black sm:h-5 sm:min-w-5 sm:text-[9px]">
+            <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-300 px-1 text-[8px] font-black text-black sm:h-[18px] sm:min-w-[18px] sm:text-[8px]">
               {newTraits.length}
             </span>
           )}
         </div>
       )}
 
-      <div className={`absolute left-[-8px] top-[21px] z-30 flex flex-col items-start sm:left-[-10px] sm:top-[39px] ${SOFT_SHADOW}`}>
-        <span className={`text-[8px] font-black leading-none sm:text-base ${getPositionTone(slotPosition)}`}>
+      <div className={`absolute left-[-8px] top-[21px] z-30 flex flex-col items-start sm:left-[-8px] sm:top-[35px] ${SOFT_SHADOW}`}>
+        <span className={`text-[8px] font-black leading-none sm:text-sm ${getPositionTone(slotPosition)}`}>
           {slotPosition}
         </span>
-        <span className="mt-0.5 text-[14px] font-black leading-none text-white sm:text-[27px]">
+        <span className="mt-0.5 text-[14px] font-black leading-none text-white sm:text-[24px]">
           {enhancedOvr ?? "-"}
         </span>
       </div>
@@ -252,16 +252,16 @@ export default function SquadPlayerCard({
         <img
           src={seasonImg}
           alt={seasonName}
-          className={`absolute bottom-[25px] left-[-8px] z-30 h-3.5 max-w-6 object-contain sm:bottom-[42px] sm:left-[-10px] sm:h-6 sm:max-w-10 ${SOFT_SHADOW}`}
+          className={`absolute bottom-[25px] left-[-8px] z-30 h-3.5 max-w-6 object-contain sm:bottom-[38px] sm:left-[-8px] sm:h-5 sm:max-w-9 ${SOFT_SHADOW}`}
         />
       )}
 
-      <div className="absolute right-[-8px] top-[31px] z-30 sm:right-[-10px] sm:top-[46px]">
+      <div className="absolute right-[-8px] top-[31px] z-30 sm:right-[-8px] sm:top-[42px]">
         <SalaryHex salary={details?.salary} />
       </div>
 
       <span
-        className={`absolute bottom-[25px] right-[-8px] z-30 flex h-[15px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:bottom-[42px] sm:right-[-10px] sm:h-6 sm:w-8 sm:border-2 sm:text-xs ${getEnhancementBadgeTone(grade)} ${SOFT_SHADOW}`}
+        className={`absolute bottom-[25px] right-[-8px] z-30 flex h-[15px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:bottom-[38px] sm:right-[-8px] sm:h-5 sm:w-7 sm:border-2 sm:text-[11px] ${getEnhancementBadgeTone(grade)} ${SOFT_SHADOW}`}
         title={`${grade}강`}
       >
         {grade}
@@ -271,16 +271,16 @@ export default function SquadPlayerCard({
         key={renderedArtworkSpid}
         spid={renderedArtworkSpid}
         alt={name}
-        className="pointer-events-none absolute bottom-[22px] left-1/2 z-10 max-h-[58px] max-w-[132%] -translate-x-1/2 object-contain sm:bottom-[39px] sm:max-h-[108px] sm:max-w-[140%]"
+        className="pointer-events-none absolute bottom-[22px] left-1/2 z-10 max-h-[58px] max-w-[132%] -translate-x-1/2 object-contain sm:bottom-[35px] sm:max-h-[96px] sm:max-w-[132%]"
       />
 
-      <div className={`absolute inset-x-[-5px] bottom-0 z-40 text-center sm:inset-x-[-10px] ${SOFT_SHADOW}`}>
-        <p className="truncate text-[8px] font-black leading-none text-white sm:text-[14px]">
+      <div className={`absolute inset-x-[-5px] bottom-0 z-40 text-center sm:inset-x-[-8px] ${SOFT_SHADOW}`}>
+        <p className="truncate text-[8px] font-black leading-none text-white sm:text-[12px]">
           {name}
         </p>
         <p
           title={formatExactBp(selectedPrice)}
-          className="mt-0.5 truncate text-[7px] font-black leading-none text-amber-300 sm:mt-1.5 sm:text-[11px]"
+          className="mt-0.5 truncate text-[7px] font-black leading-none text-amber-300 sm:mt-1 sm:text-[10px]"
         >
           {formatBp(selectedPrice)}
         </p>

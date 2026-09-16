@@ -19,20 +19,23 @@ self.addEventListener("push", (event) => {
     options
   );
 
-  const notifyOpenClients = clients
-    .matchAll({
-      type: "window",
-      includeUncontrolled: true,
-    })
-    .then((clientList) =>
-      Promise.all(
-        clientList.map((client) =>
-          client.postMessage({
-            type: "FC_HELP_PUSH_SOUND",
+  const notifyOpenClients =
+    data.playSound === false
+      ? Promise.resolve([])
+      : clients
+          .matchAll({
+            type: "window",
+            includeUncontrolled: true,
           })
-        )
-      )
-    );
+          .then((clientList) =>
+            Promise.all(
+              clientList.map((client) =>
+                client.postMessage({
+                  type: "FC_HELP_PUSH_SOUND",
+                })
+              )
+            )
+          );
 
   event.waitUntil(
     Promise.all([showNotification, notifyOpenClients])

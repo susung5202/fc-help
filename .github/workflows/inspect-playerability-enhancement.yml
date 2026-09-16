@@ -1,0 +1,37 @@
+name: Inspect PlayerAbility enhancement markup
+
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-playerability-enhancement.yml
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Fetch PlayerAbility markup
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --max-time 20 -sS 'https://fconline.nexon.com/datacenter/PlayerAbility' \
+            -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
+            -H 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8' \
+            -H 'X-Requested-With: XMLHttpRequest' \
+            -H 'Referer: https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=8&spid=840001625' \
+            --data 'spid=840001625&n1Strong=8&n1Grow=4&n4TeamColorId=0&n4TeamColorLv=0&n1Change=0&strPlayerImg=https%3A%2F%2Ffo4.dn.nexoncdn.co.kr%2Flive%2FexternalAssets%2Fcommon%2FplayersAction%2Fp840001625.png&rd=0' \
+            -o /tmp/ability.html
+          python3 - <<'PY'
+          import re
+          s=open('/tmp/ability.html',encoding='utf-8',errors='ignore').read()
+          print('LENGTH',len(s))
+          print('=== contexts ===')
+          for m in re.finditer(r'(?i)strong|enhance|upgrade|grade|강화|8강|n1Strong',s):
+              a=max(0,m.start()-500); b=min(len(s),m.end()+800)
+              print('\n---\n'+s[a:b].replace('\n',' '))
+          print('=== image/css refs ===')
+          refs=sorted(set(re.findall(r'''(?:src|href)=["']([^"']+)["']|url\(([^)]+)\)''',s,re.I)))
+          for pair in refs:
+              x=(pair[0] or pair[1]).strip('"\' ')
+              if x: print(x)
+          PY

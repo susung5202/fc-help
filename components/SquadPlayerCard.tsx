@@ -252,15 +252,16 @@ export default function SquadPlayerCard({
         />
       )}
 
-      <div className={`absolute right-[-5px] top-0 z-30 flex flex-col items-end gap-1 sm:right-[-6px] ${SOFT_SHADOW}`}>
-        <span
-          className={`flex h-[18px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:h-7 sm:w-8 sm:border-2 sm:text-[13px] ${getEnhancementBadgeTone(grade)}`}
-          title={`${grade}강`}
-        >
-          {grade}
-        </span>
+      <div className="absolute right-[-5px] top-[22px] z-30 sm:right-[-6px] sm:top-[32px]">
         <SalaryHex salary={details?.salary} />
       </div>
+
+      <span
+        className={`absolute bottom-[25px] right-[-5px] z-30 flex h-[18px] w-[22px] items-center justify-center rounded-[2px] border p-0 text-[8px] font-black leading-none sm:bottom-[42px] sm:right-[-6px] sm:h-7 sm:w-8 sm:border-2 sm:text-[13px] ${getEnhancementBadgeTone(grade)} ${SOFT_SHADOW}`}
+        title={`${grade}강`}
+      >
+        {grade}
+      </span>
 
       <PlayerArtwork
         key={renderedArtworkSpid}

@@ -1,15 +1,19 @@
 export function getEnhancementBadgeTone(grade: number) {
   if (grade >= 11) {
-    return "border-cyan-300/70 bg-cyan-400/20 text-cyan-100";
+    return "border-cyan-200/90 bg-[#16748f] text-cyan-50 shadow-[0_0_12px_rgba(34,211,238,0.22)]";
   }
+
   if (grade >= 8) {
-    return "border-yellow-300/70 bg-yellow-400/20 text-yellow-100";
+    return "border-yellow-300/90 bg-[#a97812] text-yellow-50 shadow-[0_0_10px_rgba(250,204,21,0.16)]";
   }
+
   if (grade >= 5) {
-    return "border-slate-200/70 bg-slate-200/20 text-slate-100";
+    return "border-slate-200/90 bg-[#5f6875] text-white shadow-[0_0_8px_rgba(226,232,240,0.10)]";
   }
+
   if (grade >= 2) {
-    return "border-amber-700/80 bg-amber-900/35 text-amber-200";
+    return "border-orange-700/90 bg-[#6b351c] text-orange-50 shadow-[0_0_8px_rgba(194,65,12,0.12)]";
   }
-  return "border-zinc-400/40 bg-zinc-500/20 text-zinc-200";
+
+  return "border-zinc-500/90 bg-[#3f3f46] text-zinc-100";
 }

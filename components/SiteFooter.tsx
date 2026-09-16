@@ -20,22 +20,35 @@ export default function SiteFooter() {
             </p>
           </div>
 
-          <nav aria-label="FC Help 서비스" className="md:text-right">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-gray-500">
-              Services
-            </p>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-bold md:max-w-[260px] md:justify-end">
-              <Link href="/players" className="text-gray-300 transition hover:text-lime-300">
-                선수 DB
-              </Link>
-              <Link href="/refresh" className="text-gray-300 transition hover:text-lime-300">
-                갱신시간
-              </Link>
-              <Link href="/squad" className="text-gray-300 transition hover:text-lime-300">
-                스쿼드 메이커
-              </Link>
-            </div>
-          </nav>
+          <div className="grid gap-6 sm:grid-cols-2 md:text-right">
+            <nav aria-label="FC Help 서비스">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-gray-500">
+                Services
+              </p>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-bold md:max-w-[260px] md:justify-end">
+                <Link href="/players" className="text-gray-300 transition hover:text-lime-300">
+                  선수 DB
+                </Link>
+                <Link href="/refresh" className="text-gray-300 transition hover:text-lime-300">
+                  갱신시간
+                </Link>
+                <Link href="/squad" className="text-gray-300 transition hover:text-lime-300">
+                  스쿼드 메이커
+                </Link>
+              </div>
+            </nav>
+
+            <nav aria-label="FC Help 지원">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-gray-500">
+                Support
+              </p>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-bold md:justify-end">
+                <Link href="/contact" className="text-gray-300 transition hover:text-lime-300">
+                  문의
+                </Link>
+              </div>
+            </nav>
+          </div>
         </div>
 
         <div className="mt-8 border-t border-white/[0.08] pt-5 text-[11px] leading-5 text-gray-600 sm:flex sm:items-center sm:justify-between sm:gap-4">

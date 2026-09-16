@@ -1,0 +1,72 @@
+name: One-time squad card UI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/one-time-squad-card-ui.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch squad card renderer
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("components/SquadMaker.tsx")
+          source = path.read_text(encoding="utf-8")
+
+          old_import = 'import PlayerArtwork from "@/components/PlayerArtwork";'
+          new_import = 'import SquadPlayerCard from "@/components/SquadPlayerCard";'
+          if old_import not in source:
+              raise SystemExit("PlayerArtwork import not found")
+          source = source.replace(old_import, new_import, 1)
+
+          source = source.replace(
+              '  const traitCount = player?.newTraits?.length ?? 0;\n\n',
+              '',
+              1,
+          )
+
+          start_marker = '      {player ? (\n        <div className="relative w-[68px] sm:w-[88px]">'
+          end_marker = '      ) : (\n        <span\n          className="block h-[clamp(48px,10%,76px)] w-[clamp(48px,15%,86px)]"'
+          start = source.find(start_marker)
+          if start < 0:
+              raise SystemExit("Squad player card start marker not found")
+          end = source.find(end_marker, start)
+          if end < 0:
+              raise SystemExit("Squad player card end marker not found")
+
+          replacement = '''      {player ? (\n        <SquadPlayerCard\n          spid={player.id}\n          name={player.name}\n          seasonName={player.seasonName}\n          seasonImg={player.seasonImg}\n          primaryPosition={player.position}\n          baseOvr={player.ovr}\n          slotPosition={slot.label}\n          grade={player.grade}\n          newTraits={player.newTraits ?? []}\n          dragging={dragging}\n          dropTarget={dropTarget}\n        />\n'''
+          source = source[:start] + replacement + source[end:]
+
+          old_badges = '''            {formation.slots.map((slot) => (\n              <PositionBadge\n                key={`badge-${slot.slotId}`}\n                slot={slot}\n                active={draggingSlotId !== null && slot.slotId === dropTargetSlotId}\n              />\n            ))}'''
+          new_badges = '''            {formation.slots.map((slot) =>\n              players[slot.slotId] ? null : (\n                <PositionBadge\n                  key={`badge-${slot.slotId}`}\n                  slot={slot}\n                  active={draggingSlotId !== null && slot.slotId === dropTargetSlotId}\n                />\n              )\n            )}'''
+          if old_badges not in source:
+              raise SystemExit("Position badge block not found")
+          source = source.replace(old_badges, new_badges, 1)
+
+          path.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Commit patch and remove workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/SquadMaker.tsx
+          git rm .github/workflows/one-time-squad-card-ui.yml
+          git commit -m "feat: show detailed data on squad player cards"
+          git push origin HEAD:main

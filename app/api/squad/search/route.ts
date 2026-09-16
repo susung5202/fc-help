@@ -12,24 +12,67 @@ type Season = {
   seasonImg: string;
 };
 
-async function getPlayers(): Promise<Player[]> {
-  const response = await fetch(
-    "https://open.api.nexon.com/static/fconline/meta/spid.json",
-    { next: { revalidate: 86400 } }
-  );
+type SearchItem = {
+  id: number;
+  name: string;
+  seasonName: string;
+  seasonImg: string | null;
+  ovr: number | null;
+  position: string | null;
+  newTraits: string[];
+};
 
-  if (!response.ok) throw new Error("player metadata request failed");
-  return response.json();
+type CachedSearch = {
+  expiresAt: number;
+  items: SearchItem[];
+};
+
+export const maxDuration = 60;
+
+let playersPromise: Promise<Player[]> | null = null;
+let seasonsPromise: Promise<Season[]> | null = null;
+const searchCache = new Map<string, CachedSearch>();
+const META_CACHE_MS = 24 * 60 * 60 * 1000;
+const SEARCH_CACHE_MS = 6 * 60 * 60 * 1000;
+let playerMetaExpiresAt = 0;
+let seasonMetaExpiresAt = 0;
+
+async function getPlayers(): Promise<Player[]> {
+  if (playersPromise && Date.now() < playerMetaExpiresAt) return playersPromise;
+
+  playersPromise = fetch("https://open.api.nexon.com/static/fconline/meta/spid.json", {
+    cache: "no-store",
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error("player metadata request failed");
+      return response.json() as Promise<Player[]>;
+    })
+    .catch((error) => {
+      playersPromise = null;
+      throw error;
+    });
+  playerMetaExpiresAt = Date.now() + META_CACHE_MS;
+
+  return playersPromise;
 }
 
 async function getSeasons(): Promise<Season[]> {
-  const response = await fetch(
-    "https://open.api.nexon.com/static/fconline/meta/seasonid.json",
-    { next: { revalidate: 86400 } }
-  );
+  if (seasonsPromise && Date.now() < seasonMetaExpiresAt) return seasonsPromise;
 
-  if (!response.ok) throw new Error("season metadata request failed");
-  return response.json();
+  seasonsPromise = fetch("https://open.api.nexon.com/static/fconline/meta/seasonid.json", {
+    cache: "no-store",
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error("season metadata request failed");
+      return response.json() as Promise<Season[]>;
+    })
+    .catch((error) => {
+      seasonsPromise = null;
+      throw error;
+    });
+  seasonMetaExpiresAt = Date.now() + META_CACHE_MS;
+
+  return seasonsPromise;
 }
 
 export async function GET(request: Request) {
@@ -40,7 +83,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ items: [] });
   }
 
+  const normalizedQuery = query.toLocaleLowerCase("ko-KR");
+  const cached = searchCache.get(normalizedQuery);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json(
+      { items: cached.items },
+      { headers: { "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=86400" } }
+    );
+  }
+
   try {
+    const startedAt = Date.now();
     const [players, seasons] = await Promise.all([getPlayers(), getSeasons()]);
     const seasonMap = new Map(
       seasons.map((season) => [Number(season.seasonId), season])
@@ -48,14 +101,14 @@ export async function GET(request: Request) {
 
     const matched = players
       .filter((player) =>
-        player.name.toLowerCase().includes(query.toLowerCase())
+        player.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery)
       )
       .sort((a, b) => b.id - a.id)
-      .slice(0, 24);
+      .slice(0, 12);
 
     const ovrMap = await getPlayerOvrMap(matched.map((player) => player.id));
 
-    const items = matched
+    const items: SearchItem[] = matched
       .map((player) => {
         const season = seasonMap.get(Math.floor(player.id / 1_000_000));
         const ovr = ovrMap.get(player.id) ?? null;
@@ -72,7 +125,21 @@ export async function GET(request: Request) {
       })
       .sort((a, b) => (b.ovr ?? -1) - (a.ovr ?? -1));
 
-    return NextResponse.json({ items });
+    searchCache.set(normalizedQuery, {
+      expiresAt: Date.now() + SEARCH_CACHE_MS,
+      items,
+    });
+
+    console.info("Squad player search completed", {
+      query: normalizedQuery,
+      count: items.length,
+      durationMs: Date.now() - startedAt,
+    });
+
+    return NextResponse.json(
+      { items },
+      { headers: { "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=86400" } }
+    );
   } catch (error) {
     console.error("Squad player search failed", error);
     return NextResponse.json(

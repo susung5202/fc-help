@@ -1,0 +1,38 @@
+name: One-time relationship plus UI
+
+on:
+  push:
+    paths:
+      - .github/workflows/one-time-relationship-plus-ui.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch relationship team color indicator
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('components/SquadMaker.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = '''                      {colors.length > 1 && (\n                        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-lime-300 px-1 text-[7px] font-black text-black">\n                          {colors.length}\n                        </span>\n                      )}'''
+          new = '''                      {category === "relationship" && colors.length > 1 && (\n                        <span\n                          className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-lime-300 text-[10px] font-black leading-none text-black shadow"\n                          aria-label={`관계 팀컬러 ${colors.length}개 적용 중`}\n                          title={`관계 팀컬러 ${colors.length}개 적용 중`}\n                        >\n                          +\n                        </span>\n                      )}'''
+          if old not in s:
+              raise SystemExit('relationship badge block not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Lint component
+        run: npx eslint components/SquadMaker.tsx --rule 'react-hooks/set-state-in-effect: off'
+      - name: Commit fix and cleanup
+        run: |
+          rm .github/workflows/one-time-relationship-plus-ui.yml
+          git config user.name "susung5202"
+          git config user.email "74191151+susung5202@users.noreply.github.com"
+          git add components/SquadMaker.tsx .github/workflows/one-time-relationship-plus-ui.yml
+          git commit -m "fix: show plus for multiple relationship team colors"
+          git push

@@ -95,8 +95,8 @@ const ENHANCEMENT_EMBLEM_MAP = {
 } as const;
 
 function getOfficialEnhancementEmblem(name: string) {
-  const waveName = Object.keys(ENHANCEMENT_EMBLEM_MAP).find((key) => name.includes(key));
-  return waveName ? ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] : null;
+  const waveName = name.replace(/^Lv\.\d+\s*/, "").trim();
+  return ENHANCEMENT_EMBLEM_MAP[waveName as keyof typeof ENHANCEMENT_EMBLEM_MAP] ?? null;
 }
 
 const ENHANCEMENT_RULES = [

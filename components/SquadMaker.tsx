@@ -41,16 +41,14 @@ type CustomPosition = {
   y: number;
 };
 
-type PositionsByFormation = Record<string, Record<string, CustomPosition>>;
-
 type DragState = {
   slotId: string;
   pointerId: number;
   startX: number;
   startY: number;
   moved: boolean;
-  latestPosition: CustomPosition;
-  originPosition: CustomPosition;
+  latestClientX: number;
+  latestClientY: number;
 };
 
 const FORMATIONS: Record<string, Formation> = {
@@ -168,7 +166,6 @@ function withTraitDefaults(player: SquadPlayer): SquadPlayer {
 export default function SquadMaker() {
   const [formationKey, setFormationKey] = useState("4-2-3-1");
   const [players, setPlayers] = useState<Record<string, SquadPlayer>>({});
-  const [positionsByFormation, setPositionsByFormation] = useState<PositionsByFormation>({});
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchPlayer[]>([]);
@@ -177,7 +174,8 @@ export default function SquadMaker() {
   const [grade, setGrade] = useState(1);
   const [hydrated, setHydrated] = useState(false);
   const [draggingSlotId, setDraggingSlotId] = useState<string | null>(null);
-  const [swapTargetSlotId, setSwapTargetSlotId] = useState<string | null>(null);
+  const [dropTargetSlotId, setDropTargetSlotId] = useState<string | null>(null);
+  const [dragPosition, setDragPosition] = useState<CustomPosition | null>(null);
 
   const pitchRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<DragState | null>(null);
@@ -186,7 +184,6 @@ export default function SquadMaker() {
   const formation = FORMATIONS[formationKey] ?? FORMATIONS["4-2-3-1"];
   const selectedSlot = formation.slots.find((slot) => slot.slotId === selectedSlotId) ?? null;
   const selectedPlayer = selectedSlotId ? players[selectedSlotId] ?? null : null;
-  const currentPositions = positionsByFormation[formationKey] ?? {};
 
   useEffect(() => {
     try {
@@ -195,7 +192,6 @@ export default function SquadMaker() {
         const saved = JSON.parse(raw) as {
           formationKey?: string;
           players?: Record<string, SquadPlayer>;
-          positionsByFormation?: PositionsByFormation;
         };
 
         if (saved.formationKey && FORMATIONS[saved.formationKey]) {
@@ -213,9 +209,6 @@ export default function SquadMaker() {
           );
         }
 
-        if (saved.positionsByFormation) {
-          setPositionsByFormation(saved.positionsByFormation);
-        }
       }
     } catch {
       // 잘못된 로컬 저장값은 무시한다.
@@ -228,9 +221,9 @@ export default function SquadMaker() {
     if (!hydrated) return;
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ formationKey, players, positionsByFormation })
+      JSON.stringify({ formationKey, players })
     );
-  }, [formationKey, players, positionsByFormation, hydrated]);
+  }, [formationKey, players, hydrated]);
 
   useEffect(() => {
     if (!selectedSlotId || query.trim().length < 1) {
@@ -347,16 +340,14 @@ export default function SquadMaker() {
   function clearSquad() {
     if (!window.confirm("현재 스쿼드를 모두 비울까요?")) return;
     setPlayers({});
-    setPositionsByFormation({});
     closePanel();
   }
 
   function resetCurrentPositions() {
-    setPositionsByFormation((current) => {
-      const next = { ...current };
-      delete next[formationKey];
-      return next;
-    });
+    dragStateRef.current = null;
+    setDraggingSlotId(null);
+    setDropTargetSlotId(null);
+    setDragPosition(null);
   }
 
   function handleFormationChange(nextFormation: string) {
@@ -364,31 +355,20 @@ export default function SquadMaker() {
     closePanel();
   }
 
-  function getSlotPosition(slot: Slot): CustomPosition {
-    return currentPositions[slot.slotId] ?? { x: slot.x, y: slot.y };
-  }
-
-  function getRenderedSlot(slot: Slot): Slot {
-    return { ...slot, ...getSlotPosition(slot) };
-  }
-
-  function findSwapTarget(
-    movingSlotId: string,
-    position: CustomPosition,
-    rect: DOMRect
-  ): Slot | null {
-    const thresholdPx = clamp(rect.width * 0.13, 52, 84);
+  function findDropTarget(clientX: number, clientY: number, rect: DOMRect): Slot | null {
+    const hitboxWidth = clamp(rect.width * 0.24, 88, 170);
+    const hitboxHeight = clamp(rect.height * 0.14, 72, 118);
     let best: { slot: Slot; distance: number } | null = null;
 
     for (const slot of formation.slots) {
-      if (slot.slotId === movingSlotId) continue;
+      const centerX = rect.left + (slot.x / 100) * rect.width;
+      const centerY = rect.top + (slot.y / 100) * rect.height;
+      const dx = clientX - centerX;
+      const dy = clientY - centerY;
 
-      const other = getSlotPosition(slot);
-      const dx = ((position.x - other.x) / 100) * rect.width;
-      const dy = ((position.y - other.y) / 100) * rect.height;
-      const distance = Math.hypot(dx, dy);
+      if (Math.abs(dx) > hitboxWidth / 2 || Math.abs(dy) > hitboxHeight / 2) continue;
 
-      if (distance > thresholdPx) continue;
+      const distance = Math.hypot(dx / hitboxWidth, dy / hitboxHeight);
       if (!best || distance < best.distance) {
         best = { slot, distance };
       }
@@ -403,19 +383,19 @@ export default function SquadMaker() {
     const slot = formation.slots.find((item) => item.slotId === slotId);
     if (!slot) return;
 
-    const originPosition = getSlotPosition(slot);
     dragStateRef.current = {
       slotId,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
-      latestPosition: originPosition,
-      originPosition,
+      latestClientX: event.clientX,
+      latestClientY: event.clientY,
     };
 
     setDraggingSlotId(slotId);
-    setSwapTargetSlotId(null);
+    setDropTargetSlotId(slotId);
+    setDragPosition({ x: slot.x, y: slot.y });
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
@@ -434,18 +414,12 @@ export default function SquadMaker() {
       x: clamp(((event.clientX - rect.left) / rect.width) * 100, 8, 92),
       y: clamp(((event.clientY - rect.top) / rect.height) * 100, 7, 93),
     };
-    drag.latestPosition = position;
+    drag.latestClientX = event.clientX;
+    drag.latestClientY = event.clientY;
+    setDragPosition(position);
 
-    setPositionsByFormation((current) => ({
-      ...current,
-      [formationKey]: {
-        ...(current[formationKey] ?? {}),
-        [slotId]: position,
-      },
-    }));
-
-    const target = findSwapTarget(slotId, position, rect);
-    setSwapTargetSlotId(target?.slotId ?? null);
+    const target = findDropTarget(event.clientX, event.clientY, rect);
+    setDropTargetSlotId(target?.slotId ?? null);
     event.preventDefault();
   }
 
@@ -464,31 +438,15 @@ export default function SquadMaker() {
     if (drag.moved) {
       skipClickRef.current = slotId;
 
-      if (cancelled) {
-        setPositionsByFormation((current) => ({
-          ...current,
-          [formationKey]: {
-            ...(current[formationKey] ?? {}),
-            [slotId]: drag.originPosition,
-          },
-        }));
-      } else {
+      if (!cancelled) {
         const rect = pitchRef.current?.getBoundingClientRect();
         const target = rect
-          ? findSwapTarget(slotId, drag.latestPosition, rect)
+          ? findDropTarget(drag.latestClientX, drag.latestClientY, rect)
           : null;
 
-        if (target) {
+        if (target && target.slotId !== slotId) {
           // 포지션 슬롯의 라벨/좌표는 유지하고 선수만 슬롯 사이에서 교환한다.
           // 빈 슬롯으로 이동하면 출발 슬롯은 원래 포지션의 빈칸으로 남는다.
-          setPositionsByFormation((current) => ({
-            ...current,
-            [formationKey]: {
-              ...(current[formationKey] ?? {}),
-              [slotId]: drag.originPosition,
-            },
-          }));
-
           setPlayers((current) => {
             const movingPlayer = current[slotId];
             if (!movingPlayer) return current;
@@ -513,7 +471,8 @@ export default function SquadMaker() {
 
     dragStateRef.current = null;
     setDraggingSlotId(null);
-    setSwapTargetSlotId(null);
+    setDropTargetSlotId(null);
+    setDragPosition(null);
   }
 
   function handleSlotClick(slotId: string) {
@@ -546,8 +505,8 @@ export default function SquadMaker() {
       <h2 className="mt-2 text-xl font-bold">포지션을 선택하세요</h2>
       <p className="mt-3 text-sm leading-6 text-gray-500">
         경기장 위 포지션을 누르면 선수를 검색하고 시즌과 강화 단계를 선택할 수 있습니다.
-        배치한 선수는 마우스나 터치로 끌어서 위치를 자유롭게 조정할 수 있고,
-        다른 선수 위에 놓으면 두 선수가 자리를 바꾸고, 빈 포지션 위에 놓으면 기존 자리는 원래 포지션의 빈칸으로 남습니다.
+        배치한 선수를 마우스나 터치로 끌면 포지션 드롭 영역이 표시됩니다.
+        원하는 포지션에 놓으면 빈 자리로 이동하거나 두 선수의 자리가 서로 바뀝니다.
       </p>
     </div>
   );
@@ -596,10 +555,10 @@ export default function SquadMaker() {
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
         <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
-          배치한 선수 드래그 → 자유 위치 조정
+          선수 드래그 → 포지션 영역 표시
         </span>
         <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
-          선수/빈 포지션에 겹쳐 놓기 → 선수 배치 교환
+          포지션에 놓기 → 이동 또는 선수 교환
         </span>
         <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
           선수 카드 클릭 → 선수/강화 변경
@@ -614,8 +573,20 @@ export default function SquadMaker() {
           >
             <PitchLines />
 
+            {draggingSlotId &&
+              formation.slots.map((slot) => (
+                <PositionHitbox
+                  key={`hitbox-${slot.slotId}`}
+                  slot={slot}
+                  active={slot.slotId === dropTargetSlotId}
+                />
+              ))}
+
             {formation.slots.map((slot) => {
-              const renderedSlot = getRenderedSlot(slot);
+              const renderedSlot =
+                slot.slotId === draggingSlotId && dragPosition
+                  ? { ...slot, ...dragPosition }
+                  : slot;
               return (
                 <SquadSlotButton
                   key={slot.slotId}
@@ -623,7 +594,7 @@ export default function SquadMaker() {
                   player={players[slot.slotId]}
                   active={slot.slotId === selectedSlotId}
                   dragging={slot.slotId === draggingSlotId}
-                  swapTarget={slot.slotId === swapTargetSlotId}
+                  dropTarget={slot.slotId === dropTargetSlotId}
                   onClick={() => handleSlotClick(slot.slotId)}
                   onPointerDown={(event) => beginDrag(slot.slotId, event)}
                   onPointerMove={(event) => moveDrag(slot.slotId, event)}
@@ -671,12 +642,41 @@ function PitchLines() {
   );
 }
 
+function PositionHitbox({ slot, active }: { slot: Slot; active: boolean }) {
+  return (
+    <div
+      className={`pointer-events-none absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-start justify-center rounded-2xl border-2 border-dashed pt-1.5 transition sm:pt-2 ${
+        active
+          ? "border-lime-300 bg-lime-300/20 shadow-[0_0_30px_rgba(190,242,100,0.25)]"
+          : "border-white/35 bg-black/10"
+      }`}
+      style={{
+        left: `${slot.x}%`,
+        top: `${slot.y}%`,
+        width: "clamp(88px, 24%, 170px)",
+        height: "clamp(72px, 14%, 118px)",
+      }}
+      aria-hidden="true"
+    >
+      <span
+        className={`rounded-full border px-2 py-0.5 text-[9px] font-black backdrop-blur sm:text-[10px] ${
+          active
+            ? "border-lime-200/70 bg-lime-300/25 text-lime-50"
+            : "border-white/20 bg-black/35 text-white/65"
+        }`}
+      >
+        {slot.label}
+      </span>
+    </div>
+  );
+}
+
 function SquadSlotButton({
   slot,
   player,
   active,
   dragging,
-  swapTarget,
+  dropTarget,
   onClick,
   onPointerDown,
   onPointerMove,
@@ -687,7 +687,7 @@ function SquadSlotButton({
   player?: SquadPlayer;
   active: boolean;
   dragging: boolean;
-  swapTarget: boolean;
+  dropTarget: boolean;
   onClick: () => void;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -706,9 +706,9 @@ function SquadSlotButton({
       onPointerCancel={onPointerCancel}
       className={`group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center select-none transition ${
         dragging
-          ? "z-30 scale-105 cursor-grabbing"
-          : swapTarget
-            ? "z-20 scale-105"
+          ? "z-40 scale-105 cursor-grabbing opacity-90"
+          : dropTarget
+            ? "z-30 scale-105"
             : active
               ? "scale-105"
               : "hover:scale-105"
@@ -726,8 +726,8 @@ function SquadSlotButton({
             className={`relative h-[78px] overflow-hidden rounded-2xl border bg-black/35 shadow-xl transition sm:h-[96px] ${
               dragging
                 ? "border-lime-300/70"
-                : swapTarget
-                  ? "border-cyan-300 ring-2 ring-cyan-300/35"
+                : dropTarget
+                  ? "border-lime-300 ring-2 ring-lime-300/35"
                   : "border-white/20"
             }`}
           >
@@ -766,8 +766,8 @@ function SquadSlotButton({
         <>
           <div
             className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed bg-black/25 text-xl font-light shadow-lg transition sm:h-14 sm:w-14 ${
-              swapTarget
-                ? "border-cyan-300 bg-cyan-300/10 text-cyan-100 ring-2 ring-cyan-300/35"
+              dropTarget
+                ? "border-lime-300 bg-lime-300/10 text-lime-100 ring-2 ring-lime-300/35"
                 : "border-white/45 text-white/80"
             }`}
           >
@@ -775,8 +775,8 @@ function SquadSlotButton({
           </div>
           <span
             className={`mt-1 rounded-md px-2 py-0.5 text-[10px] font-black sm:text-xs ${
-              swapTarget
-                ? "bg-cyan-300/15 text-cyan-100 ring-1 ring-cyan-300/30"
+              dropTarget
+                ? "bg-lime-300/15 text-lime-100 ring-1 ring-lime-300/30"
                 : "bg-black/55 text-white"
             }`}
           >

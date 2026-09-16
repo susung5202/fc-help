@@ -292,6 +292,7 @@ export default function SquadMaker() {
     loading: false,
   });
   const [savingImage, setSavingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; file: File } | null>(null);
 
   const pitchRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<DragState | null>(null);
@@ -806,7 +807,7 @@ export default function SquadMaker() {
         })
       );
 
-      const { default: html2canvas } = await import("html2canvas");
+      const { default: html2canvas } = await import("html2canvas-pro");
       const canvas = await html2canvas(captureRoot, {
         backgroundColor: null,
         scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)),
@@ -829,23 +830,22 @@ export default function SquadMaker() {
       const shareNavigator = navigator as Navigator & {
         canShare?: (data?: ShareData) => boolean;
       };
+      const objectUrl = URL.createObjectURL(blob);
 
       if (navigator.share && shareNavigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title: "FC Help 스쿼드" });
-        } catch (shareError) {
-          if (shareError instanceof DOMException && shareError.name === "AbortError") return;
-          throw shareError;
-        }
+        setImagePreview((current) => {
+          if (current) URL.revokeObjectURL(current.url);
+          return { url: objectUrl, file };
+        });
       } else {
-        const downloadUrl = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.href = downloadUrl;
+        link.href = objectUrl;
         link.download = filename;
+        link.rel = "noopener";
         document.body.appendChild(link);
         link.click();
         link.remove();
-        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1500);
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
       }
     } catch (captureError) {
       console.error("Squad image capture failed", captureError);
@@ -854,6 +854,39 @@ export default function SquadMaker() {
       captureRoot?.remove();
       setSavingImage(false);
     }
+  }
+
+  async function savePreviewImage() {
+    if (!imagePreview) return;
+    const shareNavigator = navigator as Navigator & {
+      canShare?: (data?: ShareData) => boolean;
+    };
+
+    if (navigator.share && shareNavigator.canShare?.({ files: [imagePreview.file] })) {
+      try {
+        await navigator.share({ files: [imagePreview.file], title: "FC Help 스쿼드" });
+        return;
+      } catch (shareError) {
+        if (shareError instanceof DOMException && shareError.name === "AbortError") return;
+        console.warn("Native image share failed; falling back to download", shareError);
+      }
+    }
+
+    const link = document.createElement("a");
+    link.href = imagePreview.url;
+    link.download = imagePreview.file.name;
+    link.target = "_blank";
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function closeImagePreview() {
+    setImagePreview((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return null;
+    });
   }
 
   const panel = selectedSlot ? (
@@ -1103,6 +1136,34 @@ export default function SquadMaker() {
 
         <aside className="hidden xl:block">{panel}</aside>
       </div>
+
+      {imagePreview && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4" onClick={closeImagePreview}>
+          <div
+            className="w-full max-w-[620px] rounded-2xl border border-white/15 bg-[#15181d] p-3 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <img src={imagePreview.url} alt="저장할 스쿼드 이미지 미리보기" className="max-h-[72vh] w-full rounded-xl object-contain" />
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void savePreviewImage()}
+                className="rounded-xl bg-lime-300 px-4 py-3 text-sm font-black text-black"
+              >
+                사진 저장
+              </button>
+              <button
+                type="button"
+                onClick={closeImagePreview}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-bold text-white"
+              >
+                닫기
+              </button>
+            </div>
+            <p className="mt-2 text-center text-[10px] text-gray-500">iPhone에서는 사진 저장을 누른 뒤 공유 시트에서 ‘이미지 저장’을 선택하세요.</p>
+          </div>
+        </div>
+      )}
 
       {selectedSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 xl:hidden">

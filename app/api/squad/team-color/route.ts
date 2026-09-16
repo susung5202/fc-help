@@ -29,6 +29,7 @@ type BasePlayerData = {
   player: SquadInput;
   html: string;
   baseOvr: number | null;
+  enhancementOptions: TeamColorOption[];
   affiliationOptions: TeamColorOption[];
   relationshipOptions: TeamColorOption[];
 };
@@ -441,6 +442,7 @@ export async function POST(request: Request) {
           player,
           html,
           baseOvr: parsePositionOvr(html, player.position),
+          enhancementOptions: parseOptionsBetween(html, "강화 팀컬러", "소속 팀컬러"),
           affiliationOptions: parseOptionsBetween(html, "소속 팀컬러", "관계 팀컬러"),
           relationshipOptions: parseOptionsBetween(html, "관계 팀컬러", "클래스 비교"),
         };
@@ -452,6 +454,16 @@ export async function POST(request: Request) {
       buildCandidates(basePlayers, "relationship"),
     ]);
     const enhancement = selectEnhancement(players);
+    const enhancementOption = enhancement
+      ? basePlayers
+          .flatMap((item) => item.enhancementOptions)
+          .find((option) => option.name === enhancement.name) ?? {
+          name: enhancement.name,
+          id: null,
+          emblemUrl: null,
+        }
+      : null;
+    const enhancementInfo = enhancementOption ? await fetchTeamInfo(enhancementOption) : null;
 
     const appliedBySlot: Record<
       string,
@@ -504,8 +516,8 @@ export async function POST(request: Request) {
         selectedTeamColorMap.set(`enhancement:${enhancement.name}`, {
           name: enhancement.name,
           category: "enhancement",
-          id: null,
-          emblemUrl: null,
+          id: enhancementInfo?.id ?? enhancementOption?.id ?? null,
+          emblemUrl: enhancementInfo?.emblemUrl ?? enhancementOption?.emblemUrl ?? null,
           count: enhancement.count,
           level: enhancement.level,
           maxLevel: enhancement.maxLevel,

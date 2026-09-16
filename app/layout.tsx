@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import PushSoundListener from "@/components/PushSoundListener";
 import MobileNav from "@/components/MobileNav";
+import SiteFooter from "@/components/SiteFooter";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col pb-20 md:pb-0">
         <PushSoundListener />
         {children}
+        <SiteFooter />
         <MobileNav />
       </body>
     </html>

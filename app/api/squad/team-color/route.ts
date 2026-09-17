@@ -133,11 +133,60 @@ function decodeHtmlEntities(value: string) {
 }
 
 function htmlToText(html: string) {
-  return decodeHtmlEntities(html.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+  return decodeHtmlEntities(
+    html
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+  )
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getClassAttribute(tag: string) {
+  return tag.match(/\bclass\s*=\s*["']([^"']*)["']/i)?.[1] ?? "";
+}
+
+function hasClass(tag: string, className: string) {
+  return getClassAttribute(tag)
+    .split(/\s+/)
+    .some((value) => value === className);
+}
+
+function findMatchingDivEnd(html: string, startIndex: number) {
+  const tagPattern = /<\/?div\b[^>]*>/gi;
+  tagPattern.lastIndex = startIndex;
+  let depth = 0;
+
+  for (let match = tagPattern.exec(html); match; match = tagPattern.exec(html)) {
+    if (/^<\/div/i.test(match[0])) {
+      depth -= 1;
+      if (depth === 0) return tagPattern.lastIndex;
+    } else {
+      depth += 1;
+    }
+  }
+
+  return html.length;
+}
+
+function extractDivBlocksByClass(html: string, className: string) {
+  const blocks: string[] = [];
+  const openPattern = /<div\b[^>]*>/gi;
+
+  for (let match = openPattern.exec(html); match; match = openPattern.exec(html)) {
+    if (!hasClass(match[0], className)) continue;
+    const end = findMatchingDivEnd(html, match.index);
+    blocks.push(html.slice(match.index, end));
+    openPattern.lastIndex = end;
+  }
+
+  return blocks;
 }
 
 function normalizeAssetUrl(src: string, base = "https://fconline.nexon.com") {
@@ -151,6 +200,7 @@ function normalizeAssetUrl(src: string, base = "https://fconline.nexon.com") {
 
 function parseIdFromMarkup(markup: string): number | null {
   const patterns = [
+    /\bdata-no\s*=\s*["'](\d+)["']/i,
     /(?:n4TeamColorId|teamColorId|teamcolorid|data-teamcolor-id|data-color-id|data-sn|data-id)\s*(?:=|:)\s*["']?(\d+)/i,
     /data-value\s*=\s*["'](\d+)["']/i,
     /(?:TeamColor|teamcolor)[^\d]{0,50}(\d{2,})/i,
@@ -172,20 +222,40 @@ function parseImageFromMarkup(markup: string): string | null {
   return null;
 }
 
-function parseOptionsBetween(html: string, startLabel: string, endLabel?: string): TeamColorOption[] {
-  const start = html.indexOf(startLabel);
-  if (start < 0) return [];
-  const end = endLabel ? html.indexOf(endLabel, start + startLabel.length) : -1;
-  const segment = html.slice(start, end > start ? end : Math.min(html.length, start + 40000));
-  const result = new Map<string, TeamColorOption>();
-  const blocks = segment.match(/<li\b[\s\S]*?<\/li>/gi) ?? [];
+function parseSelectorOptions(
+  html: string,
+  wrapperClass: "en_wrap" | "tdefault_wrap" | "tspecial_wrap",
+  sectionLabel: string,
+  preserveLevel = false
+): TeamColorOption[] {
+  const wrapper =
+    extractDivBlocksByClass(html, wrapperClass).find((block) =>
+      htmlToText(block).includes(sectionLabel)
+    ) ?? "";
+  if (!wrapper) return [];
 
-  for (const block of blocks) {
-    const anchor = block.match(/<a\b[^>]*class=["'][^"']*\bselector_item\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
-    if (!anchor) continue;
-    const name = htmlToText(anchor[1]);
-    if (!name || name === startLabel || name === "단일팀") continue;
-    const option = { name, id: parseIdFromMarkup(block), emblemUrl: parseImageFromMarkup(block) };
+  const result = new Map<string, TeamColorOption>();
+  const anchorPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+
+  for (const match of wrapper.matchAll(anchorPattern)) {
+    const attributes = match[1];
+    const anchorTag = `<a ${attributes}>`;
+    if (!hasClass(anchorTag, "selector_item")) continue;
+
+    const rawName = htmlToText(match[2]);
+    const levelMatch = rawName.match(/^Lv\.\s*(\d+)\s+(.+)$/i);
+    const baseName = (levelMatch?.[2] ?? rawName).trim();
+    if (!baseName || baseName === "단일팀") continue;
+
+    const name = preserveLevel && levelMatch
+      ? `Lv.${Number(levelMatch[1])} ${baseName}`
+      : baseName;
+    const markup = match[0];
+    const option: TeamColorOption = {
+      name,
+      id: parseIdFromMarkup(attributes) ?? parseIdFromMarkup(markup),
+      emblemUrl: parseImageFromMarkup(markup),
+    };
     const previous = result.get(name);
     result.set(name, {
       name,
@@ -254,10 +324,11 @@ function parseTeamInfoHtml(html: string, name: string, fallback: TeamColorOption
 }
 
 async function fetchTeamInfo(option: TeamColorOption) {
-  const cached = teamInfoCache.get(option.name);
+  const cacheKey = option.id ? `${option.id}:${option.name}` : option.name;
+  const cached = teamInfoCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.info;
   try {
-    const response = await fetch(`${TEAM_COLOR_URL}?strTeamColorName=${encodeURIComponent(option.name)}`, {
+    const response = await fetch(`${TEAM_COLOR_URL}?strTeamColorName=${encodeURIComponent(option.name.replace(/^Lv\.\d+\s*/, ""))}`, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
         Accept: "text/html,application/xhtml+xml",
@@ -266,8 +337,9 @@ async function fetchTeamInfo(option: TeamColorOption) {
       next: { revalidate: 600 },
     });
     if (!response.ok) throw new Error(`team color request failed: ${response.status}`);
-    const info = parseTeamInfoHtml(await response.text(), option.name, option);
-    teamInfoCache.set(option.name, { expiresAt: Date.now() + CACHE_MS, info });
+    const searchName = option.name.replace(/^Lv\.\d+\s*/, "");
+    const info = parseTeamInfoHtml(await response.text(), searchName, option);
+    teamInfoCache.set(cacheKey, { expiresAt: Date.now() + CACHE_MS, info });
     return info;
   } catch {
     return { name: option.name, id: option.id, emblemUrl: option.emblemUrl, maxLevel: 4, maxRequired: 11, effect: "" };
@@ -279,14 +351,19 @@ async function fetchPlayerAbility(player: SquadInput) {
   const cached = abilityCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.html;
 
+  const safeGrade = Math.min(13, Math.max(1, player.grade));
+  const sourceUrl = `https://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=${safeGrade}&spid=${player.spid}`;
   const body = new URLSearchParams({
     spid: String(player.spid),
-    n1Strong: String(Math.min(13, Math.max(1, player.grade))),
+    n1Strong: String(safeGrade),
     n1Grow: "4",
     n4TeamColorId: "0",
     n4TeamColorLv: "0",
+    n4TeamColorId_Enhance: "0",
+    n4TeamColorLv_Enhance: "0",
+    n4TeamColorId_Feature: "0",
     n1Change: "0",
-    strPlayerImg: `https://fo4.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`,
+    strPlayerImg: `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.spid}.png`,
     rd: "0",
   }).toString();
 
@@ -297,10 +374,11 @@ async function fetchPlayerAbility(player: SquadInput) {
         method: "POST",
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml",
-          "Accept-Language": "ko-KR,ko;q=0.9",
+          Accept: "text/html, */*; q=0.01",
+          "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          Referer: `https://fconline.nexon.com/DataCenter/PlayerInfo?spid=${player.spid}`,
+          Referer: sourceUrl,
+          Origin: "https://fconline.nexon.com",
           "X-Requested-With": "XMLHttpRequest",
         },
         body,
@@ -347,7 +425,10 @@ function effectForLevel(info: ParsedTeamInfo, level: number) {
 
 function parseAbilityValues(html: string) {
   const text = htmlToText(html);
-  const marker = text.lastIndexOf("총 능력치");
+  const markerIndexes = [text.lastIndexOf("능력치 전체"), text.lastIndexOf("총 능력치")].filter(
+    (index) => index >= 0
+  );
+  const marker = markerIndexes.length ? Math.max(...markerIndexes) : -1;
   const section = marker >= 0 ? text.slice(marker) : text;
   const values: Record<string, number> = {};
   for (const stat of STAT_NAMES) {
@@ -370,8 +451,6 @@ function applyEffectsToOvr(html: string, position: string, exactBaseOvr: number 
   const base = parseAbilityValues(html);
   const stats = Object.keys(base);
 
-  // 전체 능력치 보너스는 모든 포지션 가중치에 동일하게 적용되므로,
-  // 세부 능력치 파싱이 실패해도 최종 OVR에서 절대 누락시키지 않는다.
   if (stats.length === 0) {
     return exactBaseOvr === null ? null : exactBaseOvr + overallBonus;
   }
@@ -384,7 +463,7 @@ function applyEffectsToOvr(html: string, position: string, exactBaseOvr: number 
     }
     for (const stat of STAT_NAMES) {
       if (stat === "전체 능력치") continue;
-      const amount = Number(effect.match(new RegExp(`${escapeRegExp(stat)}\s*\+(\d+)`))?.[1] ?? 0);
+      const amount = Number(effect.match(new RegExp(`${escapeRegExp(stat)}\\s*\\+(\\d+)`))?.[1] ?? 0);
       if (amount > 0 && adjusted[stat] !== undefined) adjusted[stat] += amount;
     }
   }
@@ -461,10 +540,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "요청 형식이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const rawPlayers = Array.isArray((body as { players?: unknown[] })?.players) ? (body as { players: unknown[] }).players : [];
+  const rawPlayers = Array.isArray((body as { players?: unknown[] })?.players)
+    ? (body as { players: unknown[] }).players
+    : [];
   const players: SquadInput[] = rawPlayers
     .map((item) => item as Partial<SquadInput>)
-    .filter((item) => typeof item.slotId === "string" && Number.isInteger(item.spid) && Number(item.spid) > 0 && typeof item.position === "string" && Number.isInteger(item.grade))
+    .filter(
+      (item) =>
+        typeof item.slotId === "string" &&
+        Number.isInteger(item.spid) &&
+        Number(item.spid) > 0 &&
+        typeof item.position === "string" &&
+        Number.isInteger(item.grade)
+    )
     .slice(0, 11)
     .map((item) => ({
       slotId: item.slotId as string,
@@ -480,8 +568,6 @@ export async function POST(request: Request) {
   try {
     const basePlayers: BasePlayerData[] = [];
 
-    // FC Online 쪽 요청을 11개 동시에 몰아치면 일부 요청이 간헐적으로 실패할 수 있다.
-    // 3명씩 나눠 요청하고, 끝까지 실패한 선수만 제외해서 한 명의 실패가 전체 스쿼드를 비우지 않게 한다.
     for (let index = 0; index < players.length; index += 3) {
       const batch = await Promise.all(
         players.slice(index, index + 3).map(async (player): Promise<BasePlayerData | null> => {
@@ -496,9 +582,9 @@ export async function POST(request: Request) {
               player,
               html,
               baseOvr: parsePositionOvr(html, player.position) ?? abilityBaseOvr,
-              enhancementOptions: parseOptionsBetween(html, "강화 팀컬러", "소속 팀컬러"),
-              affiliationOptions: parseOptionsBetween(html, "소속 팀컬러", "관계 팀컬러"),
-              relationshipOptions: parseOptionsBetween(html, "관계 팀컬러", "클래스 비교"),
+              enhancementOptions: parseSelectorOptions(html, "en_wrap", "강화 팀컬러", true),
+              affiliationOptions: parseSelectorOptions(html, "tdefault_wrap", "소속 팀컬러"),
+              relationshipOptions: parseSelectorOptions(html, "tspecial_wrap", "관계 팀컬러"),
             };
           } catch (error) {
             console.error("Squad player ability fetch failed", {
@@ -512,9 +598,7 @@ export async function POST(request: Request) {
         })
       );
 
-      basePlayers.push(
-        ...batch.filter((item): item is BasePlayerData => item !== null)
-      );
+      basePlayers.push(...batch.filter((item): item is BasePlayerData => item !== null));
     }
 
     const [affiliationCandidates, relationshipCandidates] = await Promise.all([

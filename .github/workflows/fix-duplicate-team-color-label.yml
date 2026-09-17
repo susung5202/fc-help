@@ -1,0 +1,43 @@
+name: Fix duplicate team color label
+on:
+  push:
+    paths:
+      - .github/workflows/fix-duplicate-team-color-label.yml
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove generic selector labels
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/api/squad/team-color/route.ts")
+          source = path.read_text(encoding="utf-8")
+          old = '    if (!baseName || baseName === "단일팀") continue;'
+          new = '''    if (
+              !baseName ||
+              baseName === "단일팀" ||
+              baseName === sectionLabel ||
+              ["강화 팀컬러", "소속 팀컬러", "관계 팀컬러", "특성 팀컬러"].includes(baseName)
+            ) continue;'''
+          if old not in source:
+              raise SystemExit("target line not found")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+      - name: Verify patch
+        run: |
+          grep -n 'baseName === sectionLabel' app/api/squad/team-color/route.ts
+          git diff --check
+      - name: Commit fix
+        run: |
+          rm .github/workflows/fix-duplicate-team-color-label.yml
+          git config user.name "susung5202"
+          git config user.email "74191151+susung5202@users.noreply.github.com"
+          git add app/api/squad/team-color/route.ts .github/workflows/fix-duplicate-team-color-label.yml
+          git commit -m "fix: filter duplicate squad team color labels"
+          git push

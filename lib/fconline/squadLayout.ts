@@ -1,24 +1,37 @@
 export type PitchSlot = { slotId: string; label: string; x: number; y: number };
 export type PositionZone = { id: string; label: string; left: number; top: number; width: number; height: number };
 
-// These same rectangles are used for both rendering and hit testing.
+// Invisible pitch regions. Only the hovered position is shown on the dragged card.
+const centralRows = [
+  { top: 4, height: 12, labels: ["LS", "ST", "RS"] },
+  { top: 16, height: 12, labels: ["LF", "CF", "RF"] },
+  { top: 28, height: 10, labels: ["LAM", "CAM", "RAM"] },
+  { top: 38, height: 10, labels: ["LCM", "CM", "RCM"] },
+  { top: 48, height: 12, labels: ["LDM", "CDM", "RDM"] },
+  { top: 60, height: 12, labels: ["LCB", "CB", "RCB"] },
+];
+const wideRows = [
+  { top: 4, height: 24, labels: ["LW", "RW"] },
+  { top: 28, height: 18, labels: ["LM", "RM"] },
+  { top: 46, height: 14, labels: ["LWB", "RWB"] },
+  { top: 60, height: 18, labels: ["LB", "RB"] },
+];
 export const POSITION_ZONES: PositionZone[] = [
-  { top: 4, height: 18, labels: ["LW", "ST", "RW"] },
-  { top: 22, height: 12, labels: ["LAM", "CAM", "RAM"] },
-  { top: 34, height: 11, labels: ["LM", "CM", "RM"] },
-  { top: 45, height: 14, labels: ["LWB", "CDM", "RWB"] },
-  { top: 59, height: 18, labels: ["LB", "CB", "RB"] },
-].flatMap(({ top, height, labels }) => labels.map((label, index) => ({
-  id: `zone-${label}`, label, top, height,
-  left: [5, 27, 73][index], width: [22, 46, 22][index],
-})));
+  ...centralRows.flatMap(({ top, height, labels }) => labels.map((label, index) => ({
+    id: `zone-${label}`, label, top, height, left: 23 + index * 18, width: 18,
+  }))),
+  ...wideRows.flatMap(({ top, height, labels }) => labels.map((label, index) => ({
+    id: `zone-${label}`, label, top, height, left: index === 0 ? 5 : 77, width: 18,
+  }))),
+  { id: "zone-SW", label: "SW", top: 72, height: 8, left: 23, width: 54 },
+];
 
 export function findPositionZone(x: number, y: number) {
   return POSITION_ZONES.find((zone) => x >= zone.left && x < zone.left + zone.width && y >= zone.top && y < zone.top + zone.height) ?? null;
 }
 
 function lineCounts(slots: PitchSlot[]) {
-  const groups = [["LB", "CB", "RB", "LWB", "RWB", "SW"], ["CDM", "LDM", "RDM"], ["LM", "CM", "RM", "LCM", "RCM"], ["LAM", "CAM", "RAM"], ["ST", "CF", "LW", "RW", "LS", "RS", "LF", "RF"]];
+  const groups = [["LB", "LCB", "CB", "RCB", "RB", "LWB", "RWB", "SW"], ["CDM", "LDM", "RDM"], ["LM", "CM", "RM", "LCM", "RCM"], ["LAM", "CAM", "RAM"], ["ST", "CF", "LW", "RW", "LS", "RS", "LF", "RF"]];
   return groups.map((labels) => slots.filter((slot) => labels.includes(slot.label)).length);
 }
 
@@ -35,8 +48,11 @@ export function restorePositions(value: unknown, base: PitchSlot[]): Record<stri
   for (const slot of base) {
     const candidate = (value as Record<string, PitchSlot>)[slot.slotId];
     if (!candidate || slot.label === "GK" || !Number.isFinite(candidate.x) || !Number.isFinite(candidate.y)) continue;
-    const zone = findPositionZone(candidate.x, candidate.y);
-    if (zone?.label === candidate.label) result[slot.slotId] = { slotId: slot.slotId, label: zone.label, x: candidate.x, y: candidate.y };
+    // Preserve positions saved before the regions were subdivided.
+    const supported = POSITION_ZONES.some((zone) => zone.label === candidate.label);
+    if (supported && candidate.x >= 5 && candidate.x < 95 && candidate.y >= 4 && candidate.y < 80) {
+      result[slot.slotId] = { slotId: slot.slotId, label: candidate.label, x: candidate.x, y: candidate.y };
+    }
   }
   return result;
 }

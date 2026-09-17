@@ -267,7 +267,7 @@ function withTraitDefaults(player: SquadPlayer): SquadPlayer {
 }
 
 function getPositionBadgeTone(label: string) {
-  if (["ST", "CF", "LW", "RW"].includes(label)) {
+  if (["ST", "LS", "RS", "CF", "LF", "RF", "LW", "RW"].includes(label)) {
     return "border-rose-300/50 bg-rose-500 text-white";
   }
 
@@ -275,7 +275,7 @@ function getPositionBadgeTone(label: string) {
     return "border-amber-200/50 bg-amber-500 text-black";
   }
 
-  if (["LB", "CB", "RB", "LWB", "RWB"].includes(label)) {
+  if (["LB", "LCB", "CB", "RCB", "RB", "LWB", "RWB", "SW"].includes(label)) {
     return "border-blue-300/50 bg-blue-500 text-white";
   }
 
@@ -296,6 +296,8 @@ export default function SquadMaker() {
   const [draggingSlotId, setDraggingSlotId] = useState<string | null>(null);
   const [dropTargetSlotId, setDropTargetSlotId] = useState<string | null>(null);
   const [dragPosition, setDragPosition] = useState<CustomPosition | null>(null);
+  const [hoverOvr, setHoverOvr] = useState<{ key: string; value: number | null } | null>(null);
+  const hoverOvrCache = useRef(new Map<string, number>());
   const [cardDetails, setCardDetails] = useState<Record<string, SquadCardDetails>>({});
   const [teamColorState, setTeamColorState] = useState<TeamColorState>({
     adaptation: 5,
@@ -320,6 +322,52 @@ export default function SquadMaker() {
   const draggingSlot = formation.slots.find((slot) => slot.slotId === draggingSlotId);
   const selectedSlot = formation.slots.find((slot) => slot.slotId === selectedSlotId) ?? null;
   const selectedPlayer = selectedSlotId ? players[selectedSlotId] ?? null : null;
+  const hoveredPosition = dropTargetSlotId?.startsWith("zone-")
+    ? POSITION_ZONES.find((zone) => zone.id === dropTargetSlotId)?.label
+    : formation.slots.find((slot) => slot.slotId === dropTargetSlotId)?.label;
+  const hoverPreview = useMemo(() => {
+    if (!draggingSlotId || !dropTargetSlotId || !hoveredPosition) return null;
+    const targetIsSlot = !dropTargetSlotId.startsWith("zone-");
+    const destination = targetIsSlot ? dropTargetSlotId : draggingSlotId;
+    const payload = Object.entries(players).map(([slotId, player]) => {
+      const projectedSlotId = slotId === draggingSlotId ? destination
+        : targetIsSlot && slotId === destination ? draggingSlotId : slotId;
+      const position = slotId === draggingSlotId ? hoveredPosition
+        : formation.slots.find((slot) => slot.slotId === projectedSlotId)?.label ?? player.position;
+      return { slotId: projectedSlotId, spid: player.id, position, grade: player.grade };
+    });
+    return { payload, destination, key: JSON.stringify(payload) };
+  }, [draggingSlotId, dropTargetSlotId, hoveredPosition, players, formation]);
+
+  useEffect(() => {
+    if (!hoverPreview) return;
+    const preview = hoverPreview;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      const cached = hoverOvrCache.current.get(preview.key);
+      if (cached !== undefined) {
+        setHoverOvr({ key: preview.key, value: cached });
+        return;
+      }
+      try {
+        const response = await fetch("/api/squad/team-color", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ players: preview.payload }), signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (controller.signal.aborted) return;
+        const value = data.ovrBySlot?.[preview.destination];
+        if (typeof value === "number" && Number.isFinite(value)) {
+          hoverOvrCache.current.set(preview.key, value);
+          setHoverOvr({ key: preview.key, value });
+        }
+      } catch {
+        // The card's position OVR remains available if the team-color preview fails.
+      }
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [hoverPreview]);
 
   useEffect(() => {
     try {
@@ -947,7 +995,7 @@ export default function SquadMaker() {
       <h2 className="mt-2 text-xl font-bold">포지션을 선택하세요</h2>
       <p className="mt-3 text-sm leading-6 text-gray-500">
         경기장 위 포지션을 누르면 선수를 검색하고 시즌과 강화 단계를 선택할 수 있습니다.
-        배치한 선수를 마우스나 터치로 끌면 포지션 드롭 영역이 표시됩니다.
+        배치한 선수를 마우스나 터치로 끌면 해당 위치의 포지션과 OVR이 표시됩니다.
         선수 위에 놓으면 서로 교환하고, 빈 포지션 영역에 놓으면 배치와 포메이션이 자동으로 바뀝니다.
       </p>
     </div>
@@ -1135,17 +1183,7 @@ export default function SquadMaker() {
               </div>
             )}
 
-            {draggingSlot && draggingSlot.label !== "GK" && POSITION_ZONES.map((zone) => (
-              <div key={zone.id} data-position-zone={zone.label} data-capture-hide="true" aria-hidden="true"
-                className={`pointer-events-none absolute z-20 rounded-md border border-dashed p-1 text-center text-[10px] font-black sm:text-xs ${dropTargetSlotId === zone.id ? "border-lime-200 bg-lime-300/30 text-lime-100" : "border-white/40 bg-black/20 text-white/80"}`}
-                style={{ left: `${zone.left}%`, top: `${zone.top}%`, width: `${zone.width}%`, height: `${zone.height}%` }}>
-                {zone.label}
-              </div>
-            ))}
-            {draggingSlot && <div data-capture-hide="true" role="status" className="pointer-events-none absolute bottom-1 left-1/2 z-[65] -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-3 py-1 text-xs font-bold text-lime-200">
-              {dropTargetSlotId?.startsWith("zone-") ? `${POSITION_ZONES.find((zone) => zone.id === dropTargetSlotId)?.label} 위치로 이동` : dropTargetSlotId && dropTargetSlotId !== draggingSlotId ? players[dropTargetSlotId] ? "선수 자리 교환" : "빈 슬롯으로 이동" : "원하는 포지션으로 드래그"}
-            </div>}
-            {formation.slots.filter((slot) => !draggingSlot || isGoalkeeperSlot(slot.label) === isGoalkeeperSlot(draggingSlot.label)).map((slot) => (
+            {formation.slots.filter((slot) => !draggingSlot || (slot.slotId === dropTargetSlotId && slot.slotId !== draggingSlotId)).map((slot) => (
               <PositionHitbox
                 key={`hitbox-${slot.slotId}`}
                 slot={slot}
@@ -1158,7 +1196,7 @@ export default function SquadMaker() {
             {formation.slots.map((slot) => {
               const renderedSlot =
                 slot.slotId === draggingSlotId && dragPosition
-                  ? { ...slot, ...dragPosition }
+                  ? { ...slot, ...dragPosition, label: hoveredPosition ?? slot.label }
                   : slot;
               return (
                 <SquadSlotButton
@@ -1168,7 +1206,7 @@ export default function SquadMaker() {
                   active={slot.slotId === selectedSlotId}
                   dragging={slot.slotId === draggingSlotId}
                   dropTarget={slot.slotId === dropTargetSlotId}
-                  calculatedOvr={teamColorState.ovrBySlot[slot.slotId] ?? null}
+                  calculatedOvr={slot.slotId === draggingSlotId ? (hoverPreview && hoverOvr?.key === hoverPreview.key ? hoverOvr.value : hoveredPosition === slot.label ? teamColorState.ovrBySlot[slot.slotId] ?? null : null) : teamColorState.ovrBySlot[slot.slotId] ?? null}
                   onClick={() => handleSlotClick(slot.slotId)}
                   onPointerDown={(event) => beginDrag(slot.slotId, event)}
                   onPointerMove={(event) => moveDrag(slot.slotId, event)}
@@ -1358,10 +1396,12 @@ function SquadSlotButton({
         top: `${slot.y}%`,
         touchAction: player ? "none" : "auto",
       }}
+      data-preview-position={dragging ? slot.label : undefined}
       aria-label={player ? `${player.name} 위치 이동 또는 선택` : `${slot.label} 선수 선택`}
     >
       {player ? (
         <SquadPlayerCard
+          key={`${player.id}:${slot.label}`}
           spid={player.id}
           artworkSpid={player.artworkSpid}
           name={player.name}

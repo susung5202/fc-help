@@ -11,6 +11,8 @@ import PlayerArtwork from "@/components/PlayerArtwork";
 import SquadPlayerCard from "@/components/SquadPlayerCard";
 import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 
+import { POSITION_ZONES, findPositionZone, formationName, restorePositions } from "@/lib/fconline/squadLayout";
+
 type SearchPlayer = {
   id: number;
   name: string;
@@ -282,6 +284,7 @@ function getPositionBadgeTone(label: string) {
 
 export default function SquadMaker() {
   const [formationKey, setFormationKey] = useState("4-2-3-1");
+  const [customPositions, setCustomPositions] = useState<Record<string, Slot>>({});
   const [players, setPlayers] = useState<Record<string, SquadPlayer>>({});
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -308,7 +311,13 @@ export default function SquadMaker() {
   const dragStateRef = useRef<DragState | null>(null);
   const skipClickRef = useRef<string | null>(null);
 
-  const formation = FORMATIONS[formationKey] ?? FORMATIONS["4-2-3-1"];
+  const formation = useMemo(() => {
+    const base = FORMATIONS[formationKey] ?? FORMATIONS["4-2-3-1"];
+    return { ...base, slots: base.slots.map((slot) => customPositions[slot.slotId] ?? slot) };
+  }, [formationKey, customPositions]);
+  const displayFormation = formationName(formation.slots, FORMATIONS);
+  const customFormation = Object.keys(customPositions).length > 0;
+  const draggingSlot = formation.slots.find((slot) => slot.slotId === draggingSlotId);
   const selectedSlot = formation.slots.find((slot) => slot.slotId === selectedSlotId) ?? null;
   const selectedPlayer = selectedSlotId ? players[selectedSlotId] ?? null : null;
 
@@ -318,11 +327,13 @@ export default function SquadMaker() {
       if (raw) {
         const saved = JSON.parse(raw) as {
           formationKey?: string;
+          customPositions?: unknown;
           players?: Record<string, SquadPlayer>;
         };
 
         if (saved.formationKey && FORMATIONS[saved.formationKey]) {
           setFormationKey(saved.formationKey);
+          setCustomPositions(restorePositions(saved.customPositions, FORMATIONS[saved.formationKey].slots));
         }
 
         if (saved.players) {
@@ -348,9 +359,9 @@ export default function SquadMaker() {
     if (!hydrated) return;
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ formationKey, players })
+      JSON.stringify({ formationKey, players, customPositions })
     );
-  }, [formationKey, players, hydrated]);
+  }, [formationKey, players, customPositions, hydrated]);
 
   useEffect(() => {
     if (!selectedSlotId || query.trim().length < 1) {
@@ -402,7 +413,7 @@ export default function SquadMaker() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, selectedSlotId, formationKey]);
+  }, [query, selectedSlotId, formation]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -446,7 +457,7 @@ export default function SquadMaker() {
     });
 
     return () => controller.abort();
-  }, [players, formationKey]);
+  }, [players, formation]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -509,7 +520,7 @@ export default function SquadMaker() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [players, formationKey, hydrated]);
+  }, [players, formation, hydrated]);
 
   const selectedPlayers = Object.values(players) as SquadPlayer[];
   const totalSalary = Object.entries(players).reduce(
@@ -639,17 +650,21 @@ export default function SquadMaker() {
   function clearSquad() {
     if (!window.confirm("현재 스쿼드를 모두 비울까요?")) return;
     setPlayers({});
+    setCustomPositions({});
     closePanel();
   }
 
   function handleFormationChange(nextFormation: string) {
+    if (!FORMATIONS[nextFormation]) return;
     setFormationKey(nextFormation);
+    setCustomPositions({});
     closePanel();
   }
 
   function findDropTarget(clientX: number, clientY: number, rect: DOMRect, sourceSlotId?: string): Slot | null {
-    const hitboxWidth = clamp(rect.width * 0.24, 88, 170);
-    const hitboxHeight = clamp(rect.height * 0.14, 72, 118);
+    const hitboxWidth = clamp(rect.width * 0.12, 36, 86);
+    const hitboxHeight = clamp(rect.height * 0.08, 40, 76);
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
     let best: { slot: Slot; distance: number } | null = null;
     const sourceSlot = sourceSlotId
       ? formation.slots.find((slot) => slot.slotId === sourceSlotId) ?? null
@@ -670,11 +685,16 @@ export default function SquadMaker() {
       }
     }
 
-    return best?.slot ?? null;
+    if (best) return best.slot;
+    if (!sourceSlot || isGoalkeeperSlot(sourceSlot.label)) return null;
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+    const zone = findPositionZone(x, y);
+    return zone ? { slotId: zone.id, label: zone.label, x, y } : null;
   }
 
   function beginDrag(slotId: string, event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!players[slotId]) return;
+    if (!players[slotId] || dragStateRef.current || !event.isPrimary || event.button !== 0) return;
 
     const slot = formation.slots.find((item) => item.slotId === slotId);
     if (!slot) return;
@@ -737,10 +757,15 @@ export default function SquadMaker() {
       if (!cancelled) {
         const rect = pitchRef.current?.getBoundingClientRect();
         const target = rect
-          ? findDropTarget(drag.latestClientX, drag.latestClientY, rect, slotId)
+          ? findDropTarget(event.clientX, event.clientY, rect, slotId)
           : null;
 
-        if (target && target.slotId !== slotId) {
+        if (target?.slotId.startsWith("zone-")) {
+          setCustomPositions((current) => ({ ...current, [slotId]: { ...target, slotId } }));
+          setCardDetails({});
+          setTeamColorState((current) => ({ ...current, ovrBySlot: {}, loading: true }));
+          closePanel();
+        } else if (target && target.slotId !== slotId) {
           // 포지션 슬롯의 라벨/좌표는 유지하고 선수만 슬롯 사이에서 교환한다.
           // 빈 슬롯으로 이동하면 출발 슬롯은 원래 포지션의 빈칸으로 남는다.
           setPlayers((current) => {
@@ -835,7 +860,7 @@ export default function SquadMaker() {
           1
         )
       );
-      const filename = `fc-help-squad-${formationKey}-${new Date().toISOString().slice(0, 10)}.png`;
+      const filename = `fc-help-squad-${displayFormation}-${new Date().toISOString().slice(0, 10)}.png`;
       const file = new File([blob], filename, { type: "image/png" });
       const shareNavigator = navigator as Navigator & {
         canShare?: (data?: ShareData) => boolean;
@@ -923,7 +948,7 @@ export default function SquadMaker() {
       <p className="mt-3 text-sm leading-6 text-gray-500">
         경기장 위 포지션을 누르면 선수를 검색하고 시즌과 강화 단계를 선택할 수 있습니다.
         배치한 선수를 마우스나 터치로 끌면 포지션 드롭 영역이 표시됩니다.
-        원하는 포지션에 놓으면 빈 자리로 이동하거나 두 선수의 자리가 서로 바뀝니다.
+        선수 위에 놓으면 서로 교환하고, 빈 포지션 영역에 놓으면 배치와 포메이션이 자동으로 바뀝니다.
       </p>
     </div>
   );
@@ -938,10 +963,11 @@ export default function SquadMaker() {
           <label className="flex h-10 items-center rounded-lg border border-white/15 bg-[#202522] px-3">
             <span className="sr-only">포메이션</span>
             <select
-              value={formationKey}
+              value={customFormation ? "custom" : formationKey}
               onChange={(event) => handleFormationChange(event.target.value)}
               className="h-full w-full bg-transparent text-[14px] font-black text-white outline-none"
             >
+              {customFormation && <option value="custom" className="bg-[#181b21]">{displayFormation} · 직접 배치</option>}
               {Object.keys(FORMATIONS).map((key) => (
                 <option key={key} value={key} className="bg-[#181b21]">
                   {key}
@@ -964,10 +990,11 @@ export default function SquadMaker() {
           <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 px-4 py-3">
             <span className="text-xs font-semibold text-gray-500">포메이션</span>
             <select
-              value={formationKey}
+              value={customFormation ? "custom" : formationKey}
               onChange={(event) => handleFormationChange(event.target.value)}
               className="bg-transparent text-sm font-bold text-white outline-none"
             >
+              {customFormation && <option value="custom" className="bg-[#181b21]">{displayFormation} · 직접 배치</option>}
               {Object.keys(FORMATIONS).map((key) => (
                 <option key={key} value={key} className="bg-[#181b21]">
                   {key}
@@ -1108,7 +1135,17 @@ export default function SquadMaker() {
               </div>
             )}
 
-            {formation.slots.map((slot) => (
+            {draggingSlot && draggingSlot.label !== "GK" && POSITION_ZONES.map((zone) => (
+              <div key={zone.id} data-position-zone={zone.label} data-capture-hide="true" aria-hidden="true"
+                className={`pointer-events-none absolute z-20 rounded-md border border-dashed p-1 text-center text-[10px] font-black sm:text-xs ${dropTargetSlotId === zone.id ? "border-lime-200 bg-lime-300/30 text-lime-100" : "border-white/40 bg-black/20 text-white/80"}`}
+                style={{ left: `${zone.left}%`, top: `${zone.top}%`, width: `${zone.width}%`, height: `${zone.height}%` }}>
+                {zone.label}
+              </div>
+            ))}
+            {draggingSlot && <div data-capture-hide="true" role="status" className="pointer-events-none absolute bottom-1 left-1/2 z-[65] -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-3 py-1 text-xs font-bold text-lime-200">
+              {dropTargetSlotId?.startsWith("zone-") ? `${POSITION_ZONES.find((zone) => zone.id === dropTargetSlotId)?.label} 위치로 이동` : dropTargetSlotId && dropTargetSlotId !== draggingSlotId ? players[dropTargetSlotId] ? "선수 자리 교환" : "빈 슬롯으로 이동" : "원하는 포지션으로 드래그"}
+            </div>}
+            {formation.slots.filter((slot) => !draggingSlot || isGoalkeeperSlot(slot.label) === isGoalkeeperSlot(draggingSlot.label)).map((slot) => (
               <PositionHitbox
                 key={`hitbox-${slot.slotId}`}
                 slot={slot}
@@ -1242,8 +1279,8 @@ function PositionHitbox({
       style={{
         left: `${slot.x}%`,
         top: `${slot.y}%`,
-        width: dragActive ? "clamp(88px, 24%, 170px)" : "clamp(48px, 15%, 86px)",
-        height: dragActive ? "clamp(72px, 14%, 118px)" : "clamp(48px, 10%, 76px)",
+        width: dragActive ? "clamp(36px, 12%, 86px)" : "clamp(48px, 15%, 86px)",
+        height: dragActive ? "clamp(40px, 8%, 76px)" : "clamp(48px, 10%, 76px)",
       }}
       aria-hidden="true"
     >

@@ -245,7 +245,12 @@ function parseSelectorOptions(
     const rawName = htmlToText(match[2]);
     const levelMatch = rawName.match(/^Lv\.\s*(\d+)\s+(.+)$/i);
     const baseName = (levelMatch?.[2] ?? rawName).trim();
-    if (!baseName || baseName === "단일팀") continue;
+    if (
+    !baseName ||
+    baseName === "단일팀" ||
+    baseName === sectionLabel ||
+    ["강화 팀컬러", "소속 팀컬러", "관계 팀컬러", "특성 팀컬러"].includes(baseName)
+  ) continue;
 
     const name = preserveLevel && levelMatch
       ? `Lv.${Number(levelMatch[1])} ${baseName}`

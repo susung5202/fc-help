@@ -22,9 +22,7 @@ const siteUrl =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : undefined);
 
-const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.startsWith("ca-pub-")
-  ? process.env.NEXT_PUBLIC_ADSENSE_CLIENT
-  : undefined;
+const adsenseClient = "ca-pub-6735658400194219";
 
 export const metadata: Metadata = {
   ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
@@ -44,13 +42,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  ...(adsenseClient
-    ? {
-        other: {
-          "google-adsense-account": adsenseClient,
-        },
-      }
-    : {}),
+  other: {
+    "google-adsense-account": adsenseClient,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -60,15 +54,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col pb-20 md:pb-0">
-        {adsenseClient && (
-          <Script
-            id="google-adsense"
-            async
-            strategy="beforeInteractive"
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
-            crossOrigin="anonymous"
-          />
-        )}
+        <Script
+          id="google-adsense"
+          async
+          strategy="beforeInteractive"
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
+          crossOrigin="anonymous"
+        />
         <PushSoundListener />
         {children}
         <SiteFooter />

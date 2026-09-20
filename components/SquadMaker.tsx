@@ -1183,6 +1183,41 @@ export default function SquadMaker() {
               </div>
             )}
 
+            {draggingSlot && !isGoalkeeperSlot(draggingSlot.label) && (
+              <div
+                data-capture-hide="true"
+                className="pointer-events-none absolute inset-0 z-[15]"
+                aria-hidden="true"
+              >
+                {POSITION_ZONES.map((zone) => (
+                  <PositionDropZone
+                    key={zone.id}
+                    zone={zone}
+                    active={dropTargetSlotId === zone.id}
+                  />
+                ))}
+              </div>
+            )}
+
+            {draggingSlot && (
+              <div
+                data-capture-hide="true"
+                role="status"
+                aria-live="polite"
+                className="pointer-events-none absolute bottom-1 left-1/2 z-[65] -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-3 py-1.5 text-[10px] font-bold text-lime-100 shadow-lg backdrop-blur sm:bottom-2 sm:text-xs"
+              >
+                {dropTargetSlotId?.startsWith("zone-")
+                  ? `${hoveredPosition} 위치로 이동`
+                  : dropTargetSlotId && dropTargetSlotId !== draggingSlotId
+                    ? players[dropTargetSlotId]
+                      ? "선수 자리 교환"
+                      : "빈 슬롯으로 이동"
+                    : isGoalkeeperSlot(draggingSlot.label)
+                      ? "골키퍼 슬롯 안에서만 이동할 수 있습니다"
+                      : "원하는 포지션 영역에 놓으세요"}
+              </div>
+            )}
+
             {formation.slots.filter((slot) => !draggingSlot || (slot.slotId === dropTargetSlotId && slot.slotId !== draggingSlotId)).map((slot) => (
               <PositionHitbox
                 key={`hitbox-${slot.slotId}`}
@@ -1288,6 +1323,39 @@ function PitchLines() {
       <div className="absolute bottom-0 left-1/2 h-[16%] w-[56%] -translate-x-1/2 border-x-2 border-t-2 border-white/45" />
       <div className="absolute left-1/2 top-0 h-[7%] w-[27%] -translate-x-1/2 border-x-2 border-b-2 border-white/45" />
       <div className="absolute bottom-0 left-1/2 h-[7%] w-[27%] -translate-x-1/2 border-x-2 border-t-2 border-white/45" />
+    </div>
+  );
+}
+
+function PositionDropZone({
+  zone,
+  active,
+}: {
+  zone: (typeof POSITION_ZONES)[number];
+  active: boolean;
+}) {
+  return (
+    <div
+      data-position-zone={zone.label}
+      className={`absolute flex items-center justify-center rounded-md border transition-all duration-150 sm:rounded-lg ${
+        active
+          ? "z-10 scale-[1.03] border-lime-100 bg-lime-300/35 text-lime-50 shadow-[inset_0_0_20px_rgba(190,242,100,0.2),0_0_24px_rgba(190,242,100,0.35)]"
+          : "border-white/30 bg-black/20 text-white/75"
+      }`}
+      style={{
+        left: `${zone.left}%`,
+        top: `${zone.top}%`,
+        width: `${zone.width}%`,
+        height: `${zone.height}%`,
+      }}
+    >
+      <span
+        className={`rounded px-1 py-0.5 text-[7px] font-black leading-none tracking-tight transition sm:px-1.5 sm:text-[10px] ${
+          active ? "bg-lime-200 text-black" : "bg-black/35 text-white/80"
+        }`}
+      >
+        {zone.label}
+      </span>
     </div>
   );
 }

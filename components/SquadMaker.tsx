@@ -1545,6 +1545,7 @@ function PlayerPickerPanel({
   const [pendingGrade, setPendingGrade] = useState(grade);
   const [pendingDetails, setPendingDetails] = useState<SquadCardDetails | null>(null);
   const [pendingDetailsLoading, setPendingDetailsLoading] = useState(false);
+  const [resultDetails, setResultDetails] = useState<Record<number, SquadCardDetails>>({});
 
   useEffect(() => {
     setReplaceMode(!currentPlayer);
@@ -1585,6 +1586,54 @@ function PlayerPickerPanel({
     setPendingDetails(null);
     setPendingDetailsLoading(false);
   }, [slot.slotId, currentPlayer?.id]);
+
+  useEffect(() => {
+    if (results.length === 0) {
+      setResultDetails({});
+      return;
+    }
+
+    const controller = new AbortController();
+    setResultDetails({});
+
+    const load = async () => {
+      const next: Record<number, SquadCardDetails> = {};
+      for (let index = 0; index < results.length; index += 3) {
+        const batch = results.slice(index, index + 3);
+        const loaded = await Promise.all(
+          batch.map(async (player) => {
+            try {
+              const response = await fetch(
+                `/api/squad/card?spid=${player.id}&name=${encodeURIComponent(player.name)}&position=${encodeURIComponent(slot.label)}`,
+                { signal: controller.signal }
+              );
+              if (!response.ok) return null;
+              const data = await response.json();
+              return [
+                player.id,
+                {
+                  salary: Number.isFinite(data.salary) ? data.salary : null,
+                  prices: Array.isArray(data.prices) ? data.prices : [],
+                  positionOvr: Number.isFinite(data.positionOvr) ? data.positionOvr : null,
+                } satisfies SquadCardDetails,
+              ] as const;
+            } catch {
+              return null;
+            }
+          })
+        );
+
+        if (controller.signal.aborted) return;
+        for (const item of loaded) {
+          if (item) next[item[0]] = item[1];
+        }
+        setResultDetails({ ...next });
+      }
+    };
+
+    void load();
+    return () => controller.abort();
+  }, [results, slot.label]);
 
   useEffect(() => {
     if (!pendingPlayer) {
@@ -1805,30 +1854,48 @@ function PlayerPickerPanel({
               {loading && <p className="py-8 text-center text-sm text-gray-500">선수 정보를 불러오는 중...</p>}
               {!loading && error && <p className="rounded-xl bg-red-400/5 p-4 text-sm text-red-300">{error}</p>}
               {!loading && !error && query.trim() && results.length === 0 && <p className="py-8 text-center text-sm text-gray-500">검색 결과가 없습니다.</p>}
-              {!loading && !error && results.map((player) => (
-                <button
-                  key={player.id}
-                  type="button"
-                  onClick={() => {
-                    setPendingPlayer(player);
-                    setPendingGrade(grade);
-                  }}
-                  className="flex w-full items-start gap-3 rounded-xl border border-white/[0.08] bg-black/10 p-3 text-left transition hover:border-lime-400/30 hover:bg-lime-400/[0.04]"
-                >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/[0.04]">
-                    {player.seasonImg ? <img src={player.seasonImg} alt={player.seasonName} className="max-h-9 max-w-10 object-contain" /> : <span className="text-xs text-gray-700">-</span>}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-black">{player.name}</p>
-                    <p className="mt-1 truncate text-xs text-gray-500">{player.seasonName}</p>
-                    {(player.newTraits?.length ?? 0) > 0 && <TraitChips traits={player.newTraits ?? []} compactMode />}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-lg font-black text-lime-300">{player.ovr ?? "-"}</p>
-                    <p className="text-[10px] font-bold text-gray-500">{player.position ?? "OVR"}</p>
-                  </div>
-                </button>
-              ))}
+              {!loading && !error && results.map((player) => {
+                const details = resultDetails[player.id];
+                const price = details?.prices?.[grade - 1];
+                return (
+                  <button
+                    key={player.id}
+                    type="button"
+                    onClick={() => {
+                      setPendingPlayer(player);
+                      setPendingGrade(grade);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-black/10 p-2.5 text-left transition hover:border-lime-400/30 hover:bg-lime-400/[0.04]"
+                  >
+                    <div className="relative h-[68px] w-[58px] shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]">
+                      <PlayerArtwork
+                        spid={player.id}
+                        alt={`${player.name} ${player.seasonName} 액션샷`}
+                        className="absolute bottom-0 left-1/2 max-h-[64px] max-w-[135%] -translate-x-1/2 object-contain"
+                      />
+                      {player.seasonImg && (
+                        <img
+                          src={player.seasonImg}
+                          alt={player.seasonName}
+                          className="absolute bottom-1 right-1 z-10 h-4 max-w-6 object-contain"
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black">{player.name}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-gray-500">{player.seasonName}</p>
+                      <p className="mt-1 truncate text-[11px] font-black text-amber-300">
+                        {details ? `${grade}강 · ${formatPlayerPrice(price)}` : `${grade}강 · 가격 불러오는 중...`}
+                      </p>
+                      {(player.newTraits?.length ?? 0) > 0 && <TraitChips traits={player.newTraits ?? []} compactMode />}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-lg font-black text-lime-300">{player.ovr ?? "-"}</p>
+                      <p className="text-[10px] font-bold text-gray-500">{player.position ?? "OVR"}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </section>

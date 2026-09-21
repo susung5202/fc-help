@@ -44,7 +44,6 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
   const players = post.squad_data.players ?? {};
   const slots = getGallerySlots(post.squad_data);
   const filledSlots = slots.filter((slot) => players[slot.slotId]);
-  const featured = filledSlots.slice(0, 5);
 
   function copySquad() {
     window.localStorage.setItem("fc-help-squad-v1", JSON.stringify(post.squad_data));
@@ -55,7 +54,7 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
     <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#171b1f] shadow-[0_20px_70px_rgba(0,0,0,0.24)]">
       <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
         <div className="min-w-0">
-          <Link href={`/squad/gallery/${post.id}`} className="block truncate text-xl font-black tracking-tight text-white transition hover:text-lime-300">
+          <Link href={`/squad/gallery/${post.id}`} className="block truncate text-xl font-black tracking-tight text-white transition hover:text-lime-300 sm:text-2xl">
             {post.title}
           </Link>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500">
@@ -70,31 +69,21 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
         </div>
 
         <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={copySquad}
-            className="rounded-xl border border-lime-400/30 bg-lime-400/10 px-3.5 py-2.5 text-xs font-black text-lime-300 transition hover:bg-lime-400/20"
-          >
+          <button type="button" onClick={copySquad} className="rounded-xl border border-lime-400/30 bg-lime-400/10 px-3.5 py-2.5 text-xs font-black text-lime-300 transition hover:bg-lime-400/20">
             스쿼드 복사
           </button>
-          <Link
-            href={`/squad/gallery/${post.id}`}
-            className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-xs font-black text-gray-200 transition hover:bg-white/[0.07] hover:text-white"
-          >
+          <Link href={`/squad/gallery/${post.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-xs font-black text-gray-200 transition hover:bg-white/[0.07] hover:text-white">
             자세히
           </Link>
         </div>
       </div>
 
-      <div className="grid gap-5 p-4 lg:grid-cols-[240px_minmax(0,1fr)] sm:p-5">
-        <Link
-          href={`/squad/gallery/${post.id}`}
-          className="relative mx-auto aspect-[0.78] w-full max-w-[240px] overflow-hidden rounded-2xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner"
-        >
-          <div className="pointer-events-none absolute inset-3 opacity-35">
+      <div className="grid gap-5 p-4 lg:grid-cols-[minmax(360px,460px)_minmax(0,1fr)] sm:p-5">
+        <Link href={`/squad/gallery/${post.id}`} className="relative mx-auto aspect-[0.78] w-full max-w-[460px] overflow-hidden rounded-2xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner">
+          <div className="pointer-events-none absolute inset-4 opacity-35">
             <div className="absolute inset-0 border border-white/70" />
             <div className="absolute left-0 right-0 top-1/2 border-t border-white/70" />
-            <div className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70" />
+            <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70" />
             <div className="absolute left-1/2 top-0 h-[16%] w-[56%] -translate-x-1/2 border-x border-b border-white/70" />
             <div className="absolute bottom-0 left-1/2 h-[16%] w-[56%] -translate-x-1/2 border-x border-t border-white/70" />
           </div>
@@ -102,82 +91,38 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
           {filledSlots.map((slot) => {
             const player = players[slot.slotId]!;
             return (
-              <div
-                key={slot.slotId}
-                className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
-                style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
-                title={`${slot.label} · ${player.name} · ${player.grade}강`}
-              >
-                <div className="relative h-9 w-8 overflow-hidden rounded-md border border-white/20 bg-black/30 shadow-md">
-                  <PlayerArtwork
-                    spid={player.artworkSpid ?? player.id}
-                    alt={player.name}
-                    className="absolute bottom-0 left-1/2 max-h-[36px] max-w-[135%] -translate-x-1/2 object-contain"
-                  />
-                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/80 px-1 text-[7px] font-black text-lime-200">+{player.grade}</span>
+              <div key={slot.slotId} className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: `${slot.x}%`, top: `${slot.y}%` }} title={`${slot.label} · ${player.name} · ${player.grade}강`}>
+                <div className="relative h-12 w-11 overflow-hidden rounded-lg border border-white/25 bg-black/30 shadow-lg sm:h-14 sm:w-12">
+                  <PlayerArtwork spid={player.artworkSpid ?? player.id} alt={player.name} className="absolute bottom-0 left-1/2 max-h-[54px] max-w-[140%] -translate-x-1/2 object-contain" />
+                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/80 px-1 text-[8px] font-black text-lime-200">+{player.grade}</span>
                 </div>
-                <span className="mt-0.5 rounded bg-black/75 px-1 text-[7px] font-black text-white">{slot.label}</span>
+                <span className="mt-1 max-w-20 truncate rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-black text-white">{player.name}</span>
+                <span className="mt-0.5 rounded bg-black/75 px-1 text-[7px] font-black text-lime-200">{slot.label}</span>
               </div>
             );
           })}
         </Link>
 
-        <div className="min-w-0">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="min-w-0 self-center">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
             <Stat label="포메이션" value={post.formation} />
             <Stat label="급여" value={post.total_salary ? `${post.total_salary}/310` : "-"} />
             <Stat label="평균 OVR" value={post.average_ovr == null ? "-" : String(post.average_ovr)} />
             <Stat label="구단가치" value={formatGalleryValue(post.total_value)} />
           </div>
 
-          {post.description && (
-            <p className="mt-4 line-clamp-2 text-sm leading-6 text-gray-300">{post.description}</p>
-          )}
-
-          {featured.length > 0 && (
-            <div className="mt-4">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-black tracking-[0.12em] text-gray-500">대표 선수</p>
-                {filledSlots.length > featured.length && (
-                  <Link href={`/squad/gallery/${post.id}`} className="text-[10px] font-bold text-lime-300">전체 선수 보기 →</Link>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-                {featured.map((slot) => {
-                  const player = players[slot.slotId]!;
-                  return (
-                    <div key={slot.slotId} className="flex min-w-0 items-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 p-2">
-                      <div className="relative h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-white/[0.04]">
-                        <PlayerArtwork
-                          spid={player.artworkSpid ?? player.id}
-                          alt={player.name}
-                          className="absolute bottom-0 left-1/2 max-h-[46px] max-w-[135%] -translate-x-1/2 object-contain"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-[11px] font-black text-white">{player.name}</p>
-                        <p className="mt-0.5 truncate text-[9px] font-bold text-gray-500">{slot.label} · {player.seasonName ?? "시즌"}</p>
-                        <p className="mt-0.5 text-[9px] font-black text-lime-300">{player.grade}강</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {post.description && <p className="mt-4 line-clamp-4 rounded-2xl border border-white/[0.07] bg-black/10 px-4 py-3 text-sm leading-6 text-gray-300">{post.description}</p>}
 
           <div className="mt-4 flex flex-wrap gap-1.5">
-            {post.team_colors.slice(0, 4).map((teamColor) => (
-              <span key={teamColor} className="rounded-full border border-lime-400/20 bg-lime-400/[0.06] px-2.5 py-1 text-[10px] font-bold text-lime-200">
-                {teamColor}
-              </span>
+            {post.team_colors.slice(0, 6).map((teamColor) => (
+              <span key={teamColor} className="rounded-full border border-lime-400/20 bg-lime-400/[0.06] px-2.5 py-1 text-[10px] font-bold text-lime-200">{teamColor}</span>
             ))}
           </div>
 
           <div className="mt-5 flex items-center gap-4 border-t border-white/10 pt-4 text-xs font-bold text-gray-400">
             <span>♥ {post.likes_count.toLocaleString("ko-KR")}</span>
             <span>댓글 {post.comments_count.toLocaleString("ko-KR")}</span>
-            <Link href={`/squad/gallery/${post.id}`} className="ml-auto font-black text-lime-300 hover:text-lime-200">선수 구성 자세히 보기 →</Link>
+            <Link href={`/squad/gallery/${post.id}`} className="ml-auto rounded-lg bg-lime-300 px-3 py-2 font-black text-black transition hover:bg-lime-200">자세히 보기</Link>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PlayerArtwork from "@/components/PlayerArtwork";
@@ -27,6 +28,12 @@ export type SquadFeedPost = {
   created_at: string;
 };
 
+type FeedPlayerDetail = {
+  prices: Array<string | null>;
+};
+
+const FEED_DETAIL_CACHE = new Map<string, FeedPlayerDetail>();
+
 function timeAgo(value: string) {
   const diff = Date.now() - new Date(value).getTime();
   const minute = 60_000;
@@ -39,11 +46,60 @@ function timeAgo(value: string) {
   return new Date(value).toLocaleDateString("ko-KR");
 }
 
+function compactPrice(value: string | null | undefined) {
+  if (!value) return "-";
+  const formatted = formatGalleryValue(value).replace(/ BP$/, "");
+  return formatted.length > 11 ? `${formatted.slice(0, 11)}…` : formatted;
+}
+
 export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
   const router = useRouter();
   const players = post.squad_data.players ?? {};
   const slots = getGallerySlots(post.squad_data);
   const filledSlots = slots.filter((slot) => players[slot.slotId]);
+  const [details, setDetails] = useState<Record<string, FeedPlayerDetail>>({});
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDetails() {
+      const next: Record<string, FeedPlayerDetail> = {};
+
+      for (let index = 0; index < filledSlots.length; index += 4) {
+        const batch = filledSlots.slice(index, index + 4);
+        const results = await Promise.all(
+          batch.map(async (slot) => {
+            const player = players[slot.slotId]!;
+            const key = `${player.id}:${slot.label}`;
+            const cached = FEED_DETAIL_CACHE.get(key);
+            if (cached) return [slot.slotId, cached] as const;
+
+            try {
+              const response = await fetch(
+                `/api/squad/card?spid=${player.id}&name=${encodeURIComponent(player.name)}&position=${encodeURIComponent(slot.label)}`
+              );
+              if (!response.ok) throw new Error("card request failed");
+              const data = (await response.json()) as FeedPlayerDetail;
+              FEED_DETAIL_CACHE.set(key, data);
+              return [slot.slotId, data] as const;
+            } catch {
+              return [slot.slotId, { prices: Array.from({ length: 13 }, () => null) }] as const;
+            }
+          })
+        );
+
+        results.forEach(([slotId, detail]) => {
+          next[slotId] = detail;
+        });
+        if (active) setDetails({ ...next });
+      }
+    }
+
+    void loadDetails();
+    return () => {
+      active = false;
+    };
+  }, [post.id]);
 
   function copySquad() {
     window.localStorage.setItem("fc-help-squad-v1", JSON.stringify(post.squad_data));
@@ -81,41 +137,46 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
       <div className="p-4 sm:p-5">
         <Link
           href={`/squad/gallery/${post.id}`}
-          className="relative mx-auto block aspect-[0.9] w-full max-w-[760px] overflow-hidden rounded-3xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner sm:aspect-[1.05] lg:max-w-[860px]"
+          className="relative mx-auto block aspect-[0.86] w-full max-w-[560px] overflow-hidden rounded-3xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner sm:max-w-[620px] sm:aspect-[0.92]"
         >
-          <div className="pointer-events-none absolute inset-5 opacity-35 sm:inset-7">
+          <div className="pointer-events-none absolute inset-5 opacity-35 sm:inset-6">
             <div className="absolute inset-0 border border-white/70" />
             <div className="absolute left-0 right-0 top-1/2 border-t border-white/70" />
-            <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70 sm:h-24 sm:w-24" />
+            <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70 sm:h-20 sm:w-20" />
             <div className="absolute left-1/2 top-0 h-[16%] w-[56%] -translate-x-1/2 border-x border-b border-white/70" />
             <div className="absolute bottom-0 left-1/2 h-[16%] w-[56%] -translate-x-1/2 border-x border-t border-white/70" />
           </div>
 
           {filledSlots.map((slot) => {
             const player = players[slot.slotId]!;
+            const price = details[slot.slotId]?.prices?.[Math.max(0, player.grade - 1)] ?? null;
             return (
               <div
                 key={slot.slotId}
-                className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                className="absolute flex w-[76px] -translate-x-1/2 -translate-y-1/2 flex-col items-center sm:w-[88px]"
                 style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
-                title={`${slot.label} · ${player.name} · ${player.grade}강`}
+                title={`${slot.label} · ${player.name} · ${player.seasonName ?? "시즌 정보 없음"} · ${player.grade}강`}
               >
-                <div className="relative h-14 w-12 overflow-hidden rounded-xl border border-white/25 bg-black/30 shadow-xl sm:h-[72px] sm:w-[62px] lg:h-[82px] lg:w-[70px]">
+                <div className="relative h-14 w-12 overflow-visible rounded-xl border border-white/20 bg-black/20 shadow-lg sm:h-16 sm:w-14">
                   <PlayerArtwork
                     spid={player.artworkSpid ?? player.id}
                     alt={player.name}
-                    className="absolute bottom-0 left-1/2 max-h-[68px] max-w-[145%] -translate-x-1/2 object-contain sm:max-h-[86px] lg:max-h-[96px]"
+                    className="absolute bottom-0 left-1/2 max-h-[64px] max-w-[125%] -translate-x-1/2 object-contain sm:max-h-[72px]"
                   />
-                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/80 px-1.5 py-0.5 text-[9px] font-black text-lime-200 sm:text-[10px]">+{player.grade}</span>
+                  <span className="absolute -bottom-1 -right-1 rounded-md bg-black/85 px-1.5 py-0.5 text-[8px] font-black text-lime-200 sm:text-[9px]">+{player.grade}</span>
                 </div>
-                <span className="mt-1 max-w-24 truncate rounded-md bg-black/80 px-2 py-0.5 text-[9px] font-black text-white sm:max-w-32 sm:text-[11px]">{player.name}</span>
-                <span className="mt-0.5 rounded bg-black/75 px-1.5 py-0.5 text-[8px] font-black text-lime-200 sm:text-[9px]">{slot.label}</span>
+                <span className="mt-1 w-full truncate rounded bg-black/80 px-1.5 py-0.5 text-center text-[8px] font-black text-white sm:text-[9px]">{player.name}</span>
+                <span className="mt-0.5 w-full truncate text-center text-[7px] font-bold text-gray-200 sm:text-[8px]">{player.seasonName ?? "시즌 정보 없음"}</span>
+                <div className="mt-0.5 flex items-center justify-center gap-1 text-[7px] font-black sm:text-[8px]">
+                  <span className="rounded bg-black/75 px-1 text-lime-200">{slot.label}</span>
+                  <span className="max-w-[56px] truncate rounded bg-black/75 px-1 text-amber-200">{compactPrice(price)}</span>
+                </div>
               </div>
             );
           })}
         </Link>
 
-        <div className="mx-auto mt-5 max-w-[860px]">
+        <div className="mx-auto mt-5 max-w-[620px]">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="포메이션" value={post.formation} />
             <Stat label="급여" value={post.total_salary ? `${post.total_salary}/310` : "-"} />
@@ -124,9 +185,7 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
           </div>
 
           {post.description && (
-            <p className="mt-4 line-clamp-3 rounded-2xl border border-white/[0.07] bg-black/10 px-4 py-3 text-sm leading-6 text-gray-300">
-              {post.description}
-            </p>
+            <p className="mt-4 line-clamp-3 rounded-2xl border border-white/[0.07] bg-black/10 px-4 py-3 text-sm leading-6 text-gray-300">{post.description}</p>
           )}
 
           <div className="mt-4 flex flex-wrap gap-1.5">

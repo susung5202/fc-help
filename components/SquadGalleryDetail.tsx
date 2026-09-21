@@ -173,17 +173,26 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
 
       <SquadFeedCard post={post} />
 
-      <section className="mt-5 rounded-3xl border border-white/10 bg-[#171b1f] p-4 sm:p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <section className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#171b1f]">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
           <div>
             <p className="text-xs font-black tracking-[0.14em] text-lime-400">SQUAD PLAYERS</p>
             <h2 className="mt-1 text-2xl font-black">포함 선수</h2>
-            <p className="mt-1 text-xs text-gray-500">이 스쿼드에 등록된 선수 {filledSlots.length}명의 시즌, 강화, 포지션, 급여와 가격 정보입니다.</p>
+            <p className="mt-1 text-xs text-gray-500">이 스쿼드에 등록된 선수 {filledSlots.length}명을 리스트로 확인할 수 있습니다.</p>
           </div>
           {playerDetailsLoading && <span className="text-xs font-bold text-gray-500">선수 정보 불러오는 중...</span>}
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="hidden grid-cols-[76px_minmax(180px,1.5fr)_90px_80px_80px_minmax(140px,1fr)] gap-3 border-b border-white/[0.07] bg-black/10 px-4 py-2.5 text-[10px] font-black text-gray-500 md:grid sm:px-5">
+          <span>선수</span>
+          <span>이름 / 시즌</span>
+          <span>포지션</span>
+          <span>강화</span>
+          <span>OVR / 급여</span>
+          <span className="text-right">선수 가치</span>
+        </div>
+
+        <div className="divide-y divide-white/[0.07]">
           {filledSlots.map((slot) => {
             const player = players[slot.slotId]!;
             const detail = playerDetails[slot.slotId];
@@ -191,33 +200,35 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
             const displayOvr = detail?.positionOvr ?? player.ovr ?? null;
 
             return (
-              <article key={slot.slotId} className="overflow-hidden rounded-2xl border border-white/[0.09] bg-[#101318]">
-                <div className="flex min-h-36 gap-3 p-3.5">
-                  <div className="relative w-24 shrink-0 overflow-hidden rounded-xl bg-[radial-gradient(circle_at_50%_20%,rgba(163,230,53,0.16),transparent_58%)]">
-                    <PlayerArtwork
-                      spid={player.artworkSpid ?? player.id}
-                      alt={player.name}
-                      className="absolute bottom-0 left-1/2 max-h-[132px] max-w-[145%] -translate-x-1/2 object-contain"
-                    />
-                    <span className="absolute left-2 top-2 rounded-md bg-black/75 px-2 py-1 text-[10px] font-black text-lime-300">{slot.label}</span>
-                  </div>
+              <article key={slot.slotId} className="grid gap-3 px-4 py-3 transition hover:bg-white/[0.025] md:grid-cols-[76px_minmax(180px,1.5fr)_90px_80px_80px_minmax(140px,1fr)] md:items-center sm:px-5">
+                <div className="relative h-20 w-16 overflow-hidden rounded-xl border border-white/10 bg-[radial-gradient(circle_at_50%_20%,rgba(163,230,53,0.14),transparent_60%)] md:h-16 md:w-14">
+                  <PlayerArtwork spid={player.artworkSpid ?? player.id} alt={player.name} className="absolute bottom-0 left-1/2 max-h-[76px] max-w-[145%] -translate-x-1/2 object-contain md:max-h-[62px]" />
+                </div>
 
-                  <div className="min-w-0 flex-1 py-1">
-                    <p className="truncate text-base font-black text-white" title={player.name}>{player.name}</p>
-                    <p className="mt-1 truncate text-[11px] font-bold text-gray-500" title={player.seasonName ?? undefined}>{player.seasonName ?? "시즌 정보 없음"}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-black text-white" title={player.name}>{player.name}</p>
+                  <p className="mt-1 truncate text-[11px] font-bold text-gray-500" title={player.seasonName ?? undefined}>{player.seasonName ?? "시즌 정보 없음"}</p>
+                  {detail?.failed && <p className="mt-1 text-[9px] font-bold text-amber-300">일부 정보 로딩 실패</p>}
+                </div>
 
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <span className="rounded-md border border-lime-300/20 bg-lime-300/[0.07] px-2 py-1 text-[10px] font-black text-lime-300">{player.grade}강</span>
-                      <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] font-black text-gray-300">OVR {displayOvr ?? "-"}</span>
-                      <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] font-black text-gray-300">급여 {detail?.salary ?? "-"}</span>
-                    </div>
+                <div className="flex items-center gap-2 md:block">
+                  <span className="text-[10px] font-bold text-gray-600 md:hidden">포지션</span>
+                  <span className="inline-flex rounded-lg border border-lime-300/20 bg-lime-300/[0.07] px-2.5 py-1.5 text-xs font-black text-lime-300">{slot.label}</span>
+                </div>
 
-                    <div className="mt-3 border-t border-white/[0.07] pt-3">
-                      <p className="text-[9px] font-bold text-gray-600">{player.grade}강 가격</p>
-                      <p className="mt-0.5 truncate text-sm font-black text-white" title={price ?? undefined}>{detail ? formatPlayerPrice(price) : "불러오는 중..."}</p>
-                      {detail?.failed && <p className="mt-1 text-[9px] font-bold text-amber-300">일부 정보를 불러오지 못했습니다.</p>}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2 md:block">
+                  <span className="text-[10px] font-bold text-gray-600 md:hidden">강화</span>
+                  <span className="text-sm font-black text-white">{player.grade}강</span>
+                </div>
+
+                <div className="flex items-center gap-3 text-xs font-black md:block">
+                  <span className="text-lime-300">OVR {displayOvr ?? "-"}</span>
+                  <span className="text-gray-400 md:mt-1 md:block">급여 {detail?.salary ?? "-"}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 md:block md:text-right">
+                  <span className="text-[10px] font-bold text-gray-600 md:block">{player.grade}강 가격</span>
+                  <span className="text-sm font-black text-white md:mt-1 md:block" title={price ?? undefined}>{detail ? formatPlayerPrice(price) : "불러오는 중..."}</span>
                 </div>
               </article>
             );

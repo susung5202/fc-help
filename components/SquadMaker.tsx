@@ -322,9 +322,11 @@ export default function SquadMaker() {
   const draggingSlot = formation.slots.find((slot) => slot.slotId === draggingSlotId);
   const selectedSlot = formation.slots.find((slot) => slot.slotId === selectedSlotId) ?? null;
   const selectedPlayer = selectedSlotId ? players[selectedSlotId] ?? null : null;
-  const hoveredPosition = dropTargetSlotId?.startsWith("zone-")
-    ? POSITION_ZONES.find((zone) => zone.id === dropTargetSlotId)?.label
-    : formation.slots.find((slot) => slot.slotId === dropTargetSlotId)?.label;
+  const hoveredZone = dropTargetSlotId?.startsWith("zone-")
+    ? POSITION_ZONES.find((zone) => zone.id === dropTargetSlotId) ?? null
+    : null;
+  const hoveredPosition = hoveredZone?.label
+    ?? formation.slots.find((slot) => slot.slotId === dropTargetSlotId)?.label;
   const hoverPreview = useMemo(() => {
     if (!draggingSlotId || !dropTargetSlotId || !hoveredPosition) return null;
     const targetIsSlot = !dropTargetSlotId.startsWith("zone-");
@@ -1183,19 +1185,13 @@ export default function SquadMaker() {
               </div>
             )}
 
-            {draggingSlot && !isGoalkeeperSlot(draggingSlot.label) && (
+            {draggingSlot && hoveredZone && (
               <div
                 data-capture-hide="true"
                 className="pointer-events-none absolute inset-0 z-[30]"
                 aria-hidden="true"
               >
-                {POSITION_ZONES.map((zone) => (
-                  <PositionDropZone
-                    key={zone.id}
-                    zone={zone}
-                    active={dropTargetSlotId === zone.id}
-                  />
-                ))}
+                <PositionDropZone zone={hoveredZone} />
               </div>
             )}
 
@@ -1329,34 +1325,22 @@ function PitchLines() {
 
 function PositionDropZone({
   zone,
-  active,
 }: {
   zone: (typeof POSITION_ZONES)[number];
-  active: boolean;
 }) {
   return (
     <div
       data-position-zone={zone.label}
-      className={`absolute flex items-center justify-center rounded-md border-2 transition-all duration-150 sm:rounded-lg ${
-        active
-          ? "z-10 scale-[1.04] border-lime-100 text-lime-50 shadow-[inset_0_0_28px_rgba(190,242,100,0.28),0_0_28px_rgba(190,242,100,0.5)]"
-          : "border-dashed border-white/65 text-white"
-      }`}
+      className="absolute z-10 flex scale-[1.04] items-center justify-center rounded-md border-2 border-lime-100 text-lime-50 shadow-[inset_0_0_28px_rgba(190,242,100,0.28),0_0_28px_rgba(190,242,100,0.5)] transition-all duration-150 sm:rounded-lg"
       style={{
         left: `${zone.left}%`,
         top: `${zone.top}%`,
         width: `${zone.width}%`,
         height: `${zone.height}%`,
-        backgroundColor: active
-          ? "rgba(190, 242, 100, 0.42)"
-          : "rgba(255, 255, 255, 0.12)",
+        backgroundColor: "rgba(190, 242, 100, 0.42)",
       }}
     >
-      <span
-        className={`rounded px-1.5 py-1 text-[8px] font-black leading-none tracking-tight shadow transition sm:px-2 sm:text-[11px] ${
-          active ? "bg-lime-100 text-black" : "bg-black/60 text-white"
-        }`}
-      >
+      <span className="rounded bg-lime-100 px-1.5 py-1 text-[8px] font-black leading-none tracking-tight text-black shadow transition sm:px-2 sm:text-[11px]">
         {zone.label}
       </span>
     </div>

@@ -78,12 +78,15 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
         </div>
       </div>
 
-      <div className="grid gap-5 p-4 lg:grid-cols-[minmax(360px,460px)_minmax(0,1fr)] sm:p-5">
-        <Link href={`/squad/gallery/${post.id}`} className="relative mx-auto aspect-[0.78] w-full max-w-[460px] overflow-hidden rounded-2xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner">
-          <div className="pointer-events-none absolute inset-4 opacity-35">
+      <div className="p-4 sm:p-5">
+        <Link
+          href={`/squad/gallery/${post.id}`}
+          className="relative mx-auto block aspect-[0.9] w-full max-w-[760px] overflow-hidden rounded-3xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner sm:aspect-[1.05] lg:max-w-[860px]"
+        >
+          <div className="pointer-events-none absolute inset-5 opacity-35 sm:inset-7">
             <div className="absolute inset-0 border border-white/70" />
             <div className="absolute left-0 right-0 top-1/2 border-t border-white/70" />
-            <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70" />
+            <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70 sm:h-24 sm:w-24" />
             <div className="absolute left-1/2 top-0 h-[16%] w-[56%] -translate-x-1/2 border-x border-b border-white/70" />
             <div className="absolute bottom-0 left-1/2 h-[16%] w-[56%] -translate-x-1/2 border-x border-t border-white/70" />
           </div>
@@ -91,27 +94,40 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
           {filledSlots.map((slot) => {
             const player = players[slot.slotId]!;
             return (
-              <div key={slot.slotId} className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: `${slot.x}%`, top: `${slot.y}%` }} title={`${slot.label} · ${player.name} · ${player.grade}강`}>
-                <div className="relative h-12 w-11 overflow-hidden rounded-lg border border-white/25 bg-black/30 shadow-lg sm:h-14 sm:w-12">
-                  <PlayerArtwork spid={player.artworkSpid ?? player.id} alt={player.name} className="absolute bottom-0 left-1/2 max-h-[54px] max-w-[140%] -translate-x-1/2 object-contain" />
-                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/80 px-1 text-[8px] font-black text-lime-200">+{player.grade}</span>
+              <div
+                key={slot.slotId}
+                className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                title={`${slot.label} · ${player.name} · ${player.grade}강`}
+              >
+                <div className="relative h-14 w-12 overflow-hidden rounded-xl border border-white/25 bg-black/30 shadow-xl sm:h-[72px] sm:w-[62px] lg:h-[82px] lg:w-[70px]">
+                  <PlayerArtwork
+                    spid={player.artworkSpid ?? player.id}
+                    alt={player.name}
+                    className="absolute bottom-0 left-1/2 max-h-[68px] max-w-[145%] -translate-x-1/2 object-contain sm:max-h-[86px] lg:max-h-[96px]"
+                  />
+                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/80 px-1.5 py-0.5 text-[9px] font-black text-lime-200 sm:text-[10px]">+{player.grade}</span>
                 </div>
-                <span className="mt-1 max-w-20 truncate rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-black text-white">{player.name}</span>
-                <span className="mt-0.5 rounded bg-black/75 px-1 text-[7px] font-black text-lime-200">{slot.label}</span>
+                <span className="mt-1 max-w-24 truncate rounded-md bg-black/80 px-2 py-0.5 text-[9px] font-black text-white sm:max-w-32 sm:text-[11px]">{player.name}</span>
+                <span className="mt-0.5 rounded bg-black/75 px-1.5 py-0.5 text-[8px] font-black text-lime-200 sm:text-[9px]">{slot.label}</span>
               </div>
             );
           })}
         </Link>
 
-        <div className="min-w-0 self-center">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+        <div className="mx-auto mt-5 max-w-[860px]">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="포메이션" value={post.formation} />
             <Stat label="급여" value={post.total_salary ? `${post.total_salary}/310` : "-"} />
             <Stat label="평균 OVR" value={post.average_ovr == null ? "-" : String(post.average_ovr)} />
             <Stat label="구단가치" value={formatGalleryValue(post.total_value)} />
           </div>
 
-          {post.description && <p className="mt-4 line-clamp-4 rounded-2xl border border-white/[0.07] bg-black/10 px-4 py-3 text-sm leading-6 text-gray-300">{post.description}</p>}
+          {post.description && (
+            <p className="mt-4 line-clamp-3 rounded-2xl border border-white/[0.07] bg-black/10 px-4 py-3 text-sm leading-6 text-gray-300">
+              {post.description}
+            </p>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-1.5">
             {post.team_colors.slice(0, 6).map((teamColor) => (

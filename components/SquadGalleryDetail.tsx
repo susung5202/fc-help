@@ -80,11 +80,12 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
 
   useEffect(() => {
     if (!post) return;
+    const currentPost = post;
     let active = true;
 
     async function loadPlayerDetails() {
-      const players = post.squad_data.players ?? {};
-      const slots = getGallerySlots(post.squad_data).filter((slot) => players[slot.slotId]);
+      const players = currentPost.squad_data.players ?? {};
+      const slots = getGallerySlots(currentPost.squad_data).filter((slot) => players[slot.slotId]);
       setPlayerDetailsLoading(true);
       const next: Record<string, PlayerDetail> = {};
 

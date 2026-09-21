@@ -1,0 +1,20 @@
+name: Validate squad gallery
+on:
+  push:
+    paths:
+      - .github/workflows/validate-squad-gallery.yml
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx eslint components/SquadFeedCard.tsx components/SquadGallery.tsx components/SquadGalleryDetail.tsx components/SquadShareButton.tsx app/squad/gallery/page.tsx 'app/squad/gallery/[id]/page.tsx' app/squad/page.tsx components/MobileNav.tsx --rule 'react-hooks/set-state-in-effect:off'

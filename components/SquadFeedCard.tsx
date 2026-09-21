@@ -43,6 +43,8 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
   const router = useRouter();
   const players = post.squad_data.players ?? {};
   const slots = getGallerySlots(post.squad_data);
+  const filledSlots = slots.filter((slot) => players[slot.slotId]);
+  const featured = filledSlots.slice(0, 5);
 
   function copySquad() {
     window.localStorage.setItem("fc-help-squad-v1", JSON.stringify(post.squad_data));
@@ -50,53 +52,55 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
   }
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-white/10 bg-[#171b1f] shadow-xl">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-4 sm:px-5">
+    <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#171b1f] shadow-[0_20px_70px_rgba(0,0,0,0.24)]">
+      <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
         <div className="min-w-0">
-          <Link href={`/squad/gallery/${post.id}`} className="block truncate text-lg font-black text-white hover:text-lime-300">
+          <Link href={`/squad/gallery/${post.id}`} className="block truncate text-xl font-black tracking-tight text-white transition hover:text-lime-300">
             {post.title}
           </Link>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500">
             <span className="font-bold text-gray-300">{post.author_name}</span>
             <span>·</span>
             <span>{timeAgo(post.created_at)}</span>
             <span>·</span>
             <span>조회 {post.views.toLocaleString("ko-KR")}</span>
+            <span>·</span>
+            <span>선수 {filledSlots.length}/11</span>
           </div>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex shrink-0 gap-2">
           <button
             type="button"
             onClick={copySquad}
-            className="rounded-lg border border-lime-400/30 bg-lime-400/10 px-3 py-2 text-xs font-black text-lime-300 transition hover:bg-lime-400/20"
+            className="rounded-xl border border-lime-400/30 bg-lime-400/10 px-3.5 py-2.5 text-xs font-black text-lime-300 transition hover:bg-lime-400/20"
           >
             스쿼드 복사
           </button>
           <Link
             href={`/squad/gallery/${post.id}`}
-            className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-white/5 hover:text-white"
+            className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-xs font-black text-gray-200 transition hover:bg-white/[0.07] hover:text-white"
           >
             자세히
           </Link>
         </div>
       </div>
 
-      <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,300px)_1fr] sm:p-5">
+      <div className="grid gap-5 p-4 lg:grid-cols-[240px_minmax(0,1fr)] sm:p-5">
         <Link
           href={`/squad/gallery/${post.id}`}
-          className="relative mx-auto aspect-[0.72] w-full max-w-[300px] overflow-hidden rounded-xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)]"
+          className="relative mx-auto aspect-[0.78] w-full max-w-[240px] overflow-hidden rounded-2xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner"
         >
-          <div className="pointer-events-none absolute inset-3 opacity-40">
-            <div className="absolute inset-0 border border-white/60" />
-            <div className="absolute left-0 right-0 top-1/2 border-t border-white/60" />
-            <div className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />
-            <div className="absolute left-1/2 top-0 h-[16%] w-[56%] -translate-x-1/2 border-x border-b border-white/60" />
-            <div className="absolute bottom-0 left-1/2 h-[16%] w-[56%] -translate-x-1/2 border-x border-t border-white/60" />
+          <div className="pointer-events-none absolute inset-3 opacity-35">
+            <div className="absolute inset-0 border border-white/70" />
+            <div className="absolute left-0 right-0 top-1/2 border-t border-white/70" />
+            <div className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70" />
+            <div className="absolute left-1/2 top-0 h-[16%] w-[56%] -translate-x-1/2 border-x border-b border-white/70" />
+            <div className="absolute bottom-0 left-1/2 h-[16%] w-[56%] -translate-x-1/2 border-x border-t border-white/70" />
           </div>
 
-          {slots.map((slot) => {
-            const player = players[slot.slotId];
-            if (!player) return null;
+          {filledSlots.map((slot) => {
+            const player = players[slot.slotId]!;
             return (
               <div
                 key={slot.slotId}
@@ -104,19 +108,15 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
                 style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
                 title={`${slot.label} · ${player.name} · ${player.grade}강`}
               >
-                <div className="relative h-10 w-9 overflow-hidden rounded-md border border-white/20 bg-black/25 shadow-md sm:h-12 sm:w-10">
+                <div className="relative h-9 w-8 overflow-hidden rounded-md border border-white/20 bg-black/30 shadow-md">
                   <PlayerArtwork
                     spid={player.artworkSpid ?? player.id}
                     alt={player.name}
-                    className="absolute bottom-0 left-1/2 max-h-[44px] max-w-[135%] -translate-x-1/2 object-contain"
+                    className="absolute bottom-0 left-1/2 max-h-[36px] max-w-[135%] -translate-x-1/2 object-contain"
                   />
-                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/75 px-1 text-[7px] font-black text-lime-200">
-                    +{player.grade}
-                  </span>
+                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/80 px-1 text-[7px] font-black text-lime-200">+{player.grade}</span>
                 </div>
-                <span className="mt-0.5 max-w-14 truncate rounded bg-black/70 px-1 text-[7px] font-bold text-white">
-                  {player.name}
-                </span>
+                <span className="mt-0.5 rounded bg-black/75 px-1 text-[7px] font-black text-white">{slot.label}</span>
               </div>
             );
           })}
@@ -131,7 +131,39 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
           </div>
 
           {post.description && (
-            <p className="mt-4 line-clamp-3 text-sm leading-6 text-gray-300">{post.description}</p>
+            <p className="mt-4 line-clamp-2 text-sm leading-6 text-gray-300">{post.description}</p>
+          )}
+
+          {featured.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] font-black tracking-[0.12em] text-gray-500">대표 선수</p>
+                {filledSlots.length > featured.length && (
+                  <Link href={`/squad/gallery/${post.id}`} className="text-[10px] font-bold text-lime-300">전체 선수 보기 →</Link>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                {featured.map((slot) => {
+                  const player = players[slot.slotId]!;
+                  return (
+                    <div key={slot.slotId} className="flex min-w-0 items-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 p-2">
+                      <div className="relative h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-white/[0.04]">
+                        <PlayerArtwork
+                          spid={player.artworkSpid ?? player.id}
+                          alt={player.name}
+                          className="absolute bottom-0 left-1/2 max-h-[46px] max-w-[135%] -translate-x-1/2 object-contain"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-black text-white">{player.name}</p>
+                        <p className="mt-0.5 truncate text-[9px] font-bold text-gray-500">{slot.label} · {player.seasonName ?? "시즌"}</p>
+                        <p className="mt-0.5 text-[9px] font-black text-lime-300">{player.grade}강</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           <div className="mt-4 flex flex-wrap gap-1.5">
@@ -140,17 +172,12 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
                 {teamColor}
               </span>
             ))}
-            {post.player_names.slice(0, Math.max(0, 4 - post.team_colors.length)).map((name) => (
-              <span key={name} className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-gray-300">
-                {name}
-              </span>
-            ))}
           </div>
 
           <div className="mt-5 flex items-center gap-4 border-t border-white/10 pt-4 text-xs font-bold text-gray-400">
             <span>♥ {post.likes_count.toLocaleString("ko-KR")}</span>
             <span>댓글 {post.comments_count.toLocaleString("ko-KR")}</span>
-            <span className="ml-auto text-gray-600">선수 {Object.keys(players).length}/11</span>
+            <Link href={`/squad/gallery/${post.id}`} className="ml-auto font-black text-lime-300 hover:text-lime-200">선수 구성 자세히 보기 →</Link>
           </div>
         </div>
       </div>

@@ -1546,6 +1546,7 @@ function PlayerPickerPanel({
   const [pendingDetails, setPendingDetails] = useState<SquadCardDetails | null>(null);
   const [pendingDetailsLoading, setPendingDetailsLoading] = useState(false);
   const [resultDetails, setResultDetails] = useState<Record<number, SquadCardDetails>>({});
+  const [resultGrades, setResultGrades] = useState<Record<number, number>>({});
 
   useEffect(() => {
     setReplaceMode(!currentPlayer);
@@ -1856,44 +1857,67 @@ function PlayerPickerPanel({
               {!loading && !error && query.trim() && results.length === 0 && <p className="py-8 text-center text-sm text-gray-500">검색 결과가 없습니다.</p>}
               {!loading && !error && results.map((player) => {
                 const details = resultDetails[player.id];
-                const price = details?.prices?.[grade - 1];
+                const selectedGrade = resultGrades[player.id] ?? grade;
+                const price = details?.prices?.[selectedGrade - 1];
                 return (
-                  <button
+                  <div
                     key={player.id}
-                    type="button"
-                    onClick={() => {
-                      setPendingPlayer(player);
-                      setPendingGrade(grade);
-                    }}
-                    className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-black/10 p-2.5 text-left transition hover:border-lime-400/30 hover:bg-lime-400/[0.04]"
+                    className="flex w-full items-center gap-2 rounded-xl border border-white/[0.08] bg-black/10 p-2.5 transition hover:border-lime-400/30 hover:bg-lime-400/[0.04]"
                   >
-                    <div className="relative h-[68px] w-[58px] shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]">
-                      <PlayerArtwork
-                        spid={player.id}
-                        alt={`${player.name} ${player.seasonName} 액션샷`}
-                        className="absolute bottom-0 left-1/2 max-h-[64px] max-w-[135%] -translate-x-1/2 object-contain"
-                      />
-                      {player.seasonImg && (
-                        <img
-                          src={player.seasonImg}
-                          alt={player.seasonName}
-                          className="absolute bottom-1 right-1 z-10 h-4 max-w-6 object-contain"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingPlayer(player);
+                        setPendingGrade(selectedGrade);
+                      }}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <div className="relative h-[68px] w-[58px] shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]">
+                        <PlayerArtwork
+                          spid={player.id}
+                          alt={`${player.name} ${player.seasonName} 액션샷`}
+                          className="absolute bottom-0 left-1/2 max-h-[64px] max-w-[135%] -translate-x-1/2 object-contain"
                         />
-                      )}
+                        {player.seasonImg && (
+                          <img
+                            src={player.seasonImg}
+                            alt={player.seasonName}
+                            className="absolute bottom-1 right-1 z-10 h-4 max-w-6 object-contain"
+                          />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black">{player.name}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-gray-500">{player.seasonName}</p>
+                        <p className="mt-1 truncate text-[11px] font-black text-amber-300">
+                          {details ? `${selectedGrade}강 · ${formatPlayerPrice(price)}` : `${selectedGrade}강 · 가격 불러오는 중...`}
+                        </p>
+                        {(player.newTraits?.length ?? 0) > 0 && <TraitChips traits={player.newTraits ?? []} compactMode />}
+                      </div>
+                    </button>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <select
+                        value={selectedGrade}
+                        onChange={(event) => {
+                          const nextGrade = Number(event.target.value);
+                          setResultGrades((current) => ({ ...current, [player.id]: nextGrade }));
+                        }}
+                        className={`h-8 w-[58px] rounded-lg border px-1 text-center text-[11px] font-black outline-none ${getEnhancementBadgeTone(selectedGrade)}`}
+                        aria-label={`${player.name} 강화 단계 선택`}
+                      >
+                        {Array.from({ length: 13 }, (_, index) => index + 1).map((level) => (
+                          <option key={`${player.id}-grade-${level}`} value={level} className="bg-[#151a18] text-white">
+                            {level}강
+                          </option>
+                        ))}
+                      </select>
+                      <div className="w-9 text-right">
+                        <p className="text-lg font-black text-lime-300">{player.ovr ?? "-"}</p>
+                        <p className="text-[10px] font-bold text-gray-500">{player.position ?? "OVR"}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black">{player.name}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-gray-500">{player.seasonName}</p>
-                      <p className="mt-1 truncate text-[11px] font-black text-amber-300">
-                        {details ? `${grade}강 · ${formatPlayerPrice(price)}` : `${grade}강 · 가격 불러오는 중...`}
-                      </p>
-                      {(player.newTraits?.length ?? 0) > 0 && <TraitChips traits={player.newTraits ?? []} compactMode />}
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-lg font-black text-lime-300">{player.ovr ?? "-"}</p>
-                      <p className="text-[10px] font-bold text-gray-500">{player.position ?? "OVR"}</p>
-                    </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

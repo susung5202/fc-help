@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import PlayerArtwork from "@/components/PlayerArtwork";
 import SquadFeedCard, { type SquadFeedPost } from "@/components/SquadFeedCard";
+import { formatGalleryValue, getGallerySlots } from "@/lib/fconline/squadGallery";
 
 type Comment = {
   id: number;
@@ -17,6 +19,18 @@ type Comment = {
   created_at: string;
 };
 
+type PlayerDetail = {
+  salary: number | null;
+  prices: Array<string | null>;
+  positionOvr: number | null;
+  failed?: boolean;
+};
+
+function formatPlayerPrice(value: string | null | undefined) {
+  if (!value) return "가격 정보 없음";
+  return formatGalleryValue(value);
+}
+
 export default function SquadGalleryDetail({ id }: { id: string }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -27,6 +41,8 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [playerDetails, setPlayerDetails] = useState<Record<string, PlayerDetail>>({});
+  const [playerDetailsLoading, setPlayerDetailsLoading] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -61,6 +77,44 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
     void supabase.rpc("increment_squad_post_views", { target_id: id });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (!post) return;
+    let active = true;
+
+    async function loadPlayerDetails() {
+      const players = post.squad_data.players ?? {};
+      const slots = getGallerySlots(post.squad_data).filter((slot) => players[slot.slotId]);
+      setPlayerDetailsLoading(true);
+      const next: Record<string, PlayerDetail> = {};
+
+      for (let index = 0; index < slots.length; index += 3) {
+        const batch = slots.slice(index, index + 3);
+        const results = await Promise.all(batch.map(async (slot) => {
+          const player = players[slot.slotId]!;
+          try {
+            const response = await fetch(`/api/squad/card?spid=${player.id}&name=${encodeURIComponent(player.name)}&position=${encodeURIComponent(slot.label)}`);
+            if (!response.ok) throw new Error("card request failed");
+            const data = await response.json() as PlayerDetail;
+            return [slot.slotId, data] as const;
+          } catch {
+            return [slot.slotId, { salary: null, prices: Array.from({ length: 13 }, () => null), positionOvr: null, failed: true }] as const;
+          }
+        }));
+
+        results.forEach(([slotId, detail]) => {
+          next[slotId] = detail;
+        });
+
+        if (active) setPlayerDetails({ ...next });
+      }
+
+      if (active) setPlayerDetailsLoading(false);
+    }
+
+    void loadPlayerDetails();
+    return () => { active = false; };
+  }, [post]);
 
   async function toggleLike() {
     if (!userId) {
@@ -105,6 +159,8 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
   }
 
   const topLevel = comments.filter((comment) => comment.parent_id == null);
+  const players = post.squad_data.players ?? {};
+  const filledSlots = getGallerySlots(post.squad_data).filter((slot) => players[slot.slotId]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
@@ -116,6 +172,58 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
       </div>
 
       <SquadFeedCard post={post} />
+
+      <section className="mt-5 rounded-3xl border border-white/10 bg-[#171b1f] p-4 sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-black tracking-[0.14em] text-lime-400">SQUAD PLAYERS</p>
+            <h2 className="mt-1 text-2xl font-black">포함 선수</h2>
+            <p className="mt-1 text-xs text-gray-500">이 스쿼드에 등록된 선수 {filledSlots.length}명의 시즌, 강화, 포지션, 급여와 가격 정보입니다.</p>
+          </div>
+          {playerDetailsLoading && <span className="text-xs font-bold text-gray-500">선수 정보 불러오는 중...</span>}
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filledSlots.map((slot) => {
+            const player = players[slot.slotId]!;
+            const detail = playerDetails[slot.slotId];
+            const price = detail?.prices?.[Math.max(0, player.grade - 1)] ?? null;
+            const displayOvr = detail?.positionOvr ?? player.ovr ?? null;
+
+            return (
+              <article key={slot.slotId} className="overflow-hidden rounded-2xl border border-white/[0.09] bg-[#101318]">
+                <div className="flex min-h-36 gap-3 p-3.5">
+                  <div className="relative w-24 shrink-0 overflow-hidden rounded-xl bg-[radial-gradient(circle_at_50%_20%,rgba(163,230,53,0.16),transparent_58%)]">
+                    <PlayerArtwork
+                      spid={player.artworkSpid ?? player.id}
+                      alt={player.name}
+                      className="absolute bottom-0 left-1/2 max-h-[132px] max-w-[145%] -translate-x-1/2 object-contain"
+                    />
+                    <span className="absolute left-2 top-2 rounded-md bg-black/75 px-2 py-1 text-[10px] font-black text-lime-300">{slot.label}</span>
+                  </div>
+
+                  <div className="min-w-0 flex-1 py-1">
+                    <p className="truncate text-base font-black text-white" title={player.name}>{player.name}</p>
+                    <p className="mt-1 truncate text-[11px] font-bold text-gray-500" title={player.seasonName ?? undefined}>{player.seasonName ?? "시즌 정보 없음"}</p>
+
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="rounded-md border border-lime-300/20 bg-lime-300/[0.07] px-2 py-1 text-[10px] font-black text-lime-300">{player.grade}강</span>
+                      <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] font-black text-gray-300">OVR {displayOvr ?? "-"}</span>
+                      <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10px] font-black text-gray-300">급여 {detail?.salary ?? "-"}</span>
+                    </div>
+
+                    <div className="mt-3 border-t border-white/[0.07] pt-3">
+                      <p className="text-[9px] font-bold text-gray-600">{player.grade}강 가격</p>
+                      <p className="mt-0.5 truncate text-sm font-black text-white" title={price ?? undefined}>{detail ? formatPlayerPrice(price) : "불러오는 중..."}</p>
+                      {detail?.failed && <p className="mt-1 text-[9px] font-bold text-amber-300">일부 정보를 불러오지 못했습니다.</p>}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="mt-5 rounded-2xl border border-white/10 bg-[#171b1f] p-4 sm:p-5">
         <div className="flex items-center justify-between">

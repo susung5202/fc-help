@@ -1866,10 +1866,7 @@ function PlayerPickerPanel({
                   >
                     <button
                       type="button"
-                      onClick={() => {
-                        setPendingPlayer(player);
-                        setPendingGrade(selectedGrade);
-                      }}
+                      onClick={() => onChoose(player, selectedGrade)}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     >
                       <div className="relative h-[68px] w-[58px] shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]">

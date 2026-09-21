@@ -61,7 +61,7 @@ export default function SquadShareButton() {
 
       const slots = getGallerySlots(squad);
       let totalSalary = 0;
-      let totalValue = 0n;
+      let totalValue = BigInt(0);
 
       const details = await Promise.all(entries.map(async ([slotId, player]) => {
         const slot = slots.find((item) => item.slotId === slotId);

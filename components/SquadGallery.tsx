@@ -7,20 +7,20 @@ import SquadFeedCard, { type SquadFeedPost } from "@/components/SquadFeedCard";
 
 type ValueRange =
   | "all"
-  | "under1m"
-  | "1m-5m"
-  | "5m-10m"
-  | "10m-50m"
+  | "under50m"
   | "50m-100m"
-  | "100m-500m"
-  | "over500m";
+  | "100m-1b"
+  | "1b-3b"
+  | "3b-5b"
+  | "5b-10b"
+  | "over10b";
 
-const VALUE_1M = BigInt("1000000");
-const VALUE_5M = BigInt("5000000");
-const VALUE_10M = BigInt("10000000");
 const VALUE_50M = BigInt("50000000");
 const VALUE_100M = BigInt("100000000");
-const VALUE_500M = BigInt("500000000");
+const VALUE_1B = BigInt("1000000000");
+const VALUE_3B = BigInt("3000000000");
+const VALUE_5B = BigInt("5000000000");
+const VALUE_10B = BigInt("10000000000");
 
 function parseSquadValue(value: string | number) {
   const text = String(value ?? "").replace(/[^0-9]/g, "");
@@ -36,13 +36,13 @@ function matchesValueRange(value: string | number, range: ValueRange) {
   if (range === "all") return true;
   const amount = parseSquadValue(value);
   if (amount == null) return false;
-  if (range === "under1m") return amount < VALUE_1M;
-  if (range === "1m-5m") return amount >= VALUE_1M && amount < VALUE_5M;
-  if (range === "5m-10m") return amount >= VALUE_5M && amount < VALUE_10M;
-  if (range === "10m-50m") return amount >= VALUE_10M && amount < VALUE_50M;
+  if (range === "under50m") return amount < VALUE_50M;
   if (range === "50m-100m") return amount >= VALUE_50M && amount < VALUE_100M;
-  if (range === "100m-500m") return amount >= VALUE_100M && amount < VALUE_500M;
-  return amount >= VALUE_500M;
+  if (range === "100m-1b") return amount >= VALUE_100M && amount < VALUE_1B;
+  if (range === "1b-3b") return amount >= VALUE_1B && amount < VALUE_3B;
+  if (range === "3b-5b") return amount >= VALUE_3B && amount < VALUE_5B;
+  if (range === "5b-10b") return amount >= VALUE_5B && amount < VALUE_10B;
+  return amount >= VALUE_10B;
 }
 
 export default function SquadGallery() {
@@ -211,13 +211,13 @@ export default function SquadGallery() {
                   className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs text-white outline-none focus:border-lime-400/50"
                 >
                   <option value="all">전체 구단가치</option>
-                  <option value="under1m">100만 BP 미만</option>
-                  <option value="1m-5m">100만 ~ 500만 BP</option>
-                  <option value="5m-10m">500만 ~ 1,000만 BP</option>
-                  <option value="10m-50m">1,000만 ~ 5,000만 BP</option>
+                  <option value="under50m">5,000만 BP 미만</option>
                   <option value="50m-100m">5,000만 ~ 1억 BP</option>
-                  <option value="100m-500m">1억 ~ 5억 BP</option>
-                  <option value="over500m">5억 BP 이상</option>
+                  <option value="100m-1b">1억 ~ 10억 BP</option>
+                  <option value="1b-3b">10억 ~ 30억 BP</option>
+                  <option value="3b-5b">30억 ~ 50억 BP</option>
+                  <option value="5b-10b">50억 ~ 100억 BP</option>
+                  <option value="over10b">100억 BP 이상</option>
                 </select>
               </label>
             </div>

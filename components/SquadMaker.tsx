@@ -1186,7 +1186,7 @@ export default function SquadMaker() {
             {draggingSlot && !isGoalkeeperSlot(draggingSlot.label) && (
               <div
                 data-capture-hide="true"
-                className="pointer-events-none absolute inset-0 z-[15]"
+                className="pointer-events-none absolute inset-0 z-[30]"
                 aria-hidden="true"
               >
                 {POSITION_ZONES.map((zone) => (
@@ -1337,21 +1337,24 @@ function PositionDropZone({
   return (
     <div
       data-position-zone={zone.label}
-      className={`absolute flex items-center justify-center rounded-md border transition-all duration-150 sm:rounded-lg ${
+      className={`absolute flex items-center justify-center rounded-md border-2 transition-all duration-150 sm:rounded-lg ${
         active
-          ? "z-10 scale-[1.03] border-lime-100 bg-lime-300/35 text-lime-50 shadow-[inset_0_0_20px_rgba(190,242,100,0.2),0_0_24px_rgba(190,242,100,0.35)]"
-          : "border-white/30 bg-black/20 text-white/75"
+          ? "z-10 scale-[1.04] border-lime-100 text-lime-50 shadow-[inset_0_0_28px_rgba(190,242,100,0.28),0_0_28px_rgba(190,242,100,0.5)]"
+          : "border-dashed border-white/65 text-white"
       }`}
       style={{
         left: `${zone.left}%`,
         top: `${zone.top}%`,
         width: `${zone.width}%`,
         height: `${zone.height}%`,
+        backgroundColor: active
+          ? "rgba(190, 242, 100, 0.42)"
+          : "rgba(255, 255, 255, 0.12)",
       }}
     >
       <span
-        className={`rounded px-1 py-0.5 text-[7px] font-black leading-none tracking-tight transition sm:px-1.5 sm:text-[10px] ${
-          active ? "bg-lime-200 text-black" : "bg-black/35 text-white/80"
+        className={`rounded px-1.5 py-1 text-[8px] font-black leading-none tracking-tight shadow transition sm:px-2 sm:text-[11px] ${
+          active ? "bg-lime-100 text-black" : "bg-black/60 text-white"
         }`}
       >
         {zone.label}

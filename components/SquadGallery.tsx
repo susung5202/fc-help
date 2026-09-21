@@ -5,23 +5,22 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import SquadFeedCard, { type SquadFeedPost } from "@/components/SquadFeedCard";
 
-type SalaryRange = "all" | "under260" | "261-280" | "281-300" | "301-310";
-type ValueRange = "all" | "under1t" | "1-10t" | "10-100t" | "100-1000t" | "1000t-1g" | "1-5g" | "over5g";
+type ValueRange =
+  | "all"
+  | "under1m"
+  | "1m-5m"
+  | "5m-10m"
+  | "10m-50m"
+  | "50m-100m"
+  | "100m-500m"
+  | "over500m";
 
-const VALUE_1T = BigInt("1000000000000");
-const VALUE_10T = BigInt("10000000000000");
-const VALUE_100T = BigInt("100000000000000");
-const VALUE_1000T = BigInt("1000000000000000");
-const VALUE_1G = BigInt("10000000000000000");
-const VALUE_5G = BigInt("50000000000000000");
-
-function matchesSalaryRange(salary: number, range: SalaryRange) {
-  if (range === "all") return true;
-  if (range === "under260") return salary <= 260;
-  if (range === "261-280") return salary >= 261 && salary <= 280;
-  if (range === "281-300") return salary >= 281 && salary <= 300;
-  return salary >= 301 && salary <= 310;
-}
+const VALUE_1M = BigInt("1000000");
+const VALUE_5M = BigInt("5000000");
+const VALUE_10M = BigInt("10000000");
+const VALUE_50M = BigInt("50000000");
+const VALUE_100M = BigInt("100000000");
+const VALUE_500M = BigInt("500000000");
 
 function parseSquadValue(value: string | number) {
   const text = String(value ?? "").replace(/[^0-9]/g, "");
@@ -37,13 +36,13 @@ function matchesValueRange(value: string | number, range: ValueRange) {
   if (range === "all") return true;
   const amount = parseSquadValue(value);
   if (amount == null) return false;
-  if (range === "under1t") return amount < VALUE_1T;
-  if (range === "1-10t") return amount >= VALUE_1T && amount < VALUE_10T;
-  if (range === "10-100t") return amount >= VALUE_10T && amount < VALUE_100T;
-  if (range === "100-1000t") return amount >= VALUE_100T && amount < VALUE_1000T;
-  if (range === "1000t-1g") return amount >= VALUE_1000T && amount < VALUE_1G;
-  if (range === "1-5g") return amount >= VALUE_1G && amount < VALUE_5G;
-  return amount >= VALUE_5G;
+  if (range === "under1m") return amount < VALUE_1M;
+  if (range === "1m-5m") return amount >= VALUE_1M && amount < VALUE_5M;
+  if (range === "5m-10m") return amount >= VALUE_5M && amount < VALUE_10M;
+  if (range === "10m-50m") return amount >= VALUE_10M && amount < VALUE_50M;
+  if (range === "50m-100m") return amount >= VALUE_50M && amount < VALUE_100M;
+  if (range === "100m-500m") return amount >= VALUE_100M && amount < VALUE_500M;
+  return amount >= VALUE_500M;
 }
 
 export default function SquadGallery() {
@@ -53,10 +52,10 @@ export default function SquadGallery() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [playerQuery, setPlayerQuery] = useState("");
-  const [teamColor, setTeamColor] = useState("");
-  const [salaryRange, setSalaryRange] = useState<SalaryRange>("all");
+  const [teamColorQuery, setTeamColorQuery] = useState("");
   const [valueRange, setValueRange] = useState<ValueRange>("all");
   const [sort, setSort] = useState<"latest" | "popular">("latest");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -87,14 +86,10 @@ export default function SquadGallery() {
     return () => { active = false; };
   }, [sort, supabase]);
 
-  const teamColorOptions = useMemo(
-    () => [...new Set(posts.flatMap((post) => post.team_colors ?? []))].sort((a, b) => a.localeCompare(b, "ko")),
-    [posts]
-  );
-
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const playerNeedle = playerQuery.trim().toLowerCase();
+    const teamColorNeedle = teamColorQuery.trim().toLowerCase();
 
     return posts.filter((post) => {
       if (needle) {
@@ -113,25 +108,23 @@ export default function SquadGallery() {
         return false;
       }
 
-      if (teamColor && !(post.team_colors ?? []).includes(teamColor)) {
-        return false;
-      }
-
-      if (!matchesSalaryRange(Number(post.total_salary) || 0, salaryRange)) {
+      if (teamColorNeedle && !(post.team_colors ?? []).some((name) => name.toLowerCase().includes(teamColorNeedle))) {
         return false;
       }
 
       return matchesValueRange(post.total_value, valueRange);
     });
-  }, [playerQuery, posts, query, salaryRange, teamColor, valueRange]);
+  }, [playerQuery, posts, query, teamColorQuery, valueRange]);
 
-  const hasAdvancedFilters = Boolean(playerQuery.trim() || teamColor || salaryRange !== "all" || valueRange !== "all");
+  const activeFilterCount = [
+    playerQuery.trim(),
+    teamColorQuery.trim(),
+    valueRange !== "all" ? valueRange : "",
+  ].filter(Boolean).length;
 
   function resetFilters() {
-    setQuery("");
     setPlayerQuery("");
-    setTeamColor("");
-    setSalaryRange("all");
+    setTeamColorQuery("");
     setValueRange("all");
   }
 
@@ -158,6 +151,25 @@ export default function SquadGallery() {
             placeholder="제목, 작성자, 선수, 팀컬러 통합 검색"
             className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-lime-400/50"
           />
+
+          <button
+            type="button"
+            onClick={() => setShowFilters((value) => !value)}
+            className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition ${
+              showFilters || activeFilterCount > 0
+                ? "border-lime-300/40 bg-lime-300/10 text-lime-300"
+                : "border-white/10 text-gray-300 hover:bg-white/5"
+            }`}
+          >
+            필터
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-lime-300 px-1.5 text-[10px] text-black">
+                {activeFilterCount}
+              </span>
+            )}
+            <span className={`text-[9px] transition ${showFilters ? "rotate-180" : ""}`}>▼</span>
+          </button>
+
           <div className="grid grid-cols-2 gap-2 sm:w-56">
             <button type="button" onClick={() => setSort("latest")} className={`rounded-xl border px-3 py-3 text-sm font-black transition ${sort === "latest" ? "border-lime-300/40 bg-lime-300/10 text-lime-300" : "border-white/10 text-gray-400 hover:bg-white/5"}`}>
               최신
@@ -168,88 +180,86 @@ export default function SquadGallery() {
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-bold text-gray-500">포함 선수</span>
-            <input
-              value={playerQuery}
-              onChange={(event) => setPlayerQuery(event.target.value)}
-              placeholder="예: 비니시우스"
-              className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs text-white outline-none placeholder:text-gray-600 focus:border-lime-400/50"
-            />
-          </label>
+        {showFilters && (
+          <div className="mt-3 rounded-xl border border-white/10 bg-black/15 p-3 sm:p-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold text-gray-500">포함 선수</span>
+                <input
+                  value={playerQuery}
+                  onChange={(event) => setPlayerQuery(event.target.value)}
+                  placeholder="예: 비니시우스"
+                  className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs text-white outline-none placeholder:text-gray-600 focus:border-lime-400/50"
+                />
+              </label>
 
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-bold text-gray-500">팀컬러</span>
-            <select
-              value={teamColor}
-              onChange={(event) => setTeamColor(event.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs text-white outline-none focus:border-lime-400/50"
-            >
-              <option value="">전체 팀컬러</option>
-              {teamColorOptions.map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-          </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold text-gray-500">팀컬러 검색</span>
+                <input
+                  value={teamColorQuery}
+                  onChange={(event) => setTeamColorQuery(event.target.value)}
+                  placeholder="예: 레알 마드리드"
+                  className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs text-white outline-none placeholder:text-gray-600 focus:border-lime-400/50"
+                />
+              </label>
 
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-bold text-gray-500">급여</span>
-            <select
-              value={salaryRange}
-              onChange={(event) => setSalaryRange(event.target.value as SalaryRange)}
-              className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs text-white outline-none focus:border-lime-400/50"
-            >
-              <option value="all">전체 급여</option>
-              <option value="under260">260 이하</option>
-              <option value="261-280">261 ~ 280</option>
-              <option value="281-300">281 ~ 300</option>
-              <option value="301-310">301 ~ 310</option>
-            </select>
-          </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold text-gray-500">구단가치</span>
+                <select
+                  value={valueRange}
+                  onChange={(event) => setValueRange(event.target.value as ValueRange)}
+                  className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs text-white outline-none focus:border-lime-400/50"
+                >
+                  <option value="all">전체 구단가치</option>
+                  <option value="under1m">100만 BP 미만</option>
+                  <option value="1m-5m">100만 ~ 500만 BP</option>
+                  <option value="5m-10m">500만 ~ 1,000만 BP</option>
+                  <option value="10m-50m">1,000만 ~ 5,000만 BP</option>
+                  <option value="50m-100m">5,000만 ~ 1억 BP</option>
+                  <option value="100m-500m">1억 ~ 5억 BP</option>
+                  <option value="over500m">5억 BP 이상</option>
+                </select>
+              </label>
+            </div>
 
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-bold text-gray-500">구단가치</span>
-            <select
-              value={valueRange}
-              onChange={(event) => setValueRange(event.target.value as ValueRange)}
-              className="w-full rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs text-white outline-none focus:border-lime-400/50"
-            >
-              <option value="all">전체 구단가치</option>
-              <option value="under1t">1조 미만</option>
-              <option value="1-10t">1조 ~ 10조</option>
-              <option value="10-100t">10조 ~ 100조</option>
-              <option value="100-1000t">100조 ~ 1000조</option>
-              <option value="1000t-1g">1000조 ~ 1경</option>
-              <option value="1-5g">1경 ~ 5경</option>
-              <option value="over5g">5경 이상</option>
-            </select>
-          </label>
-        </div>
-
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
-          <p className="text-[11px] font-bold text-gray-500">
-            {loading ? "검색 중..." : `${filtered.length.toLocaleString("ko-KR")}개 스쿼드`}
-          </p>
-          {(hasAdvancedFilters || query.trim()) && (
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-[11px] font-bold text-gray-400 transition hover:bg-white/5 hover:text-white"
-            >
-              조건 초기화
-            </button>
-          )}
-        </div>
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
+              <p className="text-[11px] font-bold text-gray-500">
+                {loading ? "검색 중..." : `${filtered.length.toLocaleString("ko-KR")}개 스쿼드`}
+              </p>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="rounded-lg border border-white/10 px-3 py-1.5 text-[11px] font-bold text-gray-400 transition hover:bg-white/5 hover:text-white"
+                >
+                  조건 초기화
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="mt-5 space-y-4">
+      <div className="mt-4 flex items-center justify-between text-[11px] font-bold text-gray-500">
+        <span>{loading ? "불러오는 중..." : `${filtered.length.toLocaleString("ko-KR")}개 스쿼드`}</span>
+        {activeFilterCount > 0 && !showFilters && (
+          <button type="button" onClick={() => setShowFilters(true)} className="text-lime-300">
+            필터 {activeFilterCount}개 적용 중
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 space-y-4">
         {loading && <div className="rounded-2xl border border-white/10 bg-[#171b1f] py-16 text-center text-sm text-gray-500">스쿼드를 불러오는 중...</div>}
         {!loading && error && <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5 text-sm text-red-300">{error}</div>}
         {!loading && !error && filtered.length === 0 && (
           <div className="rounded-2xl border border-white/10 bg-[#171b1f] py-16 text-center">
             <p className="font-bold text-gray-300">아직 조건에 맞는 스쿼드가 없습니다.</p>
-            <button type="button" onClick={resetFilters} className="mt-3 text-sm font-black text-lime-300">검색 조건 초기화 →</button>
+            {activeFilterCount > 0 ? (
+              <button type="button" onClick={resetFilters} className="mt-3 text-sm font-black text-lime-300">검색 조건 초기화 →</button>
+            ) : (
+              <Link href="/squad" className="mt-3 inline-block text-sm font-black text-lime-300">첫 스쿼드 공유하러 가기 →</Link>
+            )}
           </div>
         )}
         {!loading && !error && filtered.map((post) => <SquadFeedCard key={post.id} post={post} />)}

@@ -157,7 +157,7 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
                 style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
                 title={`${slot.label} · ${player.name} · ${player.seasonName ?? "시즌 정보 없음"} · ${player.grade}강`}
               >
-                <div className="relative h-14 w-12 overflow-visible rounded-xl border border-white/20 bg-black/20 shadow-lg sm:h-16 sm:w-14">
+                <div className="relative h-14 w-12 overflow-visible sm:h-16 sm:w-14">
                   <PlayerArtwork
                     spid={player.artworkSpid ?? player.id}
                     alt={player.name}

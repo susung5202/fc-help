@@ -10,11 +10,18 @@ export default function AccountButton() {
 
   useEffect(() => {
     let active = true;
-    void supabase.auth.getUser().then(({ data }) => {
-      if (active) setLoggedIn(Boolean(data.user));
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) setLoggedIn(Boolean(data.session?.user));
     });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (active) setLoggedIn(Boolean(session?.user));
+    });
+
     return () => {
       active = false;
+      listener.subscription.unsubscribe();
     };
   }, [supabase]);
 

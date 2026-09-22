@@ -603,7 +603,7 @@ export default function SquadMaker() {
       .filter((value): value is number => value !== null);
 
     if (ovrs.length === 0) return null;
-    return Math.round((ovrs.reduce((sum, value) => sum + value, 0) / ovrs.length) * 10) / 10;
+    return Math.round(ovrs.reduce((sum, value) => sum + value, 0) / ovrs.length);
   }, [players, cardDetails, formation.slots, teamColorState.ovrBySlot]);
 
   function openSlot(slotId: string) {

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import PlayerArtwork from "@/components/PlayerArtwork";
 import SquadFeedCard, { type SquadFeedPost } from "@/components/SquadFeedCard";
 import { formatGalleryValue, getGallerySlots } from "@/lib/fconline/squadGallery";
+import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 
 type Comment = {
   id: number;
@@ -202,13 +203,19 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
 
             return (
               <article key={slot.slotId} className="grid gap-3 px-4 py-3 transition hover:bg-white/[0.025] md:grid-cols-[76px_minmax(180px,1.5fr)_90px_80px_80px_minmax(140px,1fr)] md:items-center sm:px-5">
-                <div className="relative h-20 w-16 overflow-hidden rounded-xl border border-white/10 bg-[radial-gradient(circle_at_50%_20%,rgba(163,230,53,0.14),transparent_60%)] md:h-16 md:w-14">
-                  <PlayerArtwork spid={player.artworkSpid ?? player.id} alt={player.name} className="absolute bottom-0 left-1/2 max-h-[76px] max-w-[145%] -translate-x-1/2 object-contain md:max-h-[62px]" />
+                <div className="relative h-20 w-16 md:h-16 md:w-14">
+                  <PlayerArtwork key={player.artworkSpid ?? player.id} spid={player.artworkSpid ?? player.id} alt={player.name} className="absolute bottom-0 left-1/2 max-h-[76px] max-w-[145%] -translate-x-1/2 object-contain md:max-h-[62px]" />
                 </div>
 
                 <div className="min-w-0">
                   <p className="truncate text-base font-black text-white" title={player.name}>{player.name}</p>
-                  <p className="mt-1 truncate text-[11px] font-bold text-gray-500" title={player.seasonName ?? undefined}>{player.seasonName ?? "시즌 정보 없음"}</p>
+                  <div className="mt-1 flex h-6 items-center">
+                    {player.seasonImg ? (
+                      <img src={player.seasonImg} alt={player.seasonName ?? "시즌"} title={player.seasonName ?? undefined} className="h-5 max-w-12 object-contain" />
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-600">시즌 정보 없음</span>
+                    )}
+                  </div>
                   {detail?.failed && <p className="mt-1 text-[9px] font-bold text-amber-300">일부 정보 로딩 실패</p>}
                 </div>
 
@@ -219,7 +226,9 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
 
                 <div className="flex items-center gap-2 md:block">
                   <span className="text-[10px] font-bold text-gray-600 md:hidden">강화</span>
-                  <span className="text-sm font-black text-white">{player.grade}강</span>
+                  <span className={`inline-flex h-7 min-w-10 items-center justify-center rounded-[3px] border px-2 text-xs font-black leading-none sm:border-2 ${getEnhancementBadgeTone(player.grade)}`} title={`${player.grade}강`}>
+                    {player.grade}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-3 text-xs font-black md:block">

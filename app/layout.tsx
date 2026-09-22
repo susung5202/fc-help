@@ -21,7 +21,7 @@ const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ??
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : undefined);
+    : "https://fc-help-chi.vercel.app");
 
 const adsenseClient = "ca-pub-6735658400194219";
 const defaultTitle = "FC Help - FC 온라인 선수 DB·갱신시간·스쿼드 메이커";
@@ -29,7 +29,7 @@ const defaultDescription =
   "FC 온라인 선수 정보, 유저 제보 기반 갱신시간, 브라우저 알림과 스쿼드 메이커를 제공하는 비공식 팬 서비스입니다.";
 
 export const metadata: Metadata = {
-  ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
+  metadataBase: new URL(siteUrl),
   applicationName: "FC Help",
   title: defaultTitle,
   description: defaultDescription,
@@ -50,10 +50,10 @@ export const metadata: Metadata = {
     description: defaultDescription,
     type: "website",
     siteName: "FC Help",
-    ...(siteUrl ? { url: siteUrl } : {}),
+    url: siteUrl,
     images: [
       {
-        url: "/fc-help-share.jpg",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
         alt: "FC Help - INFO · SQUAD · ALARM · COMMUNITY",
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: defaultTitle,
     description: defaultDescription,
-    images: ["/fc-help-share.jpg"],
+    images: ["/opengraph-image"],
   },
   other: {
     "google-adsense-account": adsenseClient,

@@ -112,7 +112,11 @@ export function getGallerySlots(data: GallerySquadData) {
 export function formatGalleryValue(value: string | number | null | undefined) {
   const digits = String(value ?? "0").replace(/\D/g, "").replace(/^0+(?=\d)/, "") || "0";
   if (digits === "0") return "0 BP";
-  if (digits.length <= 8) return `${Number(digits).toLocaleString("ko-KR")} BP`;
+  if (digits.length <= 4) return `${Number(digits).toLocaleString("ko-KR")} BP`;
+  if (digits.length <= 8) {
+    return `${Math.floor(Number(digits) / 10_000).toLocaleString("ko-KR")}만 BP`;
+  }
+
   const labels = ["", "만", "억", "조", "경", "해"];
   const groups = digits.padStart(Math.ceil(digits.length / 4) * 4, "0").match(/.{4}/g) ?? [];
   const parts: string[] = [];

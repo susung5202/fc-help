@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PlayerArtwork from "@/components/PlayerArtwork";
+import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 import {
   formatGalleryValue,
   getGallerySlots,
@@ -137,7 +138,7 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
       <div className="p-4 sm:p-5">
         <Link
           href={`/squad/gallery/${post.id}`}
-          className="relative mx-auto block aspect-[0.86] w-full max-w-[560px] overflow-hidden rounded-3xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner sm:max-w-[620px] sm:aspect-[0.92]"
+          className="relative mx-auto block aspect-[0.86] w-full max-w-[560px] overflow-hidden rounded-3xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner sm:aspect-[0.92] sm:max-w-[620px]"
         >
           <div className="pointer-events-none absolute inset-5 opacity-35 sm:inset-6">
             <div className="absolute inset-0 border border-white/70" />
@@ -153,23 +154,35 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
             return (
               <div
                 key={slot.slotId}
-                className="absolute flex w-[76px] -translate-x-1/2 -translate-y-1/2 flex-col items-center sm:w-[88px]"
+                className="absolute flex w-[78px] -translate-x-1/2 -translate-y-1/2 flex-col items-center sm:w-[92px]"
                 style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
                 title={`${slot.label} · ${player.name} · ${player.seasonName ?? "시즌 정보 없음"} · ${player.grade}강`}
               >
                 <div className="relative h-14 w-12 overflow-visible sm:h-16 sm:w-14">
                   <PlayerArtwork
+                    key={player.artworkSpid ?? player.id}
                     spid={player.artworkSpid ?? player.id}
                     alt={player.name}
-                    className="absolute bottom-0 left-1/2 max-h-[64px] max-w-[125%] -translate-x-1/2 object-contain sm:max-h-[72px]"
+                    className="absolute bottom-0 left-1/2 max-h-[64px] max-w-[128%] -translate-x-1/2 object-contain sm:max-h-[74px]"
                   />
-                  <span className="absolute -bottom-1 -right-1 rounded-md bg-black/85 px-1.5 py-0.5 text-[8px] font-black text-lime-200 sm:text-[9px]">+{player.grade}</span>
+                  {player.seasonImg && (
+                    <img
+                      src={player.seasonImg}
+                      alt={player.seasonName ?? "시즌"}
+                      className="absolute -bottom-1 -left-3 z-20 h-4 max-w-7 object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)] sm:h-5 sm:max-w-9"
+                    />
+                  )}
+                  <span
+                    className={`absolute -bottom-1 -right-3 z-20 flex h-4 min-w-6 items-center justify-center rounded-[2px] border px-1 text-[8px] font-black leading-none sm:h-5 sm:min-w-7 sm:border-2 sm:text-[10px] ${getEnhancementBadgeTone(player.grade)} drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]`}
+                    title={`${player.grade}강`}
+                  >
+                    {player.grade}
+                  </span>
                 </div>
                 <span className="mt-1 w-full truncate rounded bg-black/80 px-1.5 py-0.5 text-center text-[8px] font-black text-white sm:text-[9px]">{player.name}</span>
-                <span className="mt-0.5 w-full truncate text-center text-[7px] font-bold text-gray-200 sm:text-[8px]">{player.seasonName ?? "시즌 정보 없음"}</span>
                 <div className="mt-0.5 flex items-center justify-center gap-1 text-[7px] font-black sm:text-[8px]">
                   <span className="rounded bg-black/75 px-1 text-lime-200">{slot.label}</span>
-                  <span className="max-w-[56px] truncate rounded bg-black/75 px-1 text-amber-200">{compactPrice(price)}</span>
+                  <span className="max-w-[60px] truncate rounded bg-black/75 px-1 text-amber-200">{compactPrice(price)}</span>
                 </div>
               </div>
             );
@@ -180,7 +193,7 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="포메이션" value={post.formation} />
             <Stat label="급여" value={post.total_salary ? `${post.total_salary}/310` : "-"} />
-            <Stat label="평균 OVR" value={post.average_ovr == null ? "-" : String(post.average_ovr)} />
+            <Stat label="평균 OVR" value={post.average_ovr == null ? "-" : String(Math.round(post.average_ovr))} />
             <Stat label="구단가치" value={formatGalleryValue(post.total_value)} />
           </div>
 

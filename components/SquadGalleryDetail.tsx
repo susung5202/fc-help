@@ -44,11 +44,15 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
   const [message, setMessage] = useState("");
   const [playerDetails, setPlayerDetails] = useState<Record<string, PlayerDetail>>({});
   const [playerDetailsLoading, setPlayerDetailsLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   async function load() {
     setLoading(true);
     const [{ data: postData, error: postError }, { data: commentData }, { data: authData }] = await Promise.all([
-      supabase.from("squad_posts").select("id,author_name,title,description,formation,squad_data,player_names,team_colors,total_salary,total_value,average_ovr,likes_count,comments_count,views,created_at").eq("id", id).single(),
+      supabase.from("squad_posts").select("id,author_id,author_name,title,description,formation,squad_data,player_names,team_colors,total_salary,total_value,average_ovr,likes_count,comments_count,views,created_at").eq("id", id).single(),
       supabase.from("squad_comments").select("id,post_id,user_id,author_name,parent_id,content,likes_count,created_at").eq("post_id", id).order("created_at", { ascending: true }),
       supabase.auth.getUser(),
     ]);
@@ -61,8 +65,11 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
     }
 
     const uid = authData.user?.id ?? null;
+    const loadedPost = postData as SquadFeedPost;
     setUserId(uid);
-    setPost(postData as SquadFeedPost);
+    setPost(loadedPost);
+    setEditTitle(loadedPost.title);
+    setEditDescription(loadedPost.description ?? "");
     setComments((commentData ?? []) as Comment[]);
 
     if (uid) {
@@ -118,6 +125,34 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
     return () => { active = false; };
   }, [post]);
 
+  async function savePostEdit() {
+    if (!post || !userId || post.author_id !== userId) return;
+    const title = editTitle.trim();
+    if (!title) {
+      setMessage("제목을 입력해주세요.");
+      return;
+    }
+
+    setSavingEdit(true);
+    setMessage("");
+    const description = editDescription.trim();
+    const { error } = await supabase
+      .from("squad_posts")
+      .update({ title: title.slice(0, 50), description: description.slice(0, 500) })
+      .eq("id", post.id)
+      .eq("author_id", userId);
+
+    if (error) {
+      setMessage(error.message);
+      setSavingEdit(false);
+      return;
+    }
+
+    setPost((current) => current ? { ...current, title: title.slice(0, 50), description: description.slice(0, 500) } : current);
+    setEditing(false);
+    setSavingEdit(false);
+  }
+
   async function toggleLike() {
     if (!userId) {
       router.push("/login");
@@ -163,17 +198,54 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
   const topLevel = comments.filter((comment) => comment.parent_id == null);
   const players = post.squad_data.players ?? {};
   const filledSlots = getGallerySlots(post.squad_data).filter((slot) => players[slot.slotId]);
+  const isOwner = Boolean(userId && post.author_id === userId);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link href="/squad/gallery" className="text-sm font-bold text-gray-400 hover:text-white">← 스쿼드 갤러리</Link>
-        <button type="button" onClick={() => void toggleLike()} className={`rounded-xl border px-4 py-2.5 text-sm font-black transition ${liked ? "border-rose-300/40 bg-rose-400/10 text-rose-300" : "border-white/10 text-gray-300 hover:bg-white/5"}`}>
-          {liked ? "♥ 좋아요 취소" : "♡ 좋아요"}
-        </button>
+        <div className="flex items-center gap-2">
+          {isOwner && (
+            <button type="button" onClick={() => setEditing(true)} className="rounded-xl border border-lime-300/25 bg-lime-300/[0.06] px-4 py-2.5 text-sm font-black text-lime-300 transition hover:bg-lime-300/10">
+              게시글 수정
+            </button>
+          )}
+          <button type="button" onClick={() => void toggleLike()} className={`rounded-xl border px-4 py-2.5 text-sm font-black transition ${liked ? "border-rose-300/40 bg-rose-400/10 text-rose-300" : "border-white/10 text-gray-300 hover:bg-white/5"}`}>
+            {liked ? "♥ 좋아요 취소" : "♡ 좋아요"}
+          </button>
+        </div>
       </div>
 
       <SquadFeedCard post={post} />
+
+      {editing && isOwner && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => !savingEdit && setEditing(false)}>
+          <div className="w-full max-w-lg rounded-3xl border border-white/15 bg-[#151a18] p-5 shadow-2xl sm:p-6" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black text-lime-400">SQUAD GALLERY</p>
+                <h2 className="mt-1 text-2xl font-black">게시글 수정</h2>
+              </div>
+              <button type="button" disabled={savingEdit} onClick={() => setEditing(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-2xl text-gray-300">×</button>
+            </div>
+
+            <label className="mt-6 block text-xs font-bold text-gray-400">제목</label>
+            <input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} maxLength={50} className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-400/50" />
+            <div className="mt-1 text-right text-[10px] text-gray-600">{editTitle.length}/50</div>
+
+            <label className="mt-4 block text-xs font-bold text-gray-400">설명</label>
+            <textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={500} rows={5} className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-400/50" />
+            <div className="mt-1 text-right text-[10px] text-gray-600">{editDescription.length}/500</div>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button type="button" disabled={savingEdit} onClick={() => setEditing(false)} className="rounded-xl border border-white/15 py-3 text-sm font-bold text-gray-300 disabled:opacity-50">취소</button>
+              <button type="button" disabled={savingEdit} onClick={() => void savePostEdit()} className="rounded-xl bg-lime-300 py-3 text-sm font-black text-black disabled:opacity-50">
+                {savingEdit ? "저장 중..." : "수정 저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#171b1f]">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
@@ -186,12 +258,7 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
         </div>
 
         <div className="hidden grid-cols-[76px_minmax(180px,1.5fr)_90px_80px_80px_minmax(140px,1fr)] gap-3 border-b border-white/[0.07] bg-black/10 px-4 py-2.5 text-[10px] font-black text-gray-500 md:grid sm:px-5">
-          <span>선수</span>
-          <span>이름 / 시즌</span>
-          <span>포지션</span>
-          <span>강화</span>
-          <span>OVR / 급여</span>
-          <span className="text-right">선수 가치</span>
+          <span>선수</span><span>이름 / 시즌</span><span>포지션</span><span>강화</span><span>OVR / 급여</span><span className="text-right">선수 가치</span>
         </div>
 
         <div className="divide-y divide-white/[0.07]">
@@ -206,40 +273,17 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
                 <div className="relative h-20 w-16 md:h-16 md:w-14">
                   <PlayerArtwork key={player.artworkSpid ?? player.id} spid={player.artworkSpid ?? player.id} alt={player.name} className="absolute bottom-0 left-1/2 max-h-[76px] max-w-[145%] -translate-x-1/2 object-contain md:max-h-[62px]" />
                 </div>
-
                 <div className="min-w-0">
                   <p className="truncate text-base font-black text-white" title={player.name}>{player.name}</p>
                   <div className="mt-1 flex h-6 items-center">
-                    {player.seasonImg ? (
-                      <img src={player.seasonImg} alt={player.seasonName ?? "시즌"} title={player.seasonName ?? undefined} className="h-5 max-w-12 object-contain" />
-                    ) : (
-                      <span className="text-[10px] font-bold text-gray-600">시즌 정보 없음</span>
-                    )}
+                    {player.seasonImg ? <img src={player.seasonImg} alt={player.seasonName ?? "시즌"} title={player.seasonName ?? undefined} className="h-5 max-w-12 object-contain" /> : <span className="text-[10px] font-bold text-gray-600">시즌 정보 없음</span>}
                   </div>
                   {detail?.failed && <p className="mt-1 text-[9px] font-bold text-amber-300">일부 정보 로딩 실패</p>}
                 </div>
-
-                <div className="flex items-center gap-2 md:block">
-                  <span className="text-[10px] font-bold text-gray-600 md:hidden">포지션</span>
-                  <span className="inline-flex rounded-lg border border-lime-300/20 bg-lime-300/[0.07] px-2.5 py-1.5 text-xs font-black text-lime-300">{slot.label}</span>
-                </div>
-
-                <div className="flex items-center gap-2 md:block">
-                  <span className="text-[10px] font-bold text-gray-600 md:hidden">강화</span>
-                  <span className={`inline-flex h-7 min-w-10 items-center justify-center rounded-[3px] border px-2 text-xs font-black leading-none sm:border-2 ${getEnhancementBadgeTone(player.grade)}`} title={`${player.grade}강`}>
-                    {player.grade}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs font-black md:block">
-                  <span className="text-lime-300">OVR {displayOvr ?? "-"}</span>
-                  <span className="text-gray-400 md:mt-1 md:block">급여 {detail?.salary ?? "-"}</span>
-                </div>
-
-                <div className="flex items-center justify-between gap-3 md:block md:text-right">
-                  <span className="text-[10px] font-bold text-gray-600 md:block">{player.grade}강 가격</span>
-                  <span className="text-sm font-black text-white md:mt-1 md:block" title={price ?? undefined}>{detail ? formatPlayerPrice(price) : "불러오는 중..."}</span>
-                </div>
+                <div className="flex items-center gap-2 md:block"><span className="text-[10px] font-bold text-gray-600 md:hidden">포지션</span><span className="inline-flex rounded-lg border border-lime-300/20 bg-lime-300/[0.07] px-2.5 py-1.5 text-xs font-black text-lime-300">{slot.label}</span></div>
+                <div className="flex items-center gap-2 md:block"><span className="text-[10px] font-bold text-gray-600 md:hidden">강화</span><span className={`inline-flex h-7 min-w-10 items-center justify-center rounded-[3px] border px-2 text-xs font-black leading-none sm:border-2 ${getEnhancementBadgeTone(player.grade)}`} title={`${player.grade}강`}>{player.grade}</span></div>
+                <div className="flex items-center gap-3 text-xs font-black md:block"><span className="text-lime-300">OVR {displayOvr ?? "-"}</span><span className="text-gray-400 md:mt-1 md:block">급여 {detail?.salary ?? "-"}</span></div>
+                <div className="flex items-center justify-between gap-3 md:block md:text-right"><span className="text-[10px] font-bold text-gray-600 md:block">{player.grade}강 가격</span><span className="text-sm font-black text-white md:mt-1 md:block" title={price ?? undefined}>{detail ? formatPlayerPrice(price) : "불러오는 중..."}</span></div>
               </article>
             );
           })}
@@ -247,29 +291,12 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
       </section>
 
       <section className="mt-5 rounded-2xl border border-white/10 bg-[#171b1f] p-4 sm:p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-black">댓글 <span className="text-lime-300">{comments.length}</span></h2>
-          {!userId && <Link href="/login" className="text-xs font-bold text-lime-300">로그인 후 작성</Link>}
-        </div>
-
-        <div className="mt-4 flex gap-2">
-          <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={500} rows={3} placeholder="스쿼드에 대한 의견을 남겨보세요." className="min-w-0 flex-1 resize-none rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none placeholder:text-gray-600 focus:border-lime-400/50" />
-          <button type="button" onClick={() => void addComment()} className="self-stretch rounded-xl bg-lime-300 px-4 text-sm font-black text-black">등록</button>
-        </div>
+        <div className="flex items-center justify-between"><h2 className="text-lg font-black">댓글 <span className="text-lime-300">{comments.length}</span></h2>{!userId && <Link href="/login" className="text-xs font-bold text-lime-300">로그인 후 작성</Link>}</div>
+        <div className="mt-4 flex gap-2"><textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={500} rows={3} placeholder="스쿼드에 대한 의견을 남겨보세요." className="min-w-0 flex-1 resize-none rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none placeholder:text-gray-600 focus:border-lime-400/50" /><button type="button" onClick={() => void addComment()} className="self-stretch rounded-xl bg-lime-300 px-4 text-sm font-black text-black">등록</button></div>
         {message && <p className="mt-3 text-xs text-amber-300">{message}</p>}
-
         <div className="mt-5 space-y-3">
           {topLevel.length === 0 && <p className="py-8 text-center text-sm text-gray-600">아직 댓글이 없습니다.</p>}
-          {topLevel.map((comment) => (
-            <div key={comment.id} className="rounded-xl border border-white/[0.08] bg-black/10 p-3.5">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-black text-gray-200">{comment.author_name}</span>
-                <span className="text-[10px] text-gray-600">{new Date(comment.created_at).toLocaleString("ko-KR")}</span>
-              </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">{comment.content}</p>
-              <div className="mt-2 text-[10px] font-bold text-gray-600">좋아요 {comment.likes_count}</div>
-            </div>
-          ))}
+          {topLevel.map((comment) => <div key={comment.id} className="rounded-xl border border-white/[0.08] bg-black/10 p-3.5"><div className="flex items-center justify-between gap-3"><span className="text-xs font-black text-gray-200">{comment.author_name}</span><span className="text-[10px] text-gray-600">{new Date(comment.created_at).toLocaleString("ko-KR")}</span></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">{comment.content}</p><div className="mt-2 text-[10px] font-bold text-gray-600">좋아요 {comment.likes_count}</div></div>)}
         </div>
       </section>
     </div>

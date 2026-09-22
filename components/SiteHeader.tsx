@@ -10,10 +10,10 @@ export default function SiteHeader() {
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
         <Link href="/" aria-label="FC Help 홈" className="shrink-0">
           <img
-            src="/fc-help-header.webp"
+            src="/brand/header"
             alt="FC Help"
-            width={423}
-            height={120}
+            width={320}
+            height={91}
             className="h-10 w-auto sm:h-11"
           />
         </Link>

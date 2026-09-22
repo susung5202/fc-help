@@ -13,6 +13,7 @@ import {
 
 export type SquadFeedPost = {
   id: string;
+  author_id?: string;
   author_name: string;
   title: string;
   description: string;

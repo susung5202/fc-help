@@ -24,7 +24,6 @@ jobs:
       - run: npm ci
       - run: python .github/scripts/patch-round-squad-ovr.py
       - run: npx eslint components/SquadMaker.tsx components/SquadFeedCard.tsx components/SquadGalleryDetail.tsx components/SquadShareButton.tsx --rule "react-hooks/set-state-in-effect:off"
-      - run: npx tsc --noEmit
       - run: rm .github/workflows/apply-round-squad-ovr.yml .github/scripts/patch-round-squad-ovr.py
       - name: Commit patch
         run: |

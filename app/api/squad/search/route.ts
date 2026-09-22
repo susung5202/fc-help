@@ -99,12 +99,20 @@ export async function GET(request: Request) {
       seasons.map((season) => [Number(season.seasonId), season])
     );
 
-    const matched = players
+    const allMatches = players
       .filter((player) =>
         player.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery)
       )
-      .sort((a, b) => b.id - a.id)
-      .slice(0, 12);
+      .sort((a, b) => b.id - a.id);
+
+    const exactMatches = allMatches.filter(
+      (player) => player.name.toLocaleLowerCase("ko-KR") === normalizedQuery
+    );
+
+    // Exact player-name searches should expose every season, including old classes
+    // such as EBS. Partial-name searches stay bounded so broad queries do not become
+    // unnecessarily expensive.
+    const matched = exactMatches.length > 0 ? exactMatches : allMatches.slice(0, 30);
 
     const ovrMap = await getPlayerOvrMap(matched.map((player) => player.id));
 

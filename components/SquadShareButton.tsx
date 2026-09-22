@@ -101,11 +101,25 @@ export default function SquadShareButton() {
             ? data.teamColors.map((item: { name?: string }) => item?.name).filter((name: unknown): name is string => typeof name === "string")
             : [];
           const ovrs = Object.values(data.ovrBySlot ?? {}).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-          if (ovrs.length > 0) averageOvr = Math.round((ovrs.reduce((sum, value) => sum + value, 0) / ovrs.length) * 10) / 10;
+          if (ovrs.length > 0) averageOvr = Math.round(ovrs.reduce((sum, value) => sum + value, 0) / ovrs.length);
         }
       } catch {
         // 팀컬러 계산 실패 시에도 공유는 계속 진행한다.
       }
+
+      const squadSnapshot: GallerySquadData = {
+        ...squad,
+        players: Object.fromEntries(
+          entries.map(([slotId, player]) => [
+            slotId,
+            {
+              ...player,
+              artworkSpid: player.artworkSpid ?? player.id,
+              seasonImg: player.seasonImg ?? null,
+            },
+          ])
+        ),
+      };
 
       const authorName = String(user.user_metadata?.display_name || user.user_metadata?.name || user.email?.split("@")[0] || "구단주").slice(0, 40);
       const playerNames = [...new Set(entries.map(([, player]) => player.name))];
@@ -119,7 +133,7 @@ export default function SquadShareButton() {
           title: title.trim().slice(0, 50),
           description: description.trim().slice(0, 500),
           formation: squad.formationKey ?? "직접 배치",
-          squad_data: squad,
+          squad_data: squadSnapshot,
           player_spids: playerSpids,
           player_names: playerNames,
           team_colors: [...new Set(teamColors)],

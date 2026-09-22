@@ -160,10 +160,12 @@ export async function GET(request: Request) {
       .filter((player) => player.name === current.name)
       .sort((a, b) => b.id - a.id);
 
+    // Do not truncate historical seasons. The old 18-card cap hid classes such as EBS
+    // for players with many released versions.
     const selected = [
       current,
       ...sameName.filter((player) => player.id !== current.id),
-    ].slice(0, 18);
+    ];
 
     const variants = await Promise.all(selected.map((player) => fetchVariant(player, seasonMap)));
     return NextResponse.json({ variants }, {

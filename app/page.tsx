@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PushNotificationSetup from "@/components/PushNotificationSetup";
+import AccountButton from "@/components/AccountButton";
 
 export default function HomePage() {
   return (
@@ -25,12 +26,7 @@ export default function HomePage() {
             </Link>
           </nav>
 
-          <Link
-            href="/login"
-            className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black"
-          >
-            로그인
-          </Link>
+          <AccountButton />
         </div>
       </header>
 

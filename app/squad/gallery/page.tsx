@@ -11,15 +11,12 @@ export default function SquadGalleryPage() {
     <main className="min-h-screen bg-[#0f1115] text-white">
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="text-xl font-extrabold tracking-tight sm:text-2xl">
-            FC <span className="text-lime-400">Help</span>
+          <Link href="/squad" className="text-xl font-extrabold tracking-tight sm:text-2xl">
+            스쿼드
           </Link>
           <div className="flex items-center gap-2">
-            <Link href="/squad" className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 hover:bg-white/5 sm:text-sm">
+            <Link href="/squad/maker" className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 hover:bg-white/5 sm:text-sm">
               스쿼드 메이커
-            </Link>
-            <Link href="/login" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-black sm:text-sm">
-              로그인
             </Link>
           </div>
         </div>

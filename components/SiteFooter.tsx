@@ -33,7 +33,7 @@ export default function SiteFooter() {
                   갱신시간
                 </Link>
                 <Link href="/squad" className="text-gray-300 transition hover:text-lime-300">
-                  스쿼드 메이커
+                  스쿼드
                 </Link>
               </div>
             </nav>

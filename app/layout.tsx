@@ -17,11 +17,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "https://fc-help-chi.vercel.app");
+const siteUrl = "https://fchelp.xyz";
+const shareImage = `${siteUrl}/fc-help-share-v2.jpg`;
 
 const adsenseClient = "ca-pub-6735658400194219";
 const defaultTitle = "FC Help - FC 온라인 선수 DB·갱신시간·스쿼드 메이커";
@@ -53,9 +50,9 @@ export const metadata: Metadata = {
     url: siteUrl,
     images: [
       {
-        url: "/opengraph-image",
-        width: 1200,
-        height: 630,
+        url: shareImage,
+        width: 1536,
+        height: 864,
         alt: "FC Help - INFO · SQUAD · ALARM · COMMUNITY",
       },
     ],
@@ -64,7 +61,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: defaultTitle,
     description: defaultDescription,
-    images: ["/opengraph-image"],
+    images: [shareImage],
   },
   other: {
     "google-adsense-account": adsenseClient,

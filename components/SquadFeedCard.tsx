@@ -155,26 +155,26 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
             return (
               <div
                 key={slot.slotId}
-                className="absolute flex w-[78px] -translate-x-1/2 -translate-y-1/2 flex-col items-center sm:w-[92px]"
+                className="absolute flex w-[68px] -translate-x-1/2 -translate-y-1/2 flex-col items-center sm:w-[80px]"
                 style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
                 title={`${slot.label} · ${player.name} · ${player.seasonName ?? "시즌 정보 없음"} · ${player.grade}강`}
               >
-                <div className="relative h-14 w-12 overflow-visible sm:h-16 sm:w-14">
+                <div className="relative h-12 w-10 overflow-visible sm:h-14 sm:w-12">
                   <PlayerArtwork
                     key={player.artworkSpid ?? player.id}
                     spid={player.artworkSpid ?? player.id}
                     alt={player.name}
-                    className="absolute bottom-0 left-1/2 max-h-[64px] max-w-[128%] -translate-x-1/2 object-contain sm:max-h-[74px]"
+                    className="absolute bottom-0 left-1/2 max-h-[54px] max-w-[124%] -translate-x-1/2 object-contain sm:max-h-[64px]"
                   />
                   {player.seasonImg && (
                     <img
                       src={player.seasonImg}
                       alt={player.seasonName ?? "시즌"}
-                      className="absolute -bottom-1 -left-3 z-20 h-4 max-w-7 object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)] sm:h-5 sm:max-w-9"
+                      className="absolute -bottom-1 -left-2.5 z-20 h-3.5 max-w-6 object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)] sm:h-[18px] sm:max-w-8"
                     />
                   )}
                   <span
-                    className={`absolute -bottom-1 -right-3 z-20 flex h-4 min-w-6 items-center justify-center rounded-[2px] border px-1 text-[8px] font-black leading-none sm:h-5 sm:min-w-7 sm:border-2 sm:text-[10px] ${getEnhancementBadgeTone(player.grade)} drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]`}
+                    className={`absolute -bottom-1 -right-2.5 z-20 flex h-[15px] min-w-5 items-center justify-center rounded-[2px] border px-1 text-[8px] font-black leading-none sm:h-[18px] sm:min-w-6 sm:border-2 sm:text-[9px] ${getEnhancementBadgeTone(player.grade)} drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]`}
                     title={`${player.grade}강`}
                   >
                     {player.grade}
@@ -183,7 +183,7 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
                 <span className="mt-1 w-full truncate rounded bg-black/80 px-1.5 py-0.5 text-center text-[8px] font-black text-white sm:text-[9px]">{player.name}</span>
                 <div className="mt-0.5 flex items-center justify-center gap-1 text-[7px] font-black sm:text-[8px]">
                   <span className="rounded bg-black/75 px-1 text-lime-200">{slot.label}</span>
-                  <span className="max-w-[60px] truncate rounded bg-black/75 px-1 text-amber-200">{compactPrice(price)}</span>
+                  <span className="max-w-[54px] truncate rounded bg-black/75 px-1 text-amber-200">{compactPrice(price)}</span>
                 </div>
               </div>
             );

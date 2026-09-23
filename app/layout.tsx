@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
+import CanonicalHostGuard from "@/components/CanonicalHostGuard";
 import PushSoundListener from "@/components/PushSoundListener";
 import MobileNav from "@/components/MobileNav";
 import SiteFooter from "@/components/SiteFooter";
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
           crossOrigin="anonymous"
         />
+        <CanonicalHostGuard />
         <PushSoundListener />
         <SiteHeader />
         {children}

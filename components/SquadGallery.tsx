@@ -138,7 +138,7 @@ export default function SquadGallery() {
             다른 구단주의 스쿼드를 구경하고, 마음에 드는 스쿼드는 그대로 복사해서 내 스쿼드로 수정할 수 있습니다.
           </p>
         </div>
-        <Link href="/squad" className="rounded-xl bg-lime-300 px-4 py-3 text-center text-sm font-black text-black transition hover:bg-lime-200">
+        <Link href="/squad/maker" className="rounded-xl bg-lime-300 px-4 py-3 text-center text-sm font-black text-black transition hover:bg-lime-200">
           내 스쿼드 만들기
         </Link>
       </div>
@@ -258,7 +258,7 @@ export default function SquadGallery() {
             {activeFilterCount > 0 ? (
               <button type="button" onClick={resetFilters} className="mt-3 text-sm font-black text-lime-300">검색 조건 초기화 →</button>
             ) : (
-              <Link href="/squad" className="mt-3 inline-block text-sm font-black text-lime-300">첫 스쿼드 공유하러 가기 →</Link>
+              <Link href="/squad/maker" className="mt-3 inline-block text-sm font-black text-lime-300">첫 스쿼드 공유하러 가기 →</Link>
             )}
           </div>
         )}

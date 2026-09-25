@@ -1,0 +1,111 @@
+name: Patch mypage avatar editor
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch mypage profile editor
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/mypage/page.tsx")
+          text = path.read_text()
+
+          if 'const [avatarUrlInput, setAvatarUrlInput]' in text:
+              print("mypage avatar editor already patched")
+              raise SystemExit(0)
+
+          def replace_once(old: str, new: str):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one match, got {count}: {old[:80]!r}")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '  const [bioInput, setBioInput] = useState("");\n  const [fcNicknameInput, setFcNicknameInput] = useState("");\n  const [fcProfile, setFcProfile] = useState<FcOnlineProfile | null>(null);',
+              '  const [bioInput, setBioInput] = useState("");\n  const [avatarUrlInput, setAvatarUrlInput] = useState("");\n  const [fcNicknameInput, setFcNicknameInput] = useState("");\n  const [editorError, setEditorError] = useState("");\n  const [fcProfile, setFcProfile] = useState<FcOnlineProfile | null>(null);'
+          )
+
+          replace_once(
+              '      setBioInput(loadedProfile.bio ?? "");\n      setFcNicknameInput(loadedProfile.fconline_nickname ?? "");',
+              '      setBioInput(loadedProfile.bio ?? "");\n      setAvatarUrlInput(loadedProfile.avatar_url ?? "");\n      setFcNicknameInput(loadedProfile.fconline_nickname ?? "");'
+          )
+
+          replace_once(
+              '  async function saveProfile() {\n    if (!userId || !profile) return;\n    const username = usernameInput.trim().replace(/^@/, "").toLowerCase();\n    const displayName = displayNameInput.trim();\n    const bio = bioInput.trim();\n    const fcNickname = fcNicknameInput.trim();',
+              '  function openProfileEditor() {\n    if (!profile) return;\n    setUsernameInput(profile.username ?? makeFallbackUsername(userId));\n    setDisplayNameInput(profile.display_name);\n    setBioInput(profile.bio ?? "");\n    setAvatarUrlInput(profile.avatar_url ?? "");\n    setFcNicknameInput(profile.fconline_nickname ?? "");\n    setEditorError("");\n    setEditing(true);\n  }\n\n  async function saveProfile() {\n    if (!userId || !profile) return;\n    const username = usernameInput.trim().replace(/^@/, "").toLowerCase();\n    const displayName = displayNameInput.trim();\n    const bio = bioInput.trim();\n    const avatarUrl = avatarUrlInput.trim();\n    const fcNickname = fcNicknameInput.trim();'
+          )
+
+          replace_once(
+              '      setMessage("아이디는 영문 소문자, 숫자, 밑줄(_)만 사용해 3~20자로 입력해주세요.");',
+              '      setEditorError("아이디는 영문 소문자, 숫자, 밑줄(_)만 사용해 3~20자로 입력해주세요.");'
+          )
+          replace_once(
+              '      setMessage("닉네임은 1~20자로 입력해주세요.");',
+              '      setEditorError("닉네임은 1~20자로 입력해주세요.");'
+          )
+          replace_once(
+              '      setMessage("소개는 150자까지 입력할 수 있습니다.");',
+              '      setEditorError("소개는 150자까지 입력할 수 있습니다.");'
+          )
+          replace_once(
+              '      setMessage("FC Online 닉네임을 확인해주세요.");\n      return;\n    }\n\n    setSaving(true);\n    setMessage("");',
+              '      setEditorError("FC Online 닉네임을 확인해주세요.");\n      return;\n    }\n    if (avatarUrl) {\n      try {\n        const parsedAvatarUrl = new URL(avatarUrl);\n        if (parsedAvatarUrl.protocol !== "http:" && parsedAvatarUrl.protocol !== "https:") {\n          throw new Error("invalid protocol");\n        }\n      } catch {\n        setEditorError("프로필 사진 URL은 http:// 또는 https:// 주소로 입력해주세요.");\n        return;\n      }\n    }\n\n    setSaving(true);\n    setEditorError("");\n    setMessage("");'
+          )
+
+          replace_once(
+              '        display_name: displayName,\n        bio,\n        fconline_nickname: fcNickname || null,',
+              '        display_name: displayName,\n        bio,\n        avatar_url: avatarUrl || null,\n        fconline_nickname: fcNickname || null,'
+          )
+
+          replace_once(
+              '      setMessage(error.code === "23505" ? "이미 사용 중인 아이디입니다." : error.message);',
+              '      setEditorError(error.code === "23505" ? "이미 사용 중인 아이디입니다." : error.message);'
+          )
+
+          edit_open = 'onClick={() => setEditing(true)}'
+          count = text.count(edit_open)
+          if count != 3:
+              raise SystemExit(f"expected 3 editor open buttons, got {count}")
+          text = text.replace(edit_open, 'onClick={openProfileEditor}')
+
+          replace_once(
+              '            <p className="mt-1 text-right text-[10px] text-gray-600">{bioInput.length}/150</p>\n\n            <div className="mt-5 rounded-2xl border border-lime-300/15 bg-lime-300/[0.04] p-4">',
+              '''            <p className="mt-1 text-right text-[10px] text-gray-600">{bioInput.length}/150</p>\n\n            <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">\n              <div className="flex items-center gap-3">\n                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#111318] text-lg font-black text-lime-200">\n                  {avatarUrlInput.trim() ? (\n                    <img src={avatarUrlInput.trim()} alt="프로필 사진 미리보기" className="h-full w-full object-cover" />\n                  ) : (\n                    (displayNameInput || profile.display_name || "F").trim().slice(0, 1).toUpperCase()\n                  )}\n                </div>\n                <div className="min-w-0 flex-1">\n                  <p className="text-xs font-black text-gray-200">프로필 사진</p>\n                  <p className="mt-1 text-[10px] leading-4 text-gray-600">이미지의 직접 URL을 입력하면 바로 미리볼 수 있습니다.</p>\n                </div>\n              </div>\n              <div className="mt-3 flex gap-2">\n                <input value={avatarUrlInput} onChange={(event) => setAvatarUrlInput(event.target.value)} placeholder="https://..." className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-300/40" />\n                {avatarUrlInput && (\n                  <button type="button" onClick={() => setAvatarUrlInput("")} className="shrink-0 rounded-xl border border-white/10 px-3 text-xs font-bold text-gray-400 hover:bg-white/5">\n                    지우기\n                  </button>\n                )}\n              </div>\n            </div>\n\n            <div className="mt-5 rounded-2xl border border-lime-300/15 bg-lime-300/[0.04] p-4">'''
+          )
+
+          replace_once(
+              '            <div className="mt-4 rounded-xl bg-black/20 px-3 py-2 text-[10px] text-gray-600">로그인 이메일 · {email}</div>',
+              '''            {editorError && (\n              <div className="mt-4 rounded-xl border border-rose-300/20 bg-rose-300/5 px-3 py-2.5 text-xs font-bold text-rose-200">\n                {editorError}\n              </div>\n            )}\n\n            <div className="mt-4 rounded-xl bg-black/20 px-3 py-2 text-[10px] text-gray-600">로그인 이메일 · {email}</div>'''
+          )
+
+          path.write_text(text)
+          print("mypage avatar editor patch applied")
+          PY
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/mypage/page.tsx
+          git commit -m "add editable profile avatar"
+          git push origin HEAD:main

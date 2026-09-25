@@ -175,6 +175,7 @@ export default function MyPage() {
       setFcLoading(false);
       return;
     }
+    const linkedNickname = nickname;
 
     let active = true;
 
@@ -192,7 +193,7 @@ export default function MyPage() {
       }
 
       try {
-        const response = await fetch(`/api/fconline/profile?nickname=${encodeURIComponent(nickname)}`, {
+        const response = await fetch(`/api/fconline/profile?nickname=${encodeURIComponent(linkedNickname)}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           cache: "no-store",
         });

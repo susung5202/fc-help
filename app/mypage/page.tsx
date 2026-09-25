@@ -75,7 +75,9 @@ export default function MyPage() {
   const [usernameInput, setUsernameInput] = useState("");
   const [displayNameInput, setDisplayNameInput] = useState("");
   const [bioInput, setBioInput] = useState("");
+  const [avatarUrlInput, setAvatarUrlInput] = useState("");
   const [fcNicknameInput, setFcNicknameInput] = useState("");
+  const [editorError, setEditorError] = useState("");
   const [fcProfile, setFcProfile] = useState<FcOnlineProfile | null>(null);
   const [fcLoading, setFcLoading] = useState(false);
   const [fcError, setFcError] = useState("");
@@ -152,6 +154,7 @@ export default function MyPage() {
       setUsernameInput(loadedProfile.username ?? fallbackUsername);
       setDisplayNameInput(loadedProfile.display_name || fallbackDisplayName);
       setBioInput(loadedProfile.bio ?? "");
+      setAvatarUrlInput(loadedProfile.avatar_url ?? "");
       setFcNicknameInput(loadedProfile.fconline_nickname ?? "");
       setSquads((squadData ?? []) as MySquad[]);
 
@@ -229,31 +232,55 @@ export default function MyPage() {
     [squads]
   );
 
+  function openProfileEditor() {
+    if (!profile) return;
+    setUsernameInput(profile.username ?? makeFallbackUsername(userId));
+    setDisplayNameInput(profile.display_name);
+    setBioInput(profile.bio ?? "");
+    setAvatarUrlInput(profile.avatar_url ?? "");
+    setFcNicknameInput(profile.fconline_nickname ?? "");
+    setEditorError("");
+    setEditing(true);
+  }
+
   async function saveProfile() {
     if (!userId || !profile) return;
     const username = usernameInput.trim().replace(/^@/, "").toLowerCase();
     const displayName = displayNameInput.trim();
     const bio = bioInput.trim();
+    const avatarUrl = avatarUrlInput.trim();
     const fcNickname = fcNicknameInput.trim();
 
     if (!USERNAME_PATTERN.test(username)) {
-      setMessage("아이디는 영문 소문자, 숫자, 밑줄(_)만 사용해 3~20자로 입력해주세요.");
+      setEditorError("아이디는 영문 소문자, 숫자, 밑줄(_)만 사용해 3~20자로 입력해주세요.");
       return;
     }
     if (!displayName || displayName.length > 20) {
-      setMessage("닉네임은 1~20자로 입력해주세요.");
+      setEditorError("닉네임은 1~20자로 입력해주세요.");
       return;
     }
     if (bio.length > 150) {
-      setMessage("소개는 150자까지 입력할 수 있습니다.");
+      setEditorError("소개는 150자까지 입력할 수 있습니다.");
       return;
     }
     if (fcNickname.length > 30) {
-      setMessage("FC Online 닉네임을 확인해주세요.");
+      setEditorError("FC Online 닉네임을 확인해주세요.");
       return;
+    }
+    if (avatarUrl) {
+      try {
+        const parsedAvatarUrl = new URL(avatarUrl);
+        if (parsedAvatarUrl.protocol !== "http:" && parsedAvatarUrl.protocol !== "https:") {
+          throw new Error("invalid protocol");
+        }
+      } catch {
+        setEditorError("프로필 사진 URL은 http:// 또는 https:// 주소로 입력해주세요.");
+        return;
+      }
     }
 
     setSaving(true);
+    setEditorError("");
     setMessage("");
     const { data, error } = await supabase
       .from("profiles")
@@ -262,6 +289,7 @@ export default function MyPage() {
         username,
         display_name: displayName,
         bio,
+        avatar_url: avatarUrl || null,
         fconline_nickname: fcNickname || null,
         fconline_ouid: fcNickname === profile.fconline_nickname ? profile.fconline_ouid : null,
         updated_at: new Date().toISOString(),
@@ -270,7 +298,7 @@ export default function MyPage() {
       .single();
 
     if (error) {
-      setMessage(error.code === "23505" ? "이미 사용 중인 아이디입니다." : error.message);
+      setEditorError(error.code === "23505" ? "이미 사용 중인 아이디입니다." : error.message);
       setSaving(false);
       return;
     }
@@ -319,7 +347,7 @@ export default function MyPage() {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                 <h1 className="truncate text-xl font-black tracking-tight sm:text-2xl">{profile.display_name}</h1>
-                <button type="button" onClick={() => setEditing(true)} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-gray-100 transition hover:bg-white/15">
+                <button type="button" onClick={openProfileEditor} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-gray-100 transition hover:bg-white/15">
                   프로필 편집
                 </button>
                 <button type="button" onClick={() => void logout()} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-500 transition hover:bg-white/5 hover:text-gray-300">
@@ -354,12 +382,12 @@ export default function MyPage() {
                 )}
               </div>
               {profile.fconline_nickname && (
-                <button type="button" onClick={() => setEditing(true)} className="text-xs font-black text-lime-300">연동 수정 →</button>
+                <button type="button" onClick={openProfileEditor} className="text-xs font-black text-lime-300">연동 수정 →</button>
               )}
             </div>
 
             {!profile.fconline_nickname ? (
-              <button type="button" onClick={() => setEditing(true)} className="mt-4 rounded-xl bg-lime-300 px-4 py-2.5 text-xs font-black text-black transition hover:bg-lime-200">
+              <button type="button" onClick={openProfileEditor} className="mt-4 rounded-xl bg-lime-300 px-4 py-2.5 text-xs font-black text-black transition hover:bg-lime-200">
                 FC Online 닉네임 연결
               </button>
             ) : fcLoading ? (
@@ -448,12 +476,42 @@ export default function MyPage() {
             <textarea value={bioInput} onChange={(event) => setBioInput(event.target.value)} maxLength={150} rows={4} placeholder="스쿼드 취향이나 한마디를 적어보세요." className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm leading-6 outline-none focus:border-lime-300/40" />
             <p className="mt-1 text-right text-[10px] text-gray-600">{bioInput.length}/150</p>
 
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#111318] text-lg font-black text-lime-200">
+                  {avatarUrlInput.trim() ? (
+                    <img src={avatarUrlInput.trim()} alt="프로필 사진 미리보기" className="h-full w-full object-cover" />
+                  ) : (
+                    (displayNameInput || profile.display_name || "F").trim().slice(0, 1).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black text-gray-200">프로필 사진</p>
+                  <p className="mt-1 text-[10px] leading-4 text-gray-600">이미지의 직접 URL을 입력하면 바로 미리볼 수 있습니다.</p>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <input value={avatarUrlInput} onChange={(event) => setAvatarUrlInput(event.target.value)} placeholder="https://..." className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-300/40" />
+                {avatarUrlInput && (
+                  <button type="button" onClick={() => setAvatarUrlInput("")} className="shrink-0 rounded-xl border border-white/10 px-3 text-xs font-bold text-gray-400 hover:bg-white/5">
+                    지우기
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="mt-5 rounded-2xl border border-lime-300/15 bg-lime-300/[0.04] p-4">
               <p className="text-xs font-black text-lime-300">FC Online 연동</p>
               <label className="mt-3 block text-[10px] font-bold text-gray-500">구단주 닉네임</label>
               <input value={fcNicknameInput} onChange={(event) => setFcNicknameInput(event.target.value)} maxLength={30} placeholder="FC Online 닉네임" className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-300/40" />
               <p className="mt-2 text-[10px] leading-5 text-gray-600">저장하면 NEXON Open API에서 구단주 정보와 1대1 공식경기 등급을 조회합니다. 빈칸으로 저장하면 연동이 해제됩니다.</p>
             </div>
+
+            {editorError && (
+              <div className="mt-4 rounded-xl border border-rose-300/20 bg-rose-300/5 px-3 py-2.5 text-xs font-bold text-rose-200">
+                {editorError}
+              </div>
+            )}
 
             <div className="mt-4 rounded-xl bg-black/20 px-3 py-2 text-[10px] text-gray-600">로그인 이메일 · {email}</div>
 

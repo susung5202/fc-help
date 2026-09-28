@@ -9,6 +9,7 @@ import {
 } from "react";
 import PlayerArtwork from "@/components/PlayerArtwork";
 import SquadPlayerCard from "@/components/SquadPlayerCard";
+import { createClient } from "@/lib/supabase/client";
 import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 
 import { POSITION_ZONES, findPositionZone, formationName, restorePositions } from "@/lib/fconline/squadLayout";
@@ -26,6 +27,18 @@ type SearchPlayer = {
 type SquadPlayer = SearchPlayer & {
   grade: number;
   artworkSpid?: number;
+};
+
+type ImportedSquadPlayer = SquadPlayer & {
+  slotPosition: string;
+};
+
+type ImportedSquadResponse = {
+  nickname?: string;
+  matchDate?: string | null;
+  matchTypeName?: string;
+  players?: ImportedSquadPlayer[];
+  error?: string;
 };
 
 type SquadCardDetails = {
@@ -266,6 +279,18 @@ function withTraitDefaults(player: SquadPlayer): SquadPlayer {
   };
 }
 
+function importedPosition(slotId: string, label: string): Slot | null {
+  if (label === "GK") return null;
+  const zone = POSITION_ZONES.find((item) => item.label === label);
+  if (!zone) return null;
+  return {
+    slotId,
+    label,
+    x: zone.left + zone.width / 2,
+    y: zone.top + zone.height / 2,
+  };
+}
+
 function getPositionBadgeTone(label: string) {
   if (["ST", "LS", "RS", "CF", "LF", "RF", "LW", "RW"].includes(label)) {
     return "border-rose-300/50 bg-rose-500 text-white";
@@ -283,6 +308,7 @@ function getPositionBadgeTone(label: string) {
 }
 
 export default function SquadMaker() {
+  const supabase = useMemo(() => createClient(), []);
   const [formationKey, setFormationKey] = useState("4-2-3-1");
   const [customPositions, setCustomPositions] = useState<Record<string, Slot>>({});
   const [players, setPlayers] = useState<Record<string, SquadPlayer>>({});
@@ -308,6 +334,8 @@ export default function SquadMaker() {
   });
   const [savingImage, setSavingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ url: string; file: File } | null>(null);
+  const [importingFcSquad, setImportingFcSquad] = useState(false);
+  const [importSquadMessage, setImportSquadMessage] = useState("");
 
   const pitchRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<DragState | null>(null);
@@ -697,6 +725,70 @@ export default function SquadMaker() {
     closePanel();
   }
 
+  async function loadFcOnlineSquad() {
+    if (importingFcSquad) return;
+    if (Object.keys(players).length > 0 && !window.confirm("현재 편집 중인 스쿼드를 덮어쓰고 최근 FC Online 스쿼드를 불러올까요?")) {
+      return;
+    }
+
+    setImportingFcSquad(true);
+    setImportSquadMessage("");
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error("로그인 후 사용할 수 있습니다.");
+
+      const response = await fetch("/api/fconline/squad", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+      const data = (await response.json()) as ImportedSquadResponse;
+      if (!response.ok) throw new Error(data.error ?? "FC Online 스쿼드를 불러오지 못했습니다.");
+
+      const imported = Array.isArray(data.players) ? data.players : [];
+      const goalkeeper = imported.find((player) => player.slotPosition === "GK");
+      const fieldPlayers = imported.filter((player) => player.slotPosition !== "GK").slice(0, 10);
+      if (!goalkeeper || fieldPlayers.length !== 10) {
+        throw new Error("최근 경기의 선발 11명 정보를 완전히 불러오지 못했습니다.");
+      }
+
+      const nextPlayers: Record<string, SquadPlayer> = {};
+      const nextPositions: Record<string, Slot> = {};
+
+      fieldPlayers.forEach((importedPlayer, index) => {
+        const slotId = `p${index}`;
+        const { slotPosition, ...player } = importedPlayer;
+        nextPlayers[slotId] = withTraitDefaults(player);
+        const position = importedPosition(slotId, slotPosition);
+        if (position) nextPositions[slotId] = position;
+      });
+
+      const { slotPosition: _goalkeeperPosition, ...goalkeeperPlayer } = goalkeeper;
+      nextPlayers.p10 = withTraitDefaults(goalkeeperPlayer);
+
+      setFormationKey("4-4-2");
+      setCustomPositions(nextPositions);
+      setPlayers(nextPlayers);
+      setCardDetails({});
+      setTeamColorState((current) => ({ ...current, ovrBySlot: {}, loading: true }));
+      closePanel();
+
+      const playedAt = data.matchDate
+        ? new Date(data.matchDate).toLocaleString("ko-KR")
+        : "";
+      setImportSquadMessage(
+        `${data.nickname ?? "FC Online"} · 최근 ${data.matchTypeName ?? "공식경기"} 스쿼드를 불러왔습니다.${playedAt ? ` · ${playedAt}` : ""}`
+      );
+    } catch (requestError) {
+      setImportSquadMessage(
+        requestError instanceof Error ? requestError.message : "FC Online 스쿼드를 불러오지 못했습니다."
+      );
+    } finally {
+      setImportingFcSquad(false);
+    }
+  }
+
   function clearSquad() {
     if (!window.confirm("현재 스쿼드를 모두 비울까요?")) return;
     setPlayers({});
@@ -1026,13 +1118,24 @@ export default function SquadMaker() {
             </select>
           </label>
         </div>
-        <button
-          type="button"
-          onClick={clearSquad}
-          className="mt-1.5 h-9 w-full rounded-lg border border-red-400/20 bg-[#202522] px-3 text-[11px] font-bold text-red-300 active:bg-red-400/10"
-        >
-          전체 초기화
-        </button>
+        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => void loadFcOnlineSquad()}
+            disabled={importingFcSquad}
+            title="최근 1대1 공식경기에서 사용한 선발 11명을 불러옵니다."
+            className="h-9 rounded-lg border border-lime-400/25 bg-lime-400/[0.08] px-2 text-[10px] font-black text-lime-300 active:bg-lime-400/15 disabled:opacity-50"
+          >
+            {importingFcSquad ? "불러오는 중..." : "최근 FC 스쿼드 불러오기"}
+          </button>
+          <button
+            type="button"
+            onClick={clearSquad}
+            className="h-9 rounded-lg border border-red-400/20 bg-[#202522] px-3 text-[11px] font-bold text-red-300 active:bg-red-400/10"
+          >
+            전체 초기화
+          </button>
+        </div>
       </div>
 
       <div className="hidden flex-col gap-4 rounded-2xl border border-white/10 bg-[#181b21] p-5 md:flex lg:flex-row lg:items-center lg:justify-between">
@@ -1063,12 +1166,36 @@ export default function SquadMaker() {
           <span className="text-xs text-gray-600">이 기기에 자동 저장</span>
           <button
             type="button"
+            onClick={() => void loadFcOnlineSquad()}
+            disabled={importingFcSquad}
+            title="최근 1대1 공식경기에서 사용한 선발 11명을 불러옵니다."
+            className="rounded-xl border border-lime-400/25 bg-lime-400/[0.07] px-4 py-2.5 text-sm font-black text-lime-300 transition hover:bg-lime-400/10 disabled:opacity-50"
+          >
+            {importingFcSquad ? "불러오는 중..." : "최근 FC 스쿼드 불러오기"}
+          </button>
+          <button
+            type="button"
             onClick={clearSquad}
             className="rounded-xl border border-red-400/20 px-4 py-2.5 text-sm font-bold text-red-300 transition hover:bg-red-400/5"
           >
             전체 초기화
           </button>
         </div>
+      </div>
+
+      <div className="mx-2 mt-2 md:mx-0">
+        <p className="text-[10px] leading-4 text-gray-600 md:text-xs">
+          최근 FC 스쿼드 불러오기는 Nexon Open API의 최근 1대1 공식경기 선발 11명 기준입니다. 게임 내 현재 저장 스쿼드와 다를 수 있고 API 반영이 늦을 수 있습니다.
+        </p>
+        {importSquadMessage && (
+          <button
+            type="button"
+            onClick={() => setImportSquadMessage("")}
+            className="mt-2 w-full rounded-xl border border-lime-300/15 bg-lime-300/[0.05] px-3 py-2.5 text-left text-xs font-bold text-lime-100"
+          >
+            {importSquadMessage}
+          </button>
+        )}
       </div>
 
       <div className="mt-1 grid gap-6 md:mt-4 xl:grid-cols-[minmax(0,760px)_410px] xl:justify-center">

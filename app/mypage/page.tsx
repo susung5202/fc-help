@@ -75,7 +75,9 @@ export default function MyPage() {
   const [usernameInput, setUsernameInput] = useState("");
   const [displayNameInput, setDisplayNameInput] = useState("");
   const [bioInput, setBioInput] = useState("");
-  const [avatarUrlInput, setAvatarUrlInput] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
+  const [removeAvatar, setRemoveAvatar] = useState(false);
   const [fcNicknameInput, setFcNicknameInput] = useState("");
   const [editorError, setEditorError] = useState("");
   const [fcProfile, setFcProfile] = useState<FcOnlineProfile | null>(null);
@@ -154,7 +156,7 @@ export default function MyPage() {
       setUsernameInput(loadedProfile.username ?? fallbackUsername);
       setDisplayNameInput(loadedProfile.display_name || fallbackDisplayName);
       setBioInput(loadedProfile.bio ?? "");
-      setAvatarUrlInput(loadedProfile.avatar_url ?? "");
+      setAvatarPreviewUrl(loadedProfile.avatar_url ?? "");
       setFcNicknameInput(loadedProfile.fconline_nickname ?? "");
       setSquads((squadData ?? []) as MySquad[]);
 
@@ -237,10 +239,33 @@ export default function MyPage() {
     setUsernameInput(profile.username ?? makeFallbackUsername(userId));
     setDisplayNameInput(profile.display_name);
     setBioInput(profile.bio ?? "");
-    setAvatarUrlInput(profile.avatar_url ?? "");
+    setAvatarFile(null);
+    setAvatarPreviewUrl(profile.avatar_url ?? "");
+    setRemoveAvatar(false);
     setFcNicknameInput(profile.fconline_nickname ?? "");
     setEditorError("");
     setEditing(true);
+  }
+
+  function handleAvatarFile(file: File) {
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (!allowedTypes.has(file.type)) {
+      setEditorError("프로필 사진은 JPG, PNG, WebP 파일만 사용할 수 있습니다.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setEditorError("프로필 사진은 5MB 이하만 업로드할 수 있습니다.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarPreviewUrl(typeof reader.result === "string" ? reader.result : "");
+    };
+    reader.readAsDataURL(file);
+    setAvatarFile(file);
+    setRemoveAvatar(false);
+    setEditorError("");
   }
 
   async function saveProfile() {
@@ -248,7 +273,6 @@ export default function MyPage() {
     const username = usernameInput.trim().replace(/^@/, "").toLowerCase();
     const displayName = displayNameInput.trim();
     const bio = bioInput.trim();
-    const avatarUrl = avatarUrlInput.trim();
     const fcNickname = fcNicknameInput.trim();
 
     if (!USERNAME_PATTERN.test(username)) {
@@ -267,21 +291,39 @@ export default function MyPage() {
       setEditorError("FC Online 닉네임을 확인해주세요.");
       return;
     }
-    if (avatarUrl) {
-      try {
-        const parsedAvatarUrl = new URL(avatarUrl);
-        if (parsedAvatarUrl.protocol !== "http:" && parsedAvatarUrl.protocol !== "https:") {
-          throw new Error("invalid protocol");
-        }
-      } catch {
-        setEditorError("프로필 사진 URL은 http:// 또는 https:// 주소로 입력해주세요.");
+    setSaving(true);
+    setEditorError("");
+    setMessage("");
+
+    let avatarUrl = removeAvatar ? "" : profile.avatar_url ?? "";
+    const avatarPath = `${userId}/avatar`;
+
+    if (avatarFile) {
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(avatarPath, avatarFile, {
+          cacheControl: "3600",
+          contentType: avatarFile.type,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        setEditorError(`프로필 사진 업로드에 실패했습니다. ${uploadError.message}`);
+        setSaving(false);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(avatarPath);
+      avatarUrl = `${publicUrlData.publicUrl}?v=${Date.now()}`;
+    } else if (removeAvatar && profile.avatar_url?.includes("/storage/v1/object/public/avatars/")) {
+      const { error: removeError } = await supabase.storage.from("avatars").remove([avatarPath]);
+      if (removeError) {
+        setEditorError(`프로필 사진 삭제에 실패했습니다. ${removeError.message}`);
+        setSaving(false);
         return;
       }
     }
 
-    setSaving(true);
-    setEditorError("");
-    setMessage("");
     const { data, error } = await supabase
       .from("profiles")
       .upsert({
@@ -309,6 +351,9 @@ export default function MyPage() {
     ]);
 
     setProfile(data as Profile);
+    setAvatarFile(null);
+    setAvatarPreviewUrl((data as Profile).avatar_url ?? "");
+    setRemoveAvatar(false);
     setEditing(false);
     setSaving(false);
     setMessage("프로필을 저장했습니다.");
@@ -478,25 +523,48 @@ export default function MyPage() {
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#111318] text-lg font-black text-lime-200">
-                  {avatarUrlInput.trim() ? (
-                    <img src={avatarUrlInput.trim()} alt="프로필 사진 미리보기" className="h-full w-full object-cover" />
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#111318] text-lg font-black text-lime-200">
+                  {avatarPreviewUrl ? (
+                    <img src={avatarPreviewUrl} alt="프로필 사진 미리보기" className="h-full w-full object-cover" />
                   ) : (
                     (displayNameInput || profile.display_name || "F").trim().slice(0, 1).toUpperCase()
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-black text-gray-200">프로필 사진</p>
-                  <p className="mt-1 text-[10px] leading-4 text-gray-600">이미지의 직접 URL을 입력하면 바로 미리볼 수 있습니다.</p>
+                  <p className="mt-1 text-[10px] leading-4 text-gray-600">JPG, PNG, WebP · 최대 5MB</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <label className="cursor-pointer rounded-lg bg-lime-300 px-3 py-2 text-[11px] font-black text-black transition hover:bg-lime-200">
+                      사진 선택
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        disabled={saving}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) handleAvatarFile(file);
+                          event.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                    {avatarPreviewUrl && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => {
+                          setAvatarFile(null);
+                          setAvatarPreviewUrl("");
+                          setRemoveAvatar(true);
+                          setEditorError("");
+                        }}
+                        className="rounded-lg border border-white/10 px-3 py-2 text-[11px] font-bold text-gray-400 transition hover:bg-white/5 hover:text-gray-200"
+                      >
+                        사진 삭제
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <input value={avatarUrlInput} onChange={(event) => setAvatarUrlInput(event.target.value)} placeholder="https://..." className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-300/40" />
-                {avatarUrlInput && (
-                  <button type="button" onClick={() => setAvatarUrlInput("")} className="shrink-0 rounded-xl border border-white/10 px-3 text-xs font-bold text-gray-400 hover:bg-white/5">
-                    지우기
-                  </button>
-                )}
               </div>
             </div>
 

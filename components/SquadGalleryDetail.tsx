@@ -27,6 +27,12 @@ type PlayerDetail = {
   failed?: boolean;
 };
 
+type CommentProfile = {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+};
+
 function formatPlayerPrice(value: string | null | undefined) {
   if (!value) return "가격 정보 없음";
   return formatGalleryValue(value);
@@ -37,6 +43,7 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [post, setPost] = useState<SquadFeedPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [commentProfiles, setCommentProfiles] = useState<Record<string, CommentProfile>>({});
   const [userId, setUserId] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
   const [content, setContent] = useState("");
@@ -70,7 +77,22 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
     setPost(loadedPost);
     setEditTitle(loadedPost.title);
     setEditDescription(loadedPost.description ?? "");
-    setComments((commentData ?? []) as Comment[]);
+    const loadedComments = (commentData ?? []) as Comment[];
+    setComments(loadedComments);
+
+    const commentUserIds = Array.from(new Set(loadedComments.map((comment) => comment.user_id).filter(Boolean)));
+    if (commentUserIds.length > 0) {
+      const { data: profileRows } = await supabase
+        .from("profiles")
+        .select("id,username,avatar_url")
+        .in("id", commentUserIds);
+      const profileMap = Object.fromEntries(
+        ((profileRows ?? []) as CommentProfile[]).map((profile) => [profile.id, profile])
+      );
+      setCommentProfiles(profileMap);
+    } else {
+      setCommentProfiles({});
+    }
 
     if (uid) {
       const { data: likeData } = await supabase.from("squad_likes").select("post_id").eq("post_id", id).eq("user_id", uid).maybeSingle();
@@ -216,7 +238,7 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      <SquadFeedCard post={post} />
+      <SquadFeedCard post={post} detailMode />
 
       {editing && isOwner && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => !savingEdit && setEditing(false)}>
@@ -296,7 +318,32 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
         {message && <p className="mt-3 text-xs text-amber-300">{message}</p>}
         <div className="mt-5 space-y-3">
           {topLevel.length === 0 && <p className="py-8 text-center text-sm text-gray-600">아직 댓글이 없습니다.</p>}
-          {topLevel.map((comment) => <div key={comment.id} className="rounded-xl border border-white/[0.08] bg-black/10 p-3.5"><div className="flex items-center justify-between gap-3"><span className="text-xs font-black text-gray-200">{comment.author_name}</span><span className="text-[10px] text-gray-600">{new Date(comment.created_at).toLocaleString("ko-KR")}</span></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">{comment.content}</p><div className="mt-2 text-[10px] font-bold text-gray-600">좋아요 {comment.likes_count}</div></div>)}
+          {topLevel.map((comment) => {
+            const commentProfile = commentProfiles[comment.user_id];
+            const initial = comment.author_name.trim().slice(0, 1).toUpperCase();
+            return (
+              <div key={comment.id} className="rounded-xl border border-white/[0.08] bg-black/10 p-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <Link href={`/profile/${comment.user_id}`} className="inline-flex min-w-0 items-center gap-2 transition hover:text-lime-300">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-[10px] font-black text-lime-200">
+                      {commentProfile?.avatar_url ? (
+                        <img src={commentProfile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        initial
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-black text-gray-200">{comment.author_name}</span>
+                      {commentProfile?.username && <span className="block truncate text-[10px] text-gray-600">@{commentProfile.username}</span>}
+                    </span>
+                  </Link>
+                  <span className="shrink-0 text-[10px] text-gray-600">{new Date(comment.created_at).toLocaleString("ko-KR")}</span>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">{comment.content}</p>
+                <div className="mt-2 text-[10px] font-bold text-gray-600">좋아요 {comment.likes_count}</div>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

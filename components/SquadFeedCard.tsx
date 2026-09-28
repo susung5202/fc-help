@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PlayerArtwork from "@/components/PlayerArtwork";
+import { createClient } from "@/lib/supabase/client";
 import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 import {
   formatGalleryValue,
@@ -34,6 +35,11 @@ type FeedPlayerDetail = {
   prices: Array<string | null>;
 };
 
+type AuthorProfile = {
+  username: string | null;
+  avatar_url: string | null;
+};
+
 const FEED_DETAIL_CACHE = new Map<string, FeedPlayerDetail>();
 
 function timeAgo(value: string) {
@@ -54,8 +60,10 @@ function compactPrice(value: string | null | undefined) {
   return formatted.length > 11 ? `${formatted.slice(0, 11)}…` : formatted;
 }
 
-export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
+export default function SquadFeedCard({ post, detailMode = false }: { post: SquadFeedPost; detailMode?: boolean }) {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+  const [authorProfile, setAuthorProfile] = useState<AuthorProfile | null>(null);
   const players = post.squad_data.players ?? {};
   const slots = getGallerySlots(post.squad_data);
   const filledSlots = slots.filter((slot) => players[slot.slotId]);
@@ -103,6 +111,28 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
     };
   }, [post.id]);
 
+  useEffect(() => {
+    const authorId = post.author_id;
+    if (!authorId) {
+      setAuthorProfile(null);
+      return;
+    }
+
+    let active = true;
+    void supabase
+      .from("profiles")
+      .select("username,avatar_url")
+      .eq("id", authorId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setAuthorProfile((data as AuthorProfile | null) ?? null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [post.author_id, supabase]);
+
   function copySquad() {
     window.localStorage.setItem("fc-help-squad-v1", JSON.stringify(post.squad_data));
     router.push("/squad");
@@ -117,8 +147,16 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
           </Link>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500">
             {post.author_id ? (
-              <Link href={`/profile/${post.author_id}`} className="font-bold text-gray-300 transition hover:text-lime-300">
-                {post.author_name}
+              <Link href={`/profile/${post.author_id}`} className="inline-flex items-center gap-1.5 font-bold text-gray-300 transition hover:text-lime-300">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-[9px] font-black text-lime-200">
+                  {authorProfile?.avatar_url ? (
+                    <img src={authorProfile.avatar_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    post.author_name.trim().slice(0, 1).toUpperCase()
+                  )}
+                </span>
+                <span>{post.author_name}</span>
+                {authorProfile?.username && <span className="font-medium text-gray-600">@{authorProfile.username}</span>}
               </Link>
             ) : (
               <span className="font-bold text-gray-300">{post.author_name}</span>
@@ -136,9 +174,11 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
           <button type="button" onClick={copySquad} className="rounded-xl border border-lime-400/30 bg-lime-400/10 px-3.5 py-2.5 text-xs font-black text-lime-300 transition hover:bg-lime-400/20">
             스쿼드 복사
           </button>
-          <Link href={`/squad/gallery/${post.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-xs font-black text-gray-200 transition hover:bg-white/[0.07] hover:text-white">
-            자세히
-          </Link>
+          {!detailMode && (
+            <Link href={`/squad/gallery/${post.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-xs font-black text-gray-200 transition hover:bg-white/[0.07] hover:text-white">
+              자세히
+            </Link>
+          )}
         </div>
       </div>
 
@@ -217,7 +257,9 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
           <div className="mt-5 flex items-center gap-4 border-t border-white/10 pt-4 text-xs font-bold text-gray-400">
             <span>♥ {post.likes_count.toLocaleString("ko-KR")}</span>
             <span>댓글 {post.comments_count.toLocaleString("ko-KR")}</span>
-            <Link href={`/squad/gallery/${post.id}`} className="ml-auto rounded-lg bg-lime-300 px-3 py-2 font-black text-black transition hover:bg-lime-200">자세히 보기</Link>
+            {!detailMode && (
+              <Link href={`/squad/gallery/${post.id}`} className="ml-auto rounded-lg bg-lime-300 px-3 py-2 font-black text-black transition hover:bg-lime-200">자세히 보기</Link>
+            )}
           </div>
         </div>
       </div>

@@ -1,0 +1,50 @@
+name: Patch public profile link
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Link squad author to public profile
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("components/SquadFeedCard.tsx")
+          text = path.read_text()
+
+          old = '            <span className="font-bold text-gray-300">{post.author_name}</span>'
+          new = '''            {post.author_id ? (\n              <Link href={`/profile/${post.author_id}`} className="font-bold text-gray-300 transition hover:text-lime-300">\n                {post.author_name}\n              </Link>\n            ) : (\n              <span className="font-bold text-gray-300">{post.author_name}</span>\n            )}'''
+
+          if new in text:
+              print("author profile link already patched")
+              raise SystemExit(0)
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one author span, found {text.count(old)}")
+
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/SquadFeedCard.tsx
+          git commit -m "link squad authors to public profiles"
+          git push origin HEAD:main

@@ -116,7 +116,13 @@ export default function SquadFeedCard({ post }: { post: SquadFeedPost }) {
             {post.title}
           </Link>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500">
-            <span className="font-bold text-gray-300">{post.author_name}</span>
+            {post.author_id ? (
+              <Link href={`/profile/${post.author_id}`} className="font-bold text-gray-300 transition hover:text-lime-300">
+                {post.author_name}
+              </Link>
+            ) : (
+              <span className="font-bold text-gray-300">{post.author_name}</span>
+            )}
             <span>·</span>
             <span>{timeAgo(post.created_at)}</span>
             <span>·</span>

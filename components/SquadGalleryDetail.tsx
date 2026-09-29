@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import PlayerArtwork from "@/components/PlayerArtwork";
 import SquadFeedCard, { type SquadFeedPost } from "@/components/SquadFeedCard";
+import ReportButton from "@/components/ReportButton";
+import ThreadedComments from "@/components/ThreadedComments";
 import { formatGalleryValue, getGallerySlots } from "@/lib/fconline/squadGallery";
 import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
 
@@ -30,6 +32,7 @@ type PlayerDetail = {
 type CommentProfile = {
   id: string;
   username: string | null;
+  display_name: string;
   avatar_url: string | null;
 };
 
@@ -60,7 +63,7 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
     setLoading(true);
     const [{ data: postData, error: postError }, { data: commentData }, { data: authData }] = await Promise.all([
       supabase.from("squad_posts").select("id,author_id,author_name,title,description,formation,squad_data,player_names,team_colors,total_salary,total_value,average_ovr,likes_count,comments_count,views,created_at").eq("id", id).single(),
-      supabase.from("squad_comments").select("id,post_id,user_id,author_name,parent_id,content,likes_count,created_at").eq("post_id", id).order("created_at", { ascending: true }),
+      supabase.from("squad_comments").select("id,post_id,user_id,author_name,parent_id,content,likes_count,created_at,updated_at").eq("post_id", id).order("created_at", { ascending: true }),
       supabase.auth.getUser(),
     ]);
 
@@ -84,7 +87,7 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
     if (commentUserIds.length > 0) {
       const { data: profileRows } = await supabase
         .from("profiles")
-        .select("id,username,avatar_url")
+        .select("id,username,display_name,avatar_url")
         .in("id", commentUserIds);
       const profileMap = Object.fromEntries(
         ((profileRows ?? []) as CommentProfile[]).map((profile) => [profile.id, profile])
@@ -232,6 +235,9 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
               게시글 수정
             </button>
           )}
+          {!isOwner && (
+            <ReportButton targetType="squad_post" targetId={post.id} reportedUserId={post.author_id} viewerId={userId} className="rounded-xl border border-red-400/15 px-3 py-2.5 text-xs font-bold text-red-300/80 hover:bg-red-400/5" />
+          )}
           <button type="button" onClick={() => void toggleLike()} className={`rounded-xl border px-4 py-2.5 text-sm font-black transition ${liked ? "border-rose-300/40 bg-rose-400/10 text-rose-300" : "border-white/10 text-gray-300 hover:bg-white/5"}`}>
             {liked ? "♥ 좋아요 취소" : "♡ 좋아요"}
           </button>
@@ -312,40 +318,16 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
         </div>
       </section>
 
-      <section className="mt-5 rounded-2xl border border-white/10 bg-[#171b1f] p-4 sm:p-5">
-        <div className="flex items-center justify-between"><h2 className="text-lg font-black">댓글 <span className="text-lime-300">{comments.length}</span></h2>{!userId && <Link href="/login" className="text-xs font-bold text-lime-300">로그인 후 작성</Link>}</div>
-        <div className="mt-4 flex gap-2"><textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={500} rows={3} placeholder="스쿼드에 대한 의견을 남겨보세요." className="min-w-0 flex-1 resize-none rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none placeholder:text-gray-600 focus:border-lime-400/50" /><button type="button" onClick={() => void addComment()} className="self-stretch rounded-xl bg-lime-300 px-4 text-sm font-black text-black">등록</button></div>
-        {message && <p className="mt-3 text-xs text-amber-300">{message}</p>}
-        <div className="mt-5 space-y-3">
-          {topLevel.length === 0 && <p className="py-8 text-center text-sm text-gray-600">아직 댓글이 없습니다.</p>}
-          {topLevel.map((comment) => {
-            const commentProfile = commentProfiles[comment.user_id];
-            const initial = comment.author_name.trim().slice(0, 1).toUpperCase();
-            return (
-              <div key={comment.id} className="rounded-xl border border-white/[0.08] bg-black/10 p-3.5">
-                <div className="flex items-center justify-between gap-3">
-                  <Link href={`/profile/${comment.user_id}`} className="inline-flex min-w-0 items-center gap-2 transition hover:text-lime-300">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-[10px] font-black text-lime-200">
-                      {commentProfile?.avatar_url ? (
-                        <img src={commentProfile.avatar_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        initial
-                      )}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs font-black text-gray-200">{comment.author_name}</span>
-                      {commentProfile?.username && <span className="block truncate text-[10px] text-gray-600">@{commentProfile.username}</span>}
-                    </span>
-                  </Link>
-                  <span className="shrink-0 text-[10px] text-gray-600">{new Date(comment.created_at).toLocaleString("ko-KR")}</span>
-                </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">{comment.content}</p>
-                <div className="mt-2 text-[10px] font-bold text-gray-600">좋아요 {comment.likes_count}</div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <ThreadedComments
+        kind="squad"
+        postId={post.id}
+        initialComments={comments}
+        initialProfiles={commentProfiles}
+        viewerId={userId}
+        maxLength={500}
+        placeholder="스쿼드에 대한 의견을 남겨보세요."
+        onCountChange={(count) => setPost((current) => current ? { ...current, comments_count: count } : current)}
+      />
     </div>
   );
 }

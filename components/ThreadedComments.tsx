@@ -72,7 +72,6 @@ export default function ThreadedComments({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comments.length]);
 
-  const table = kind === "community" ? "community_comments" : "squad_comments";
   const reportType = kind === "community" ? "community_comment" : "squad_comment";
   const topLevel = comments.filter((comment) => comment.parent_id == null);
 
@@ -109,21 +108,34 @@ export default function ThreadedComments({
       authorName = String(user?.user_metadata?.display_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "구단주").slice(0, 40);
     }
 
-    const payload = kind === "squad"
-      ? { post_id: postId, user_id: viewerId, author_name: authorName.slice(0, 40), parent_id: parentId, content: text }
-      : { post_id: postId, user_id: viewerId, parent_id: parentId, content: text };
-    const selectColumns = kind === "squad"
-      ? "id,post_id,user_id,author_name,parent_id,content,likes_count,created_at,updated_at"
-      : "id,post_id,user_id,parent_id,content,created_at,updated_at";
+    let inserted: ThreadedCommentData | null = null;
+    let insertError: { message: string } | null = null;
 
-    const { data, error } = await supabase.from(table).insert(payload).select(selectColumns).single();
-    if (error || !data) {
-      setMessage(error?.message || "댓글을 등록하지 못했습니다.");
+    if (kind === "squad") {
+      const { data, error } = await supabase
+        .from("squad_comments")
+        .insert({ post_id: postId, user_id: viewerId, author_name: authorName.slice(0, 40), parent_id: parentId, content: text })
+        .select("id,post_id,user_id,author_name,parent_id,content,likes_count,created_at,updated_at")
+        .single();
+      inserted = data as ThreadedCommentData | null;
+      insertError = error;
+    } else {
+      const { data, error } = await supabase
+        .from("community_comments")
+        .insert({ post_id: postId, user_id: viewerId, parent_id: parentId, content: text })
+        .select("id,post_id,user_id,parent_id,content,created_at,updated_at")
+        .single();
+      inserted = data as ThreadedCommentData | null;
+      insertError = error;
+    }
+
+    if (insertError || !inserted) {
+      setMessage(insertError?.message || "댓글을 등록하지 못했습니다.");
       setBusy(false);
       return false;
     }
 
-    setComments((current) => [...current, data as ThreadedCommentData]);
+    setComments((current) => [...current, inserted]);
     setBusy(false);
     return true;
   }
@@ -155,11 +167,9 @@ export default function ThreadedComments({
     setBusy(true);
     setMessage("");
     const updatedAt = new Date().toISOString();
-    const { error } = await supabase
-      .from(table)
-      .update({ content: text, updated_at: updatedAt })
-      .eq("id", commentId)
-      .eq("user_id", viewerId);
+    const { error } = kind === "squad"
+      ? await supabase.from("squad_comments").update({ content: text, updated_at: updatedAt }).eq("id", commentId).eq("user_id", viewerId)
+      : await supabase.from("community_comments").update({ content: text, updated_at: updatedAt }).eq("id", commentId).eq("user_id", viewerId);
     if (error) {
       setMessage(error.message);
       setBusy(false);
@@ -180,7 +190,9 @@ export default function ThreadedComments({
     if (!window.confirm(prompt)) return;
 
     setBusy(true);
-    const { error } = await supabase.from(table).delete().eq("id", comment.id).eq("user_id", viewerId);
+    const { error } = kind === "squad"
+      ? await supabase.from("squad_comments").delete().eq("id", comment.id).eq("user_id", viewerId)
+      : await supabase.from("community_comments").delete().eq("id", comment.id).eq("user_id", viewerId);
     if (error) {
       setMessage(error.message);
       setBusy(false);

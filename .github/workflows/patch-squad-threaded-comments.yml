@@ -1,0 +1,95 @@
+name: Patch squad threaded comments
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch SquadGalleryDetail
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("components/SquadGalleryDetail.tsx")
+          text = path.read_text()
+
+          if 'kind="squad"' in text and 'ThreadedComments' in text:
+              print("Squad threaded comments already patched")
+              raise SystemExit(0)
+
+          def replace_once(old: str, new: str, label: str):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              'import SquadFeedCard, { type SquadFeedPost } from "@/components/SquadFeedCard";\n',
+              'import SquadFeedCard, { type SquadFeedPost } from "@/components/SquadFeedCard";\nimport ReportButton from "@/components/ReportButton";\nimport ThreadedComments from "@/components/ThreadedComments";\n',
+              'imports',
+          )
+
+          replace_once(
+              '''type CommentProfile = {\n  id: string;\n  username: string | null;\n  avatar_url: string | null;\n};''',
+              '''type CommentProfile = {\n  id: string;\n  username: string | null;\n  display_name: string;\n  avatar_url: string | null;\n};''',
+              'profile type',
+          )
+
+          replace_once(
+              'supabase.from("squad_comments").select("id,post_id,user_id,author_name,parent_id,content,likes_count,created_at")',
+              'supabase.from("squad_comments").select("id,post_id,user_id,author_name,parent_id,content,likes_count,created_at,updated_at")',
+              'comment select',
+          )
+
+          replace_once(
+              '.select("id,username,avatar_url")',
+              '.select("id,username,display_name,avatar_url")',
+              'profile select',
+          )
+
+          like_marker = '''          <button type="button" onClick={() => void toggleLike()} className={`rounded-xl border px-4 py-2.5 text-sm font-black transition ${liked ? "border-rose-300/40 bg-rose-400/10 text-rose-300" : "border-white/10 text-gray-300 hover:bg-white/5"}`}>'''
+          replace_once(
+              like_marker,
+              '''          {!isOwner && (\n            <ReportButton targetType="squad_post" targetId={post.id} reportedUserId={post.author_id} viewerId={userId} className="rounded-xl border border-red-400/15 px-3 py-2.5 text-xs font-bold text-red-300/80 hover:bg-red-400/5" />\n          )}\n''' + like_marker,
+              'post report button',
+          )
+
+          start_marker = '''      <section className="mt-5 rounded-2xl border border-white/10 bg-[#171b1f] p-4 sm:p-5">\n        <div className="flex items-center justify-between"><h2 className="text-lg font-black">댓글'''
+          start = text.find(start_marker)
+          if start < 0:
+              raise SystemExit("comment section start not found")
+          end_marker = '\n      </section>\n    </div>\n  );\n}'
+          end = text.find(end_marker, start)
+          if end < 0:
+              raise SystemExit("comment section end not found")
+          end += len('\n      </section>')
+          replacement = '''      <ThreadedComments\n        kind="squad"\n        postId={post.id}\n        initialComments={comments}\n        initialProfiles={commentProfiles}\n        viewerId={userId}\n        maxLength={500}\n        placeholder="스쿼드에 대한 의견을 남겨보세요."\n        onCountChange={(count) => setPost((current) => current ? { ...current, comments_count: count } : current)}\n      />'''
+          text = text[:start] + replacement + text[end:]
+
+          path.write_text(text)
+          PY
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/SquadGalleryDetail.tsx
+          git commit -m "add squad comment replies editing and reports"
+          git push

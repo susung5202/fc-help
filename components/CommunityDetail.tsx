@@ -11,6 +11,7 @@ type Post = {
   category: "free" | "question" | "tip" | "squad";
   title: string;
   content: string;
+  image_urls: string[] | null;
   created_at: string;
 };
 
@@ -54,7 +55,7 @@ export default function CommunityDetail({ id }: { id: string }) {
     setMessage("");
 
     const [{ data: postData, error: postError }, { data: commentData }, { data: likeData }, { data: authData }] = await Promise.all([
-      supabase.from("community_posts").select("id,author_id,category,title,content,created_at").eq("id", id).maybeSingle(),
+      supabase.from("community_posts").select("id,author_id,category,title,content,image_urls,created_at").eq("id", id).maybeSingle(),
       supabase.from("community_comments").select("id,post_id,user_id,content,created_at").eq("post_id", id).order("created_at", { ascending: true }),
       supabase.from("community_likes").select("post_id,user_id").eq("post_id", id),
       supabase.auth.getUser(),
@@ -129,8 +130,14 @@ export default function CommunityDetail({ id }: { id: string }) {
 
   async function deletePost() {
     if (!post || post.author_id !== viewerId || !window.confirm("게시글을 삭제할까요?")) return;
+    const { data: mediaData } = await supabase.from("community_posts").select("image_paths").eq("id", post.id).maybeSingle();
+    const paths = Array.isArray(mediaData?.image_paths) ? (mediaData.image_paths as string[]) : [];
     const { error } = await supabase.from("community_posts").delete().eq("id", post.id).eq("author_id", viewerId);
     if (error) { setMessage(error.message); return; }
+    if (paths.length > 0) {
+      const { error: storageError } = await supabase.storage.from("community-media").remove(paths);
+      if (storageError) console.warn("Community image cleanup failed", storageError);
+    }
     router.replace("/community");
     router.refresh();
   }
@@ -144,12 +151,18 @@ export default function CommunityDetail({ id }: { id: string }) {
   const author = profiles[post.author_id];
   const authorInitial = (author?.display_name || "F").trim().slice(0, 1).toUpperCase();
   const isOwner = viewerId === post.author_id;
+  const images = Array.isArray(post.image_urls) ? post.image_urls : [];
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link href="/community" className="text-sm font-bold text-gray-400 hover:text-white">← 커뮤니티</Link>
-        {isOwner && <button type="button" onClick={() => void deletePost()} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs font-bold text-red-300 hover:bg-red-400/5">게시글 삭제</button>}
+        {isOwner && (
+          <div className="flex gap-2">
+            <Link href={`/community/${post.id}/edit`} className="rounded-lg border border-white/15 px-3 py-2 text-xs font-bold text-gray-200 hover:bg-white/5">수정</Link>
+            <button type="button" onClick={() => void deletePost()} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs font-bold text-red-300 hover:bg-red-400/5">게시글 삭제</button>
+          </div>
+        )}
       </div>
 
       <article className="rounded-2xl border border-white/10 bg-[#15191d] p-4 sm:p-6">
@@ -171,6 +184,16 @@ export default function CommunityDetail({ id }: { id: string }) {
           <h1 className="text-xl font-black leading-8 text-white sm:text-2xl">{post.title}</h1>
         </div>
         <p className="mt-5 min-h-32 whitespace-pre-wrap break-words text-sm leading-7 text-gray-200 sm:text-base">{post.content}</p>
+
+        {images.length > 0 && (
+          <div className={`mt-5 grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+            {images.map((url, index) => (
+              <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                <img src={url} alt={`게시글 첨부 이미지 ${index + 1}`} className={`w-full object-cover ${images.length === 1 ? "max-h-[640px]" : "aspect-square"}`} />
+              </a>
+            ))}
+          </div>
+        )}
 
         <div className="mt-7 flex items-center gap-3 border-t border-white/10 pt-4">
           <button type="button" onClick={() => void toggleLike()} className={`rounded-xl border px-4 py-2.5 text-sm font-black transition ${liked ? "border-rose-300/35 bg-rose-400/10 text-rose-300" : "border-white/10 text-gray-300 hover:bg-white/5"}`}>

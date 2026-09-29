@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReportButton from "@/components/ReportButton";
@@ -192,7 +192,7 @@ export default function ThreadedComments({
     setBusy(false);
   }
 
-  function renderComment(comment: ThreadedCommentData, isReply: boolean) {
+  function renderComment(comment: ThreadedCommentData, isReply: boolean): ReactNode {
     const profile = profiles[comment.user_id];
     const displayName = profile?.display_name || comment.author_name || "구단주";
     const initial = displayName.trim().slice(0, 1).toUpperCase();

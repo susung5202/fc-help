@@ -1,0 +1,58 @@
+name: Fix threaded comments types
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fix Supabase typed branches
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('components/ThreadedComments.tsx')
+          s = p.read_text()
+
+          old = '''    const payload = kind === "squad"\n      ? { post_id: postId, user_id: viewerId, author_name: authorName.slice(0, 40), parent_id: parentId, content: text }\n      : { post_id: postId, user_id: viewerId, parent_id: parentId, content: text };\n    const selectColumns = kind === "squad"\n      ? "id,post_id,user_id,author_name,parent_id,content,likes_count,created_at,updated_at"\n      : "id,post_id,user_id,parent_id,content,created_at,updated_at";\n\n    const { data, error } = await supabase.from(table).insert(payload).select(selectColumns).single();\n    if (error || !data) {\n      setMessage(error?.message || "댓글을 등록하지 못했습니다.");\n      setBusy(false);\n      return false;\n    }\n\n    setComments((current) => [...current, data as ThreadedCommentData]);'''
+
+          new = '''    let inserted: ThreadedCommentData | null = null;\n    let insertError: { message: string } | null = null;\n\n    if (kind === "squad") {\n      const { data, error } = await supabase\n        .from("squad_comments")\n        .insert({ post_id: postId, user_id: viewerId, author_name: authorName.slice(0, 40), parent_id: parentId, content: text })\n        .select("id,post_id,user_id,author_name,parent_id,content,likes_count,created_at,updated_at")\n        .single();\n      inserted = data as ThreadedCommentData | null;\n      insertError = error;\n    } else {\n      const { data, error } = await supabase\n        .from("community_comments")\n        .insert({ post_id: postId, user_id: viewerId, parent_id: parentId, content: text })\n        .select("id,post_id,user_id,parent_id,content,created_at,updated_at")\n        .single();\n      inserted = data as ThreadedCommentData | null;\n      insertError = error;\n    }\n\n    if (insertError || !inserted) {\n      setMessage(insertError?.message || "댓글을 등록하지 못했습니다.");\n      setBusy(false);\n      return false;\n    }\n\n    setComments((current) => [...current, inserted]);'''
+
+          if old not in s:
+              raise SystemExit('target block not found')
+          s = s.replace(old, new, 1)
+
+          old2 = '''    const { error } = await supabase\n      .from(table)\n      .update({ content: text, updated_at: updatedAt })\n      .eq("id", commentId)\n      .eq("user_id", viewerId);'''
+          new2 = '''    const { error } = kind === "squad"\n      ? await supabase.from("squad_comments").update({ content: text, updated_at: updatedAt }).eq("id", commentId).eq("user_id", viewerId)\n      : await supabase.from("community_comments").update({ content: text, updated_at: updatedAt }).eq("id", commentId).eq("user_id", viewerId);'''
+          if old2 not in s:
+              raise SystemExit('update block not found')
+          s = s.replace(old2, new2, 1)
+
+          old3 = '''    const { error } = await supabase.from(table).delete().eq("id", comment.id).eq("user_id", viewerId);'''
+          new3 = '''    const { error } = kind === "squad"\n      ? await supabase.from("squad_comments").delete().eq("id", comment.id).eq("user_id", viewerId)\n      : await supabase.from("community_comments").delete().eq("id", comment.id).eq("user_id", viewerId);'''
+          if old3 not in s:
+              raise SystemExit('delete block not found')
+          s = s.replace(old3, new3, 1)
+
+          s = s.replace('  const table = kind === "community" ? "community_comments" : "squad_comments";\n', '')
+          p.write_text(s)
+          PY
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/ThreadedComments.tsx
+          git commit -m "fix threaded comment Supabase types"
+          git push

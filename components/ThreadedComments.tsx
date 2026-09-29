@@ -68,7 +68,9 @@ export default function ThreadedComments({
 
   useEffect(() => {
     onCountChange?.(comments.length);
-  }, [comments.length, onCountChange]);
+    // onCountChange may be an inline parent callback; count changes are the only trigger we need.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comments.length]);
 
   const table = kind === "community" ? "community_comments" : "squad_comments";
   const reportType = kind === "community" ? "community_comment" : "squad_comment";

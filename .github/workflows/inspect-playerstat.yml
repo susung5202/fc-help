@@ -7,32 +7,53 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect FC Online playerstat AJAX
+      - name: Inspect selected teamcolor players
         run: |
           python - <<'PY'
-          import requests,re,urllib.parse
+          import requests,re,html as h
+          from urllib.parse import urlencode
           headers={'User-Agent':'Mozilla/5.0','Accept-Language':'ko-KR,ko;q=0.9'}
           base='https://fconline.nexon.com/DataCenter/PlayerStat'
-          r=requests.get(base,headers=headers,timeout=30)
-          html=r.text
-          print('PAGE',r.status_code,len(html))
-          needles=['GetPlayerStatList','SetSearchForStat','SetTeamColorId']
-          for needle in needles:
-            print('\nINLINE',needle)
-            for m in list(re.finditer(needle,html,re.I))[:10]:
-              print(html[max(0,m.start()-1200):m.start()+2500])
-          scripts=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',html,re.I)
-          print('\nSCRIPTS',len(scripts))
-          for src in scripts:
-            url=urllib.parse.urljoin(base,src)
-            try:
-              t=requests.get(url,headers=headers,timeout=30).text
-            except Exception:
-              continue
-            if any(n in t for n in needles):
-              print('\nSCRIPT',url,'LEN',len(t))
-              for needle in needles:
-                for m in list(re.finditer(needle,t,re.I))[:5]:
-                  print('\nFOUND',needle,'AT',m.start())
-                  print(t[max(0,m.start()-1800):m.start()+5000])
+          s=requests.Session(); s.headers.update(headers)
+          page=s.get(base,timeout=30).text
+          form=re.search(r'<form[^>]+id=["\']form1["\'][^>]*>([\s\S]*?)</form>',page,re.I)
+          body=form.group(1) if form else ''
+          pairs=[]
+          for tag in re.findall(r'<input\b[^>]*>',body,re.I):
+            nm=re.search(r'\bname=["\']([^"\']+)["\']',tag,re.I)
+            if not nm: continue
+            typ=(re.search(r'\btype=["\']([^"\']+)["\']',tag,re.I).group(1).lower() if re.search(r'\btype=["\']([^"\']+)["\']',tag,re.I) else 'text')
+            if typ in ('checkbox','radio') and not re.search(r'\bchecked(?:\s*=|\s|>)',tag,re.I): continue
+            val=re.search(r'\bvalue=["\']([^"\']*)["\']',tag,re.I)
+            pairs.append((nm.group(1),h.unescape(val.group(1) if val else '')))
+          # override team color and stable defaults relevant to AJAX
+          override={'teamcolorid':'40417','strTeamColorName':'22-23 레알 마드리드','n1Strong':'1','n1Grow':'0','n1PlayType':'50'}
+          names={k for k,v in pairs}
+          pairs=[(k,override.get(k,v)) for k,v in pairs]
+          for k,v in override.items():
+            if k not in names: pairs.append((k,v))
+          pairs.append(('n4PageNo','1'))
+          print('FORM_PAIRS')
+          print(urlencode(pairs))
+          url='https://fconline.nexon.com/datacenter/PlayerRankerStatList'
+          r=s.post(url,data=pairs,headers={**headers,'X-Requested-With':'XMLHttpRequest','Referer':base},timeout=30)
+          text=r.text
+          print('STATUS',r.status_code,'LEN',len(text),'TYPE',r.headers.get('content-type'))
+          # likely identifiers / onclicks / images / names
+          patterns=[
+            r'GetPlayerDetail\([^)]*\)',
+            r'\bspid\s*[=:]\s*["\']?(\d+)',
+            r'PlayerInfo[^"\']*spid=(\d+)',
+            r'Strong(\d+)',
+            r'data-spid=["\']?(\d+)',
+          ]
+          for pat in patterns:
+            vals=[]
+            for m in re.finditer(pat,text,re.I):
+              v=m.group(0)
+              if v not in vals: vals.append(v)
+            print('\nPAT',pat,'COUNT',len(vals))
+            print('\n'.join(vals[:30]))
+          print('\nFIRST_HTML')
+          print(text[:18000])
           PY

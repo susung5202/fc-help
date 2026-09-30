@@ -1,5 +1,10 @@
 import Link from "next/link";
+import PlayerArtwork from "@/components/PlayerArtwork";
 import PushNotificationSetup from "@/components/PushNotificationSetup";
+import { getPlayerRankings, type PlayerRankingItem } from "@/lib/fconline/playerRankings";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export const revalidate = 60;
 
 const QUICK_LINKS = [
   {
@@ -32,7 +37,96 @@ const QUICK_LINKS = [
   },
 ] as const;
 
-export default function HomePage() {
+type RefreshReport = {
+  id: number;
+  player_spid: number;
+  player_name: string;
+  season_name: string;
+  hour_type: string;
+  refresh_minute: number;
+  observed_at: string;
+  created_at: string;
+};
+
+type SquadPost = {
+  id: string;
+  author_name: string;
+  title: string;
+  formation: string;
+  likes_count: number;
+  comments_count: number;
+  views: number;
+  created_at: string;
+};
+
+type CommunityPost = {
+  id: string;
+  category: string;
+  title: string;
+  created_at: string;
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  free: "자유",
+  question: "질문",
+  tip: "팁·정보",
+  squad: "스쿼드",
+};
+
+async function loadLobbyData() {
+  const supabase = createAdminClient();
+
+  const [rankings, refreshResult, squadResult, communityResult] = await Promise.all([
+    getPlayerRankings(),
+    supabase
+      .from("refresh_reports")
+      .select("id,player_spid,player_name,season_name,hour_type,refresh_minute,observed_at,created_at")
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("squad_posts")
+      .select("id,author_name,title,formation,likes_count,comments_count,views,created_at")
+      .eq("is_public", true)
+      .order("likes_count", { ascending: false })
+      .order("views", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("community_posts")
+      .select("id,category,title,created_at")
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+
+  if (refreshResult.error) console.error("Failed to load refresh lobby data", refreshResult.error);
+  if (squadResult.error) console.error("Failed to load squad lobby data", squadResult.error);
+  if (communityResult.error) console.error("Failed to load community lobby data", communityResult.error);
+
+  return {
+    popularPlayers: rankings.popular,
+    refreshReports: (refreshResult.data ?? []) as RefreshReport[],
+    squads: (squadResult.data ?? []) as SquadPost[],
+    communityPosts: (communityResult.data ?? []) as CommunityPost[],
+  };
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+function refreshTimeText(report: RefreshReport) {
+  const hour = report.hour_type === "odd" ? "홀수시" : report.hour_type === "even" ? "짝수시" : report.hour_type;
+  return `${hour} ${String(report.refresh_minute).padStart(2, "0")}분`;
+}
+
+export default async function HomePage() {
+  const { popularPlayers, refreshReports, squads, communityPosts } = await loadLobbyData();
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0f1115] text-white">
       <div
@@ -178,6 +272,140 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16">
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-black tracking-[0.2em] text-cyan-300">UPDATED DATA</p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">지금 FC Help에서는</h2>
+          </div>
+          <p className="max-w-md text-xs leading-5 text-gray-600 sm:text-sm sm:leading-6">
+            FC Online 공식 데이터와 FC Help에 실제로 쌓인 최신 데이터를 보여줍니다.
+          </p>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-2">
+          <LobbyPanel
+            eyebrow="PLAYER RANKING"
+            title="최근 인기 선수"
+            href="/players"
+            action="선수 DB 전체 보기"
+          >
+            {popularPlayers.length > 0 ? (
+              <div className="divide-y divide-white/[0.07]">
+                {popularPlayers.slice(0, 5).map((player, index) => (
+                  <PopularPlayerRow key={`${player.spid}-${player.grade}`} player={player} rank={index + 1} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="FC Online 인기 선수 데이터를 불러오지 못했습니다." />
+            )}
+          </LobbyPanel>
+
+          <LobbyPanel
+            eyebrow="REFRESH REPORT"
+            title="최근 갱신 제보"
+            href="/refresh"
+            action="갱신시간 전체 보기"
+          >
+            {refreshReports.length > 0 ? (
+              <div className="divide-y divide-white/[0.07]">
+                {refreshReports.map((report) => (
+                  <Link
+                    key={report.id}
+                    href="/refresh"
+                    className="flex items-center gap-4 px-5 py-4 transition hover:bg-white/[0.03] sm:px-6"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-black text-gray-100">{report.player_name}</span>
+                        <span className="shrink-0 rounded-md border border-cyan-300/15 bg-cyan-300/[0.05] px-2 py-0.5 text-[9px] font-black text-cyan-200">
+                          {refreshTimeText(report)}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-[11px] text-gray-600">{report.season_name}</p>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-bold text-gray-700">{formatDate(report.created_at)}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="아직 등록된 갱신 제보가 없습니다." />
+            )}
+          </LobbyPanel>
+
+          <LobbyPanel
+            eyebrow="SQUAD GALLERY"
+            title="인기 스쿼드"
+            href="/squad/gallery"
+            action="스쿼드 갤러리 보기"
+          >
+            {squads.length > 0 ? (
+              <div className="divide-y divide-white/[0.07]">
+                {squads.map((squad, index) => (
+                  <Link
+                    key={squad.id}
+                    href={`/squad/gallery/${squad.id}`}
+                    className="flex items-center gap-4 px-5 py-4 transition hover:bg-white/[0.03] sm:px-6"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-violet-300/15 bg-violet-300/[0.05] text-[10px] font-black text-violet-200">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black text-gray-100">{squad.title}</p>
+                      <p className="mt-1 truncate text-[11px] text-gray-600">
+                        {squad.author_name} · {squad.formation || "포메이션 미지정"}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right text-[10px] font-bold text-gray-600">
+                      <p>♥ {Number(squad.likes_count || 0).toLocaleString("ko-KR")}</p>
+                      <p className="mt-1">조회 {Number(squad.views || 0).toLocaleString("ko-KR")}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="아직 공개된 스쿼드가 없습니다." />
+            )}
+          </LobbyPanel>
+
+          <LobbyPanel
+            eyebrow="COMMUNITY"
+            title="최신 커뮤니티"
+            href="/community"
+            action="커뮤니티 전체 보기"
+          >
+            {communityPosts.length > 0 ? (
+              <div className="divide-y divide-white/[0.07]">
+                {communityPosts.map((post) => (
+                  <Link
+                    key={post.id}
+                    href={`/community/${post.id}`}
+                    className="flex items-center gap-4 px-5 py-4 transition hover:bg-white/[0.03] sm:px-6"
+                  >
+                    <span className="shrink-0 rounded-md border border-amber-300/15 bg-amber-300/[0.05] px-2 py-1 text-[9px] font-black text-amber-200">
+                      {CATEGORY_LABEL[post.category] ?? post.category}
+                    </span>
+                    <p className="min-w-0 flex-1 truncate text-sm font-black text-gray-100">{post.title}</p>
+                    <span className="shrink-0 text-[10px] font-bold text-gray-700">{formatDate(post.created_at)}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
+                <p className="text-sm font-black text-gray-300">아직 작성된 커뮤니티 글이 없습니다.</p>
+                <p className="mt-2 text-xs text-gray-600">첫 글을 작성해서 FC Help 커뮤니티를 시작해보세요.</p>
+                <Link
+                  href="/community/write"
+                  className="mt-5 rounded-xl bg-amber-300 px-4 py-2.5 text-xs font-black text-black transition hover:bg-amber-200"
+                >
+                  첫 글 작성하기
+                </Link>
+              </div>
+            )}
+          </LobbyPanel>
+        </div>
+      </section>
+
       <section className="relative mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 sm:pb-24 sm:pt-10">
         <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
           <div className="overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-[#192118] via-[#151a18] to-[#13171b] p-6 sm:p-8">
@@ -263,6 +491,70 @@ function FeatureCard({
         <span className="transition group-hover:translate-x-1 group-hover:text-lime-300">→</span>
       </div>
     </Link>
+  );
+}
+
+function LobbyPanel({
+  eyebrow,
+  title,
+  href,
+  action,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  href: string;
+  action: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#15191d]">
+      <div className="flex items-end justify-between gap-4 border-b border-white/[0.08] px-5 py-5 sm:px-6">
+        <div>
+          <p className="text-[9px] font-black tracking-[0.2em] text-gray-600">{eyebrow}</p>
+          <h3 className="mt-1 text-xl font-black tracking-tight">{title}</h3>
+        </div>
+        <Link href={href} className="shrink-0 text-[10px] font-black text-gray-500 transition hover:text-white">
+          {action} →
+        </Link>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function PopularPlayerRow({ player, rank }: { player: PlayerRankingItem; rank: number }) {
+  return (
+    <Link
+      href={`/players/${player.spid}`}
+      className="group flex items-center gap-3 px-5 py-3.5 transition hover:bg-white/[0.03] sm:px-6"
+    >
+      <span className={`w-5 text-center text-xs font-black ${rank === 1 ? "text-lime-300" : "text-gray-600"}`}>
+        {rank}
+      </span>
+      <div className="flex h-12 w-12 shrink-0 items-end justify-center overflow-hidden rounded-xl bg-black/20">
+        <PlayerArtwork
+          spid={player.spid}
+          alt={player.name}
+          className="h-14 w-auto max-w-none object-contain transition group-hover:scale-105"
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-black text-gray-100">{player.name}</p>
+        <p className="mt-1 text-[10px] font-bold text-gray-600">+{player.grade} 강화 · 전일 공식경기</p>
+      </div>
+      <span className="shrink-0 rounded-lg border border-lime-300/10 bg-lime-300/[0.04] px-2.5 py-1.5 text-[10px] font-black text-lime-200">
+        {Number(player.metric).toLocaleString("ko-KR")}회
+      </span>
+    </Link>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex min-h-64 items-center justify-center px-6 text-center text-sm font-bold text-gray-600">
+      {text}
+    </div>
   );
 }
 

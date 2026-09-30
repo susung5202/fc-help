@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import MyPageNav from "@/components/MyPageNav";
 import { createClient } from "@/lib/supabase/client";
 
 type Report = {
@@ -132,7 +133,10 @@ export default function MyReportsPage() {
             <h1 className="mt-1 text-2xl font-black sm:text-3xl">내 신고내역</h1>
             <p className="mt-2 text-sm text-gray-500">내가 접수한 신고와 처리 상태를 확인할 수 있습니다.</p>
           </div>
-          <Link href="/mypage" className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 hover:bg-white/5">← 마이페이지</Link>
+        </div>
+
+        <div className="mt-6">
+          <MyPageNav />
         </div>
 
         {message && <p className="mt-5 rounded-xl border border-amber-300/15 bg-amber-300/5 px-4 py-3 text-sm text-amber-200">{message}</p>}

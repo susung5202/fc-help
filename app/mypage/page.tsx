@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PlayerArtwork from "@/components/PlayerArtwork";
+import MyPageNav from "@/components/MyPageNav";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatGalleryValue,
@@ -379,7 +380,9 @@ export default function MyPage() {
   return (
     <main className="min-h-screen bg-[#0f1115] text-white">
       <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-        <section className="border-b border-white/10 pb-7 sm:pb-9">
+        <MyPageNav />
+
+        <section className="mt-6 border-b border-white/10 pb-7 sm:mt-8 sm:pb-9">
           <div className="flex items-start gap-5 sm:gap-10">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-gradient-to-br from-lime-300/25 via-[#1d2920] to-[#111318] text-3xl font-black text-lime-200 sm:h-32 sm:w-32 sm:text-5xl">
               {profile.avatar_url ? (

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import MyPageNav from "@/components/MyPageNav";
 import { createClient } from "@/lib/supabase/client";
 
 type ActivityTab = "posts" | "comments" | "likes";
@@ -334,9 +335,10 @@ export default function MyActivityPage() {
             <h1 className="mt-1 text-3xl font-black">내 활동</h1>
             <p className="mt-2 text-sm text-gray-500">내가 작성하거나 좋아요한 커뮤니티·스쿼드 활동을 모아봅니다.</p>
           </div>
-          <Link href="/mypage" className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-black text-gray-300 hover:bg-white/5">
-            ← 마이페이지
-          </Link>
+        </div>
+
+        <div className="mt-6">
+          <MyPageNav />
         </div>
 
         {error && (

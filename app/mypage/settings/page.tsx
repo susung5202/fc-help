@@ -119,7 +119,7 @@ export default function AccountSettingsPage() {
     setBusy("password");
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
-      currentPassword,
+      current_password: currentPassword,
     });
     setBusy(null);
 

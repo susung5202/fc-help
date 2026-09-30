@@ -271,9 +271,9 @@ export default function MyPage() {
   async function saveProfile() {
     if (!userId || !profile) return;
     const username = usernameInput.trim().replace(/^@/, "").toLowerCase();
-    const displayName = displayNameInput.trim();
+    const displayName = profile.display_name;
     const bio = bioInput.trim();
-    const fcNickname = fcNicknameInput.trim();
+    const fcNickname = profile.fconline_nickname ?? "";
 
     if (!USERNAME_PATTERN.test(username)) {
       setEditorError("아이디는 영문 소문자, 숫자, 밑줄(_)만 사용해 3~20자로 입력해주세요.");
@@ -395,6 +395,9 @@ export default function MyPage() {
                 <button type="button" onClick={openProfileEditor} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-gray-100 transition hover:bg-white/15">
                   프로필 편집
                 </button>
+                <Link href="/mypage/settings" className="rounded-lg border border-lime-300/15 bg-lime-300/[0.04] px-3 py-2 text-xs font-black text-lime-200 transition hover:bg-lime-300/[0.08]">
+                  계정 설정
+                </Link>
                 <button type="button" onClick={() => void logout()} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-500 transition hover:bg-white/5 hover:text-gray-300">
                   로그아웃
                 </button>
@@ -427,14 +430,14 @@ export default function MyPage() {
                 )}
               </div>
               {profile.fconline_nickname && (
-                <button type="button" onClick={openProfileEditor} className="text-xs font-black text-lime-300">연동 수정 →</button>
+                <Link href="/mypage/settings" className="text-xs font-black text-lime-300">연동 수정 →</Link>
               )}
             </div>
 
             {!profile.fconline_nickname ? (
-              <button type="button" onClick={openProfileEditor} className="mt-4 rounded-xl bg-lime-300 px-4 py-2.5 text-xs font-black text-black transition hover:bg-lime-200">
+              <Link href="/mypage/settings" className="mt-4 inline-block rounded-xl bg-lime-300 px-4 py-2.5 text-xs font-black text-black transition hover:bg-lime-200">
                 FC Online 닉네임 연결
-              </button>
+              </Link>
             ) : fcLoading ? (
               <p className="mt-4 text-xs font-bold text-gray-500">공식경기 정보를 불러오는 중...</p>
             ) : fcError ? (
@@ -507,15 +510,16 @@ export default function MyPage() {
               <button type="button" disabled={saving} onClick={() => setEditing(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-2xl text-gray-400">×</button>
             </div>
 
-            <label className="mt-6 block text-xs font-bold text-gray-400">FC Help 아이디</label>
+            <label className="mt-6 block text-xs font-bold text-gray-400">공개 프로필 아이디</label>
             <div className="mt-2 flex items-center rounded-xl border border-white/10 bg-[#0f1115] px-3 focus-within:border-lime-300/40">
               <span className="text-sm font-bold text-gray-600">@</span>
               <input value={usernameInput} onChange={(event) => setUsernameInput(event.target.value.toLowerCase())} maxLength={20} className="min-w-0 flex-1 bg-transparent px-1 py-3 text-sm outline-none" placeholder="fchelp_id" />
             </div>
-            <p className="mt-1 text-[10px] text-gray-600">영문 소문자, 숫자, 밑줄(_) · 3~20자</p>
+            <p className="mt-1 text-[10px] text-gray-600">영문 소문자, 숫자, 밑줄(_) · 3~20자 · 로그인 아이디와 별개</p>
 
-            <label className="mt-4 block text-xs font-bold text-gray-400">닉네임</label>
-            <input value={displayNameInput} onChange={(event) => setDisplayNameInput(event.target.value)} maxLength={20} className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-300/40" />
+            <div className="mt-4 rounded-xl border border-lime-300/10 bg-lime-300/[0.03] px-3 py-3 text-xs text-gray-400">
+              사이트 닉네임은 FC Online 닉네임과 동일하게 사용합니다. 변경은 <Link href="/mypage/settings" className="font-black text-lime-300">계정 설정</Link>에서 할 수 있습니다.
+            </div>
 
             <label className="mt-4 block text-xs font-bold text-gray-400">자기소개</label>
             <textarea value={bioInput} onChange={(event) => setBioInput(event.target.value)} maxLength={150} rows={4} placeholder="스쿼드 취향이나 한마디를 적어보세요." className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm leading-6 outline-none focus:border-lime-300/40" />
@@ -566,13 +570,6 @@ export default function MyPage() {
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-lime-300/15 bg-lime-300/[0.04] p-4">
-              <p className="text-xs font-black text-lime-300">FC Online 연동</p>
-              <label className="mt-3 block text-[10px] font-bold text-gray-500">구단주 닉네임</label>
-              <input value={fcNicknameInput} onChange={(event) => setFcNicknameInput(event.target.value)} maxLength={30} placeholder="FC Online 닉네임" className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-300/40" />
-              <p className="mt-2 text-[10px] leading-5 text-gray-600">저장하면 NEXON Open API에서 구단주 정보와 1대1 공식경기 등급을 조회합니다. 빈칸으로 저장하면 연동이 해제됩니다.</p>
             </div>
 
             {editorError && (

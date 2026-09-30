@@ -31,7 +31,9 @@ export default function AccountSettingsPage() {
   const [fcNickname, setFcNickname] = useState("");
   const [linkedFcNickname, setLinkedFcNickname] = useState("");
   const [linkedOuid, setLinkedOuid] = useState("");
-  const [busy, setBusy] = useState<"email" | "password" | "fc" | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [busy, setBusy] = useState<"email" | "password" | "fc" | "delete" | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -71,6 +73,11 @@ export default function AccountSettingsPage() {
   function resetNotice() {
     setMessage("");
     setError("");
+  }
+
+  async function getAccessToken() {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? "";
   }
 
   async function changeEmail() {
@@ -117,26 +124,30 @@ export default function AccountSettingsPage() {
     }
 
     setBusy("password");
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-      current_password: currentPassword,
-    });
-    setBusy(null);
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) throw new Error("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
 
-    if (updateError) {
-      const lowered = updateError.message.toLowerCase();
-      setError(
-        lowered.includes("current") || lowered.includes("password")
-          ? "현재 비밀번호가 맞는지 확인해주세요."
-          : updateError.message
-      );
-      return;
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "비밀번호 변경에 실패했습니다.");
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage("비밀번호를 변경했습니다.");
+    } catch (changeError) {
+      setError(changeError instanceof Error ? changeError.message : "비밀번호 변경에 실패했습니다.");
+    } finally {
+      setBusy(null);
     }
-
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setMessage("비밀번호를 변경했습니다.");
   }
 
   async function relinkFcOnline() {
@@ -150,8 +161,7 @@ export default function AccountSettingsPage() {
 
     setBusy("fc");
     try {
-      const { data } = await supabase.auth.getSession();
-      const accessToken = data.session?.access_token;
+      const accessToken = await getAccessToken();
       if (!accessToken) throw new Error("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
 
       const response = await fetch(`/api/fconline/profile?nickname=${encodeURIComponent(nickname)}`, {
@@ -198,6 +208,45 @@ export default function AccountSettingsPage() {
     } catch (relinkError) {
       setError(relinkError instanceof Error ? relinkError.message : "FC Online 연동에 실패했습니다.");
     } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteAccount() {
+    resetNotice();
+    if (!deletePassword) {
+      setError("회원탈퇴를 위해 현재 비밀번호를 입력해주세요.");
+      return;
+    }
+    if (deleteConfirmation.trim() !== "회원탈퇴") {
+      setError("확인란에 '회원탈퇴'를 정확히 입력해주세요.");
+      return;
+    }
+
+    setBusy("delete");
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) throw new Error("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
+
+      const response = await fetch("/api/auth/delete-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          currentPassword: deletePassword,
+          confirmation: deleteConfirmation.trim(),
+        }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "회원탈퇴에 실패했습니다.");
+
+      await supabase.auth.signOut().catch(() => undefined);
+      router.replace("/");
+      router.refresh();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "회원탈퇴에 실패했습니다.");
       setBusy(null);
     }
   }
@@ -271,6 +320,7 @@ export default function AccountSettingsPage() {
 
           <section className="rounded-2xl border border-white/10 bg-[#171b1f] p-5 sm:p-6">
             <h2 className="text-lg font-black">비밀번호 변경</h2>
+            <p className="mt-1 text-xs text-gray-500">현재 비밀번호를 다시 확인한 뒤 새 비밀번호로 변경합니다.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <input
                 type="password"
@@ -341,6 +391,39 @@ export default function AccountSettingsPage() {
               className="mt-3 rounded-xl bg-lime-300 px-4 py-2.5 text-xs font-black text-black disabled:opacity-40"
             >
               {busy === "fc" ? "구단주 확인 중..." : "FC Online 다시 연동"}
+            </button>
+          </section>
+
+          <section className="rounded-2xl border border-red-400/20 bg-red-400/[0.035] p-5 sm:p-6">
+            <h2 className="text-lg font-black text-red-200">회원탈퇴</h2>
+            <p className="mt-2 text-xs leading-5 text-red-200/60">
+              계정, 프로필, 작성한 커뮤니티 글·댓글, 스쿼드 게시물, 좋아요와 알림 정보가 삭제됩니다. 갱신시간 제보 기록은 통계 유지를 위해 계정 연결만 제거한 뒤 익명 기록으로 남습니다. 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                placeholder="현재 비밀번호"
+                autoComplete="current-password"
+                className="rounded-xl border border-red-300/15 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-red-300/40"
+              />
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                placeholder="확인을 위해 회원탈퇴 입력"
+                autoComplete="off"
+                className="rounded-xl border border-red-300/15 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-red-300/40"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => void deleteAccount()}
+              disabled={busy !== null || deleteConfirmation.trim() !== "회원탈퇴" || !deletePassword}
+              className="mt-3 rounded-xl bg-red-500 px-4 py-2.5 text-xs font-black text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              {busy === "delete" ? "계정 삭제 중..." : "영구적으로 회원탈퇴"}
             </button>
           </section>
         </div>

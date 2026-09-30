@@ -6,34 +6,34 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const revalidate = 60;
 
-const QUICK_LINKS = [
+const SERVICES = [
   {
     href: "/players",
-    number: "01",
-    title: "선수 DB",
-    description: "선수 검색 · 시즌 · OVR · 공식경기 데이터",
-    accent: "text-lime-300",
+    code: "01",
+    title: "PLAYER DB",
+    label: "선수 DB",
+    description: "시즌 · OVR · 공식경기 데이터",
   },
   {
     href: "/refresh",
-    number: "02",
-    title: "갱신시간",
-    description: "유저 제보 기반 갱신시간 · 브라우저 알림",
-    accent: "text-cyan-300",
+    code: "02",
+    title: "REFRESH",
+    label: "갱신시간",
+    description: "유저 제보 · 갱신 알림",
   },
   {
     href: "/squad",
-    number: "03",
-    title: "스쿼드",
-    description: "스쿼드 제작 · 공유 · 다른 구단주 스쿼드 탐색",
-    accent: "text-violet-300",
+    code: "03",
+    title: "SQUAD LAB",
+    label: "스쿼드",
+    description: "제작 · 저장 · 갤러리",
   },
   {
     href: "/community",
-    number: "04",
-    title: "커뮤니티",
-    description: "자유 · 질문 · 팁 · 스쿼드 이야기",
-    accent: "text-amber-300",
+    code: "04",
+    title: "LOUNGE",
+    label: "커뮤니티",
+    description: "질문 · 팁 · 자유 · 피드백",
   },
 ] as const;
 
@@ -113,10 +113,7 @@ async function loadLobbyData() {
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return date.toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" });
 }
 
 function refreshTimeText(report: RefreshReport) {
@@ -128,170 +125,125 @@ export default async function HomePage() {
   const { popularPlayers, refreshReports, squads, communityPosts } = await loadLobbyData();
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#0f1115] text-white">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-[720px] opacity-40"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 18% 10%, rgba(163,230,53,0.20), transparent 32%), radial-gradient(circle at 82% 22%, rgba(34,211,238,0.10), transparent 28%), linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
-          backgroundSize: "auto, auto, 42px 42px, 42px 42px",
-        }}
-      />
+    <main className="min-h-screen overflow-hidden bg-[#08111f] text-[#f5f7fb]">
+      <section className="relative border-b border-[#23324d]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-70"
+          style={{
+            backgroundImage:
+              "linear-gradient(120deg, rgba(58,111,255,0.12), transparent 42%), linear-gradient(rgba(116,145,196,0.055) 1px, transparent 1px)",
+            backgroundSize: "auto, 100% 64px",
+          }}
+        />
 
-      <section className="relative mx-auto max-w-7xl px-4 pb-10 pt-12 sm:px-6 sm:pb-16 sm:pt-20 lg:pt-24">
-        <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-lime-300/15 bg-lime-300/[0.06] px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-lime-300 sm:text-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-lime-300 shadow-[0_0_14px_rgba(190,242,100,0.9)]" />
-              FC ONLINE DATA HUB
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1.2fr_0.8fr] lg:gap-0 lg:py-20">
+          <div className="lg:border-r lg:border-[#23324d] lg:pr-14">
+            <div className="flex items-center gap-3 text-[10px] font-black tracking-[0.24em] text-[#7fa6ff] sm:text-xs">
+              <span className="h-px w-10 bg-[#3f75ff]" />
+              FC HELP / CONTROL DESK
             </div>
 
-            <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.045em] sm:text-6xl lg:text-7xl">
-              찾는 시간은 줄이고,
+            <h1 className="mt-7 max-w-4xl text-4xl font-black leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-[72px]">
+              선수부터 스쿼드까지,
               <br />
-              <span className="text-lime-300">플레이에 집중하세요.</span>
+              <span className="text-[#6f98ff]">한 화면에서 컨트롤.</span>
             </h1>
 
-            <p className="mt-6 max-w-2xl text-sm leading-7 text-gray-400 sm:text-base sm:leading-8">
-              FC Help에서 선수 정보, 갱신시간, 스쿼드 제작과 커뮤니티를 한 번에 이용하세요.
-              필요한 정보까지 가장 짧은 동선을 목표로 만듭니다.
+            <p className="mt-6 max-w-2xl text-sm leading-7 text-[#8795ad] sm:text-base sm:leading-8">
+              FC Online 데이터를 찾고, 갱신시간을 확인하고, 스쿼드를 만들고, 다른 구단주와 정보를 나누는 곳.
+              FC Help는 필요한 기능을 빠르게 연결하는 플레이어 도구함입니다.
             </p>
 
-            <form
-              action="/players"
-              method="GET"
-              className="mt-8 flex max-w-2xl items-center rounded-2xl border border-white/10 bg-[#171b20]/90 p-2 shadow-2xl shadow-black/20 backdrop-blur"
-            >
-              <div className="hidden pl-3 pr-1 text-gray-500 sm:block" aria-hidden="true">
-                ⌕
+            <form action="/players" method="GET" className="mt-9 max-w-2xl border border-[#2b3c5c] bg-[#0b1728]">
+              <div className="flex items-stretch">
+                <div className="hidden w-14 items-center justify-center border-r border-[#2b3c5c] text-xs font-black text-[#58719a] sm:flex">
+                  P
+                </div>
+                <input
+                  type="text"
+                  name="q"
+                  placeholder="선수 이름을 입력하세요"
+                  className="min-w-0 flex-1 bg-transparent px-4 py-4 text-sm font-bold text-white outline-none placeholder:font-medium placeholder:text-[#53637d] sm:px-5 sm:py-5"
+                />
+                <button
+                  type="submit"
+                  className="shrink-0 bg-[#3f75ff] px-5 text-xs font-black text-white transition hover:bg-[#5b88ff] sm:px-7 sm:text-sm"
+                >
+                  SEARCH →
+                </button>
               </div>
-              <input
-                type="text"
-                name="q"
-                placeholder="선수 이름을 검색하세요"
-                className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-semibold text-white outline-none placeholder:font-medium placeholder:text-gray-600 sm:px-4 sm:py-4"
-              />
-              <button
-                type="submit"
-                className="shrink-0 rounded-xl bg-lime-300 px-4 py-3 text-xs font-black text-black transition hover:bg-lime-200 sm:px-6 sm:py-4 sm:text-sm"
-              >
-                선수 검색
-              </button>
             </form>
 
-            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[11px] font-bold text-gray-600 sm:text-xs">
-              <span>✓ FC Online 공식 데이터 기반</span>
-              <span>✓ 갱신시간 유저 제보</span>
-              <span>✓ 모바일 지원</span>
+            <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-[10px] font-bold tracking-wide text-[#586984] sm:text-xs">
+              <span>OFFICIAL PLAYER DATA</span>
+              <span>USER REFRESH REPORTS</span>
+              <span>RESPONSIVE WEB</span>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="absolute -inset-12 -z-10 rounded-full bg-lime-300/[0.04] blur-3xl" />
-            <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#14181c]/90 shadow-2xl shadow-black/30 backdrop-blur-xl">
-              <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4 sm:px-6">
-                <div>
-                  <p className="text-[9px] font-black tracking-[0.22em] text-gray-600">FC HELP</p>
-                  <p className="mt-1 text-sm font-black text-gray-200">QUICK ACCESS</p>
-                </div>
-                <span className="rounded-full border border-lime-300/15 bg-lime-300/[0.05] px-3 py-1 text-[10px] font-black text-lime-300">
-                  ONLINE
-                </span>
+          <div className="lg:pl-10">
+            <div className="mb-4 flex items-center justify-between border-b border-[#23324d] pb-3">
+              <div>
+                <p className="text-[9px] font-black tracking-[0.24em] text-[#58719a]">NAVIGATION</p>
+                <p className="mt-1 text-sm font-black">SERVICE ROUTES</p>
               </div>
+              <span className="text-[10px] font-black text-[#6f98ff]">04 MODULES</span>
+            </div>
 
-              <div className="grid grid-cols-2">
-                {QUICK_LINKS.map((item, index) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`group min-h-40 p-5 transition hover:bg-white/[0.04] sm:min-h-44 sm:p-6 ${
-                      index % 2 === 0 ? "border-r border-white/[0.07]" : ""
-                    } ${index < 2 ? "border-b border-white/[0.07]" : ""}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-black tracking-[0.15em] ${item.accent}`}>
-                        {item.number}
-                      </span>
-                      <span className="text-sm text-gray-700 transition group-hover:translate-x-1 group-hover:text-gray-300">
-                        →
-                      </span>
+            <div className="divide-y divide-[#1f2d45] border-y border-[#23324d]">
+              {SERVICES.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="group grid grid-cols-[44px_1fr_auto] items-center gap-3 py-5 transition hover:bg-[#0d1c30] sm:grid-cols-[56px_1fr_auto] sm:py-6"
+                >
+                  <span className="text-[10px] font-black text-[#486182]">{item.code}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-3">
+                      <p className="text-sm font-black text-white sm:text-base">{item.label}</p>
+                      <span className="hidden text-[9px] font-black tracking-[0.18em] text-[#486182] sm:inline">{item.title}</span>
                     </div>
-                    <h2 className="mt-7 text-lg font-black tracking-tight sm:text-xl">{item.title}</h2>
-                    <p className="mt-2 text-[11px] leading-5 text-gray-600 sm:text-xs sm:leading-5">
-                      {item.description}
-                    </p>
-                  </Link>
-                ))}
-              </div>
+                    <p className="mt-1 truncate text-[11px] text-[#687b99]">{item.description}</p>
+                  </div>
+                  <span className="text-sm font-black text-[#3f75ff] transition group-hover:translate-x-1">↗</span>
+                </Link>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-black tracking-[0.2em] text-lime-400">START HERE</p>
-            <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">FC Help, 이렇게 쓰면 됩니다</h2>
-          </div>
-          <p className="max-w-md text-xs leading-5 text-gray-600 sm:text-sm sm:leading-6">
-            검색부터 알림, 스쿼드 공유까지 자주 쓰는 기능을 메인에서 바로 시작할 수 있습니다.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <FeatureCard
-            href="/players"
-            eyebrow="PLAYER"
-            title="선수를 찾는다"
-            description="이름으로 검색하고 시즌별 선수 정보와 공식경기 데이터를 확인하세요."
-            action="선수 DB 열기"
-          />
-          <FeatureCard
-            href="/refresh"
-            eyebrow="REFRESH"
-            title="갱신을 기다린다"
-            description="유저들이 제보한 갱신시간을 확인하고 원하는 선수의 알림을 설정하세요."
-            action="갱신시간 확인"
-          />
-          <FeatureCard
-            href="/squad"
-            eyebrow="SQUAD"
-            title="스쿼드를 만든다"
-            description="내 스쿼드를 구성하고 저장한 뒤 다른 구단주에게 공유해보세요."
-            action="스쿼드 만들기"
-          />
-          <FeatureCard
-            href="/community"
-            eyebrow="COMMUNITY"
-            title="정보를 나눈다"
-            description="질문, 팁, 자유 이야기와 스쿼드 피드백을 다른 유저들과 나눠보세요."
-            action="커뮤니티 가기"
-          />
+      <section className="border-b border-[#23324d] bg-[#0a1525]">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-y divide-[#23324d] border-x border-[#23324d] sm:grid-cols-4 sm:divide-y-0">
+          {SERVICES.map((item) => (
+            <Link key={item.href} href={item.href} className="group p-4 transition hover:bg-[#0e1e33] sm:p-5">
+              <p className="text-[9px] font-black tracking-[0.2em] text-[#516a8e]">{item.title}</p>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <span className="text-sm font-black text-[#dce5f6]">{item.label}</span>
+                <span className="text-xs text-[#3f75ff] transition group-hover:translate-x-1">→</span>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[#23324d] pb-5">
           <div>
-            <p className="text-[10px] font-black tracking-[0.2em] text-cyan-300">UPDATED DATA</p>
-            <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">지금 FC Help에서는</h2>
+            <p className="text-[10px] font-black tracking-[0.24em] text-[#6f98ff]">LIVE BOARD / 01</p>
+            <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] sm:text-3xl">업데이트 데이터</h2>
           </div>
-          <p className="max-w-md text-xs leading-5 text-gray-600 sm:text-sm sm:leading-6">
-            FC Online 공식 데이터와 FC Help에 실제로 쌓인 최신 데이터를 보여줍니다.
+          <p className="max-w-md text-xs leading-5 text-[#657693] sm:text-sm sm:leading-6">
+            FC Online 공식 데이터와 FC Help에 실제로 쌓인 정보를 같은 보드에서 확인합니다.
           </p>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          <LobbyPanel
-            eyebrow="PLAYER RANKING"
-            title="최근 인기 선수"
-            href="/players"
-            action="선수 DB 전체 보기"
-          >
+        <div className="grid border border-[#23324d] lg:grid-cols-[1.15fr_0.85fr]">
+          <section className="border-b border-[#23324d] lg:border-b-0 lg:border-r">
+            <PanelHeader code="A01" title="최근 인기 선수" href="/players" action="PLAYER DB" />
             {popularPlayers.length > 0 ? (
-              <div className="divide-y divide-white/[0.07]">
+              <div className="divide-y divide-[#1e2c43]">
                 {popularPlayers.slice(0, 5).map((player, index) => (
                   <PopularPlayerRow key={`${player.spid}-${player.grade}`} player={player} rank={index + 1} />
                 ))}
@@ -299,163 +251,110 @@ export default async function HomePage() {
             ) : (
               <EmptyState text="FC Online 인기 선수 데이터를 불러오지 못했습니다." />
             )}
-          </LobbyPanel>
+          </section>
 
-          <LobbyPanel
-            eyebrow="REFRESH REPORT"
-            title="최근 갱신 제보"
-            href="/refresh"
-            action="갱신시간 전체 보기"
-          >
-            {refreshReports.length > 0 ? (
-              <div className="divide-y divide-white/[0.07]">
-                {refreshReports.map((report) => (
-                  <Link
-                    key={report.id}
-                    href="/refresh"
-                    className="flex items-center gap-4 px-5 py-4 transition hover:bg-white/[0.03] sm:px-6"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-black text-gray-100">{report.player_name}</span>
-                        <span className="shrink-0 rounded-md border border-cyan-300/15 bg-cyan-300/[0.05] px-2 py-0.5 text-[9px] font-black text-cyan-200">
-                          {refreshTimeText(report)}
-                        </span>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-1">
+            <section className="border-b border-[#23324d] sm:border-r lg:border-r-0">
+              <PanelHeader code="B01" title="최근 갱신 제보" href="/refresh" action="REFRESH" compact />
+              {refreshReports.length > 0 ? (
+                <div className="divide-y divide-[#1e2c43]">
+                  {refreshReports.slice(0, 3).map((report) => (
+                    <Link key={report.id} href="/refresh" className="flex items-center gap-3 px-4 py-4 transition hover:bg-[#0d1b2e] sm:px-5">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-black text-[#eef3fb] sm:text-sm">{report.player_name}</p>
+                        <p className="mt-1 truncate text-[10px] text-[#5f7290]">{report.season_name}</p>
                       </div>
-                      <p className="mt-1 truncate text-[11px] text-gray-600">{report.season_name}</p>
-                    </div>
-                    <span className="shrink-0 text-[10px] font-bold text-gray-700">{formatDate(report.created_at)}</span>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <EmptyState text="아직 등록된 갱신 제보가 없습니다." />
-            )}
-          </LobbyPanel>
+                      <div className="shrink-0 text-right">
+                        <p className="text-[10px] font-black text-[#67d5ff]">{refreshTimeText(report)}</p>
+                        <p className="mt-1 text-[9px] text-[#4f607a]">{formatDate(report.created_at)}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState text="아직 등록된 갱신 제보가 없습니다." compact />
+              )}
+            </section>
 
-          <LobbyPanel
-            eyebrow="SQUAD GALLERY"
-            title="인기 스쿼드"
-            href="/squad/gallery"
-            action="스쿼드 갤러리 보기"
-          >
-            {squads.length > 0 ? (
-              <div className="divide-y divide-white/[0.07]">
-                {squads.map((squad, index) => (
-                  <Link
-                    key={squad.id}
-                    href={`/squad/gallery/${squad.id}`}
-                    className="flex items-center gap-4 px-5 py-4 transition hover:bg-white/[0.03] sm:px-6"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-violet-300/15 bg-violet-300/[0.05] text-[10px] font-black text-violet-200">
-                      {index + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black text-gray-100">{squad.title}</p>
-                      <p className="mt-1 truncate text-[11px] text-gray-600">
-                        {squad.author_name} · {squad.formation || "포메이션 미지정"}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right text-[10px] font-bold text-gray-600">
-                      <p>♥ {Number(squad.likes_count || 0).toLocaleString("ko-KR")}</p>
-                      <p className="mt-1">조회 {Number(squad.views || 0).toLocaleString("ko-KR")}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <EmptyState text="아직 공개된 스쿼드가 없습니다." />
-            )}
-          </LobbyPanel>
+            <section>
+              <PanelHeader code="B02" title="인기 스쿼드" href="/squad/gallery" action="SQUAD" compact />
+              {squads.length > 0 ? (
+                <div className="divide-y divide-[#1e2c43]">
+                  {squads.slice(0, 3).map((squad, index) => (
+                    <Link key={squad.id} href={`/squad/gallery/${squad.id}`} className="grid grid-cols-[24px_1fr_auto] items-center gap-3 px-4 py-4 transition hover:bg-[#0d1b2e] sm:px-5">
+                      <span className="text-[10px] font-black text-[#6f98ff]">0{index + 1}</span>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-black text-[#eef3fb] sm:text-sm">{squad.title}</p>
+                        <p className="mt-1 truncate text-[10px] text-[#5f7290]">{squad.author_name} · {squad.formation || "미지정"}</p>
+                      </div>
+                      <span className="text-[9px] font-bold text-[#53647e]">♥ {Number(squad.likes_count || 0).toLocaleString("ko-KR")}</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState text="아직 공개된 스쿼드가 없습니다." compact />
+              )}
+            </section>
+          </div>
+        </div>
 
-          <LobbyPanel
-            eyebrow="COMMUNITY"
-            title="최신 커뮤니티"
-            href="/community"
-            action="커뮤니티 전체 보기"
-          >
+        <div className="mt-5 grid border border-[#23324d] lg:grid-cols-[0.9fr_1.1fr]">
+          <section className="border-b border-[#23324d] lg:border-b-0 lg:border-r">
+            <PanelHeader code="C01" title="최신 커뮤니티" href="/community" action="LOUNGE" />
             {communityPosts.length > 0 ? (
-              <div className="divide-y divide-white/[0.07]">
+              <div className="divide-y divide-[#1e2c43]">
                 {communityPosts.map((post) => (
-                  <Link
-                    key={post.id}
-                    href={`/community/${post.id}`}
-                    className="flex items-center gap-4 px-5 py-4 transition hover:bg-white/[0.03] sm:px-6"
-                  >
-                    <span className="shrink-0 rounded-md border border-amber-300/15 bg-amber-300/[0.05] px-2 py-1 text-[9px] font-black text-amber-200">
-                      {CATEGORY_LABEL[post.category] ?? post.category}
-                    </span>
-                    <p className="min-w-0 flex-1 truncate text-sm font-black text-gray-100">{post.title}</p>
-                    <span className="shrink-0 text-[10px] font-bold text-gray-700">{formatDate(post.created_at)}</span>
+                  <Link key={post.id} href={`/community/${post.id}`} className="flex items-center gap-3 px-5 py-4 transition hover:bg-[#0d1b2e]">
+                    <span className="w-14 shrink-0 text-[9px] font-black tracking-wide text-[#6f98ff]">{CATEGORY_LABEL[post.category] ?? post.category}</span>
+                    <p className="min-w-0 flex-1 truncate text-sm font-black text-[#e7eef9]">{post.title}</p>
+                    <span className="text-[9px] font-bold text-[#50617b]">{formatDate(post.created_at)}</span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
-                <p className="text-sm font-black text-gray-300">아직 작성된 커뮤니티 글이 없습니다.</p>
-                <p className="mt-2 text-xs text-gray-600">첫 글을 작성해서 FC Help 커뮤니티를 시작해보세요.</p>
-                <Link
-                  href="/community/write"
-                  className="mt-5 rounded-xl bg-amber-300 px-4 py-2.5 text-xs font-black text-black transition hover:bg-amber-200"
-                >
-                  첫 글 작성하기
+              <div className="flex min-h-56 flex-col justify-center px-6 py-8">
+                <p className="text-sm font-black text-[#d8e1f0]">아직 작성된 글이 없습니다.</p>
+                <p className="mt-2 text-xs text-[#60718c]">첫 글을 작성해서 FC Help 라운지를 시작해보세요.</p>
+                <Link href="/community/write" className="mt-5 w-fit border border-[#3f75ff] bg-[#3f75ff] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#5b88ff]">
+                  WRITE FIRST POST →
                 </Link>
               </div>
             )}
-          </LobbyPanel>
-        </div>
-      </section>
+          </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 sm:pb-24 sm:pt-10">
-        <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
-          <div className="overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-[#192118] via-[#151a18] to-[#13171b] p-6 sm:p-8">
-            <div className="flex h-full min-h-72 flex-col justify-between">
+          <section className="bg-[#0a1729] p-5 sm:p-7">
+            <div className="grid h-full gap-6 sm:grid-cols-[1fr_auto] sm:items-end">
               <div>
-                <p className="text-[10px] font-black tracking-[0.2em] text-lime-300">REFRESH ALERT</p>
-                <h2 className="mt-3 max-w-lg text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                  갱신시간을 계속
-                  <br />
-                  보고 있을 필요는 없습니다.
-                </h2>
-                <p className="mt-4 max-w-xl text-sm leading-6 text-gray-500">
-                  브라우저 알림을 켜두면 등록한 선수의 갱신시간을 놓치지 않도록 FC Help가 알려줍니다.
+                <p className="text-[10px] font-black tracking-[0.22em] text-[#67d5ff]">SIGNAL / REFRESH ALERT</p>
+                <h3 className="mt-3 text-2xl font-black tracking-[-0.03em] sm:text-3xl">갱신시간은 직접 지켜보지 않아도 됩니다.</h3>
+                <p className="mt-3 max-w-2xl text-xs leading-6 text-[#687b98] sm:text-sm">
+                  브라우저 알림을 켜두면 등록한 선수의 갱신 타이밍을 FC Help가 알려줍니다.
                 </p>
               </div>
-
-              <div className="mt-8">
+              <div className="sm:min-w-64">
                 <PushNotificationSetup />
               </div>
             </div>
-          </div>
+          </section>
+        </div>
+      </section>
 
-          <div className="rounded-[28px] border border-white/10 bg-[#15191d] p-6 sm:p-8">
-            <p className="text-[10px] font-black tracking-[0.2em] text-gray-600">FC HELP</p>
-            <h2 className="mt-3 text-2xl font-black tracking-tight">하나의 계정으로 이어지는 기능</h2>
-            <p className="mt-3 text-sm leading-6 text-gray-500">
-              FC Online 닉네임을 연동하면 프로필, 스쿼드, 커뮤니티 활동과 알림을 한 계정에서 관리할 수 있습니다.
+      <section className="border-y border-[#23324d] bg-[#0a1525]">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-[10px] font-black tracking-[0.22em] text-[#6f98ff]">ACCOUNT LINK / 02</p>
+            <h2 className="mt-3 text-2xl font-black tracking-[-0.03em] sm:text-3xl">한 계정에서 플레이 기록을 이어가세요.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#687b98]">
+              FC Online 닉네임 연동, 스쿼드 저장, 커뮤니티 활동, 알림과 신고 처리까지 마이페이지에서 관리합니다.
             </p>
-
-            <div className="mt-8 space-y-3">
-              <InfoRow number="01" text="FC Online 닉네임 · OUID 연동" />
-              <InfoRow number="02" text="내 스쿼드 저장 및 갤러리 공유" />
-              <InfoRow number="03" text="댓글 · 좋아요 · 신고 처리 알림" />
-              <InfoRow number="04" text="내 활동과 계정 설정 한 곳에서 관리" />
-            </div>
-
-            <div className="mt-8 flex flex-wrap gap-2">
-              <Link
-                href="/mypage"
-                className="rounded-xl bg-white px-4 py-2.5 text-xs font-black text-black transition hover:bg-gray-200"
-              >
-                마이페이지
-              </Link>
-              <Link
-                href="/login"
-                className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-black text-gray-300 transition hover:bg-white/[0.04] hover:text-white"
-              >
-                로그인 / 회원가입
-              </Link>
-            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/mypage" className="border border-[#3f75ff] bg-[#3f75ff] px-5 py-3 text-xs font-black text-white transition hover:bg-[#5b88ff]">
+              MY PAGE →
+            </Link>
+            <Link href="/login" className="border border-[#2c3d5e] px-5 py-3 text-xs font-black text-[#b4c2d8] transition hover:border-[#4f6f9f] hover:text-white">
+              LOGIN / JOIN
+            </Link>
           </div>
         </div>
       </section>
@@ -463,106 +362,55 @@ export default async function HomePage() {
   );
 }
 
-function FeatureCard({
-  href,
-  eyebrow,
-  title,
-  description,
-  action,
-}: {
-  href: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-  action: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex min-h-64 flex-col rounded-3xl border border-white/10 bg-[#15191d] p-5 transition duration-300 hover:-translate-y-1 hover:border-lime-300/20 hover:bg-[#181d20] sm:p-6"
-    >
-      <p className="text-[9px] font-black tracking-[0.2em] text-gray-600 transition group-hover:text-lime-400">
-        {eyebrow}
-      </p>
-      <h3 className="mt-5 text-xl font-black tracking-tight">{title}</h3>
-      <p className="mt-3 text-xs leading-6 text-gray-500">{description}</p>
-      <div className="mt-auto flex items-center justify-between pt-8 text-xs font-black text-gray-400">
-        <span>{action}</span>
-        <span className="transition group-hover:translate-x-1 group-hover:text-lime-300">→</span>
-      </div>
-    </Link>
-  );
-}
-
-function LobbyPanel({
-  eyebrow,
+function PanelHeader({
+  code,
   title,
   href,
   action,
-  children,
+  compact = false,
 }: {
-  eyebrow: string;
+  code: string;
   title: string;
   href: string;
   action: string;
-  children: React.ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#15191d]">
-      <div className="flex items-end justify-between gap-4 border-b border-white/[0.08] px-5 py-5 sm:px-6">
-        <div>
-          <p className="text-[9px] font-black tracking-[0.2em] text-gray-600">{eyebrow}</p>
-          <h3 className="mt-1 text-xl font-black tracking-tight">{title}</h3>
-        </div>
-        <Link href={href} className="shrink-0 text-[10px] font-black text-gray-500 transition hover:text-white">
-          {action} →
-        </Link>
+    <div className={`flex items-end justify-between gap-4 border-b border-[#23324d] ${compact ? "px-4 py-4 sm:px-5" : "px-5 py-5 sm:px-6"}`}>
+      <div>
+        <p className="text-[9px] font-black tracking-[0.2em] text-[#4e6688]">{code}</p>
+        <h3 className={`mt-1 font-black tracking-[-0.02em] ${compact ? "text-base" : "text-xl"}`}>{title}</h3>
       </div>
-      {children}
-    </section>
+      <Link href={href} className="shrink-0 text-[9px] font-black tracking-[0.12em] text-[#6f98ff] transition hover:text-[#9db8ff]">
+        {action} ↗
+      </Link>
+    </div>
   );
 }
 
 function PopularPlayerRow({ player, rank }: { player: PlayerRankingItem; rank: number }) {
   return (
-    <Link
-      href={`/players/${player.spid}`}
-      className="group flex items-center gap-3 px-5 py-3.5 transition hover:bg-white/[0.03] sm:px-6"
-    >
-      <span className={`w-5 text-center text-xs font-black ${rank === 1 ? "text-lime-300" : "text-gray-600"}`}>
-        {rank}
-      </span>
-      <div className="flex h-12 w-12 shrink-0 items-end justify-center overflow-hidden rounded-xl bg-black/20">
-        <PlayerArtwork
-          spid={player.spid}
-          alt={player.name}
-          className="h-14 w-auto max-w-none object-contain transition group-hover:scale-105"
-        />
+    <Link href={`/players/${player.spid}`} className="group grid grid-cols-[32px_56px_1fr_auto] items-center gap-3 px-5 py-4 transition hover:bg-[#0d1b2e] sm:grid-cols-[42px_64px_1fr_auto] sm:px-6">
+      <span className={`text-sm font-black ${rank === 1 ? "text-[#6f98ff]" : "text-[#51627c]"}`}>{String(rank).padStart(2, "0")}</span>
+      <div className="flex h-14 w-14 items-end justify-center overflow-hidden border border-[#23324d] bg-[#0a1627] sm:h-16 sm:w-16">
+        <PlayerArtwork spid={player.spid} alt={player.name} className="h-16 w-auto max-w-none object-contain transition group-hover:scale-105 sm:h-18" />
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black text-gray-100">{player.name}</p>
-        <p className="mt-1 text-[10px] font-bold text-gray-600">+{player.grade} 강화 · 전일 공식경기</p>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-black text-[#eef3fb] sm:text-base">{player.name}</p>
+        <p className="mt-1 text-[10px] font-bold text-[#5c6e8a]">+{player.grade} 강화 · 전일 공식경기</p>
       </div>
-      <span className="shrink-0 rounded-lg border border-lime-300/10 bg-lime-300/[0.04] px-2.5 py-1.5 text-[10px] font-black text-lime-200">
-        {Number(player.metric).toLocaleString("ko-KR")}회
-      </span>
+      <div className="text-right">
+        <p className="text-xs font-black text-[#67d5ff] sm:text-sm">{Number(player.metric).toLocaleString("ko-KR")}</p>
+        <p className="mt-1 text-[9px] font-bold text-[#4e607b]">MATCHES</p>
+      </div>
     </Link>
   );
 }
 
-function EmptyState({ text }: { text: string }) {
+function EmptyState({ text, compact = false }: { text: string; compact?: boolean }) {
   return (
-    <div className="flex min-h-64 items-center justify-center px-6 text-center text-sm font-bold text-gray-600">
+    <div className={`flex items-center justify-center px-6 text-center text-xs font-bold text-[#596b86] ${compact ? "min-h-40" : "min-h-56"}`}>
       {text}
-    </div>
-  );
-}
-
-function InfoRow({ number, text }: { number: string; text: string }) {
-  return (
-    <div className="flex items-center gap-4 rounded-xl border border-white/[0.07] bg-black/10 px-4 py-3.5">
-      <span className="text-[10px] font-black text-lime-400/70">{number}</span>
-      <span className="text-xs font-bold text-gray-300 sm:text-sm">{text}</span>
     </div>
   );
 }

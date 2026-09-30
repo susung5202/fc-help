@@ -53,6 +53,9 @@ export default function AccountButton() {
             신고관리
           </Link>
         )}
+        <Link href="/mypage/activity" className="rounded-lg border border-lime-300/15 bg-lime-300/[0.04] px-2.5 py-2 text-[11px] font-black text-lime-200 hover:bg-lime-300/[0.08] sm:px-3 sm:text-sm">
+          내 활동
+        </Link>
         <Link href="/mypage/reports" className="hidden rounded-lg border border-white/10 px-2.5 py-2 text-[11px] font-bold text-gray-300 hover:bg-white/5 sm:inline-flex sm:px-3 sm:text-sm">
           신고내역
         </Link>

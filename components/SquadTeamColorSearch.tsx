@@ -10,8 +10,24 @@ type TeamColorPlayer = {
 };
 
 function findPlayerSearchInput() {
-  return document.querySelector<HTMLInputElement>(
-    'input[placeholder="선수 이름 검색"], input[placeholder="골키퍼 이름 검색"]'
+  const inputs = Array.from(
+    document.querySelectorAll<HTMLInputElement>(
+      'input[placeholder="선수 이름 검색"], input[placeholder="골키퍼 이름 검색"]'
+    )
+  );
+
+  return (
+    inputs.find((input) => {
+      const rect = input.getBoundingClientRect();
+      const style = window.getComputedStyle(input);
+      return (
+        input.isConnected &&
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden"
+      );
+    }) ?? null
   );
 }
 
@@ -64,10 +80,17 @@ export default function SquadTeamColorSearch() {
 
     sync();
     const observer = new MutationObserver(sync);
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
+    window.addEventListener("resize", sync);
 
     return () => {
       observer.disconnect();
+      window.removeEventListener("resize", sync);
       if (currentMount?.isConnected) currentMount.remove();
     };
   }, []);

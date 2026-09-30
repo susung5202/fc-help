@@ -42,11 +42,11 @@ export default function NotificationBell({ userId }: { userId: string }) {
       href="/notifications"
       aria-label={unread > 0 ? `알림 ${unread}개` : "알림"}
       title="알림"
-      className="relative flex h-9 w-9 shrink-0 items-center justify-center border border-[#263750] bg-[#0a1627] text-base text-[#9aabc3] transition hover:border-[#3f75ff] hover:text-white"
+      className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-base text-gray-300 transition hover:bg-white/5 hover:text-white"
     >
       <span aria-hidden>🔔</span>
       {unread > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 flex min-w-5 items-center justify-center bg-[#ff5d73] px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-lg">
+        <span className="absolute -right-1.5 -top-1.5 flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-lg">
           {unread > 99 ? "99+" : unread}
         </span>
       )}

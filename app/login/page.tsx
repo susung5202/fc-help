@@ -111,37 +111,60 @@ export default function LoginPage() {
         return;
       }
 
-      const { data, error } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/login`,
-          data: {
-            login_id: normalizedLoginId,
-            display_name: normalizedFcNickname,
-            fconline_nickname: normalizedFcNickname,
-          },
-        },
-      });
+      try {
+        const signupResponse = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: normalizedEmail,
+            loginId: normalizedLoginId,
+            fcNickname: normalizedFcNickname,
+            password,
+          }),
+        });
+        const signupPayload = (await signupResponse.json()) as {
+          nickname?: string;
+          ouid?: string;
+          emailConfirmationRequired?: boolean;
+          access_token?: string | null;
+          refresh_token?: string | null;
+          error?: string;
+        };
 
-      if (error) {
-        setMessage(authErrorMessage(error.message, mode));
+        if (!signupResponse.ok) {
+          setMessage(signupPayload.error || "회원가입에 실패했습니다.");
+          setLoading(false);
+          return;
+        }
+
+        if (signupPayload.access_token && signupPayload.refresh_token) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: signupPayload.access_token,
+            refresh_token: signupPayload.refresh_token,
+          });
+          if (sessionError) {
+            setMessage(authErrorMessage(sessionError.message, mode));
+            setLoading(false);
+            return;
+          }
+
+          router.push("/mypage");
+          router.refresh();
+          return;
+        }
+
+        setSuccess(true);
+        setMessage(`FC Online '${signupPayload.nickname ?? normalizedFcNickname}' 구단주를 확인했습니다. 이메일 인증 후 로그인해주세요.`);
+        setMode("login");
+        setPassword("");
+        setFcNickname("");
+        setLoading(false);
+        return;
+      } catch {
+        setMessage("회원가입 처리 중 오류가 발생했습니다.");
         setLoading(false);
         return;
       }
-
-      if (data.session) {
-        router.push("/mypage");
-        router.refresh();
-        return;
-      }
-
-      setSuccess(true);
-      setMessage(`회원가입 요청이 완료되었습니다. 이메일 인증 후 로그인 아이디 '${normalizedLoginId}' 또는 가입 이메일로 로그인해주세요.`);
-      setMode("login");
-      setPassword("");
-      setLoading(false);
-      return;
     }
 
     try {

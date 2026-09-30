@@ -13,7 +13,7 @@ function authErrorMessage(message: string, mode: AuthMode) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("invalid login credentials")) {
-    return "로그인 아이디 또는 비밀번호가 맞지 않습니다.";
+    return "아이디 또는 이메일, 혹은 비밀번호가 맞지 않습니다.";
   }
   if (normalized.includes("email not confirmed")) {
     return "이메일 인증이 아직 완료되지 않았습니다. 받은 편지함의 인증 메일을 확인해주세요.";
@@ -60,7 +60,7 @@ export default function LoginPage() {
 
     if (!normalizedLoginId || !password) {
       setSuccess(false);
-      setMessage("로그인 아이디와 비밀번호를 입력해주세요.");
+      setMessage(mode === "login" ? "아이디 또는 이메일과 비밀번호를 입력해주세요." : "로그인 아이디와 비밀번호를 입력해주세요.");
       return;
     }
 
@@ -137,7 +137,7 @@ export default function LoginPage() {
       }
 
       setSuccess(true);
-      setMessage(`회원가입 요청이 완료되었습니다. 이메일 인증 후 로그인 아이디 '${normalizedLoginId}'로 로그인해주세요.`);
+      setMessage(`회원가입 요청이 완료되었습니다. 이메일 인증 후 로그인 아이디 '${normalizedLoginId}' 또는 가입 이메일로 로그인해주세요.`);
       setMode("login");
       setPassword("");
       setLoading(false);
@@ -153,7 +153,7 @@ export default function LoginPage() {
       const payload = (await response.json()) as { access_token?: string; refresh_token?: string; error?: string };
 
       if (!response.ok || !payload.access_token || !payload.refresh_token) {
-        setMessage(payload.error || "로그인 아이디 또는 비밀번호가 맞지 않습니다.");
+        setMessage(payload.error || "아이디 또는 이메일, 혹은 비밀번호가 맞지 않습니다.");
         setLoading(false);
         return;
       }
@@ -188,7 +188,7 @@ export default function LoginPage() {
 
         <p className="mt-2 text-sm text-gray-400">
           {mode === "login"
-            ? "회원가입할 때 만든 로그인 아이디와 비밀번호를 입력해주세요."
+            ? "로그인 아이디 또는 가입한 이메일과 비밀번호를 입력해주세요."
             : "이메일, 로그인 아이디, FC Online 닉네임을 각각 따로 등록합니다."}
         </p>
 
@@ -211,13 +211,15 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label htmlFor="loginId" className="text-sm text-gray-400">로그인 아이디</label>
+            <label htmlFor="loginId" className="text-sm text-gray-400">
+              {mode === "login" ? "아이디 또는 이메일" : "로그인 아이디"}
+            </label>
             <input
               id="loginId"
               type="text"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value.toLowerCase())}
-              placeholder="fchelp123"
+              placeholder={mode === "login" ? "아이디 또는 example@email.com" : "fchelp123"}
               autoComplete="username"
               maxLength={mode === "signup" ? 20 : 254}
               required
@@ -226,7 +228,7 @@ export default function LoginPage() {
             {mode === "signup" ? (
               <p className="mt-1 text-[11px] text-gray-600">영문 소문자, 숫자, 밑줄(_) · 3~20자 · 로그인 전용</p>
             ) : (
-              <p className="mt-1 text-[11px] text-gray-600">기존 계정은 이전처럼 이메일로도 로그인할 수 있습니다.</p>
+              <p className="mt-1 text-[11px] text-gray-600">로그인 아이디와 가입 이메일 중 편한 것으로 로그인할 수 있습니다.</p>
             )}
           </div>
 

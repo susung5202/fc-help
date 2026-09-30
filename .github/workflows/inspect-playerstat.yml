@@ -7,32 +7,32 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect FC Online PlayerStat teamcolor result
+      - name: Inspect FC Online playerstat AJAX
         run: |
           python - <<'PY'
-          import requests,re,html as h
+          import requests,re,urllib.parse
           headers={'User-Agent':'Mozilla/5.0','Accept-Language':'ko-KR,ko;q=0.9'}
           base='https://fconline.nexon.com/DataCenter/PlayerStat'
-          for params in [
-            {'teamcolorid':'40417'},
-            {'teamcolorid':'40417','strTeamColorName':'22-23 레알 마드리드'},
-            {'n4TeamColorId':'40417'},
-          ]:
-            r=requests.get(base,params=params,headers=headers,timeout=30)
-            text=r.text
-            print('\nURL',r.url,'STATUS',r.status_code,'LEN',len(text))
-            # print player detail links and nearby text
-            found=[]
-            for m in re.finditer(r'href=["\']([^"\']*PlayerInfo[^"\']*spid=\d+[^"\']*)["\']',text,re.I):
-              href=h.unescape(m.group(1))
-              if href in [x[0] for x in found]: continue
-              snippet=re.sub(r'<[^>]+>',' ',text[max(0,m.start()-350):m.end()+500])
-              snippet=h.unescape(re.sub(r'\s+',' ',snippet)).strip()
-              found.append((href,snippet[:350]))
-            print('PLAYER_LINKS',len(found))
-            for item in found[:15]: print(item)
-            for needle in ['40417','22-23 레알 마드리드','teamcolorid']:
-              i=text.find(needle)
-              print('NEEDLE',needle,'INDEX',i)
-              if i>=0: print(text[max(0,i-400):i+800])
+          r=requests.get(base,headers=headers,timeout=30)
+          html=r.text
+          print('PAGE',r.status_code,len(html))
+          needles=['GetPlayerStatList','SetSearchForStat','SetTeamColorId']
+          for needle in needles:
+            print('\nINLINE',needle)
+            for m in list(re.finditer(needle,html,re.I))[:10]:
+              print(html[max(0,m.start()-1200):m.start()+2500])
+          scripts=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',html,re.I)
+          print('\nSCRIPTS',len(scripts))
+          for src in scripts:
+            url=urllib.parse.urljoin(base,src)
+            try:
+              t=requests.get(url,headers=headers,timeout=30).text
+            except Exception:
+              continue
+            if any(n in t for n in needles):
+              print('\nSCRIPT',url,'LEN',len(t))
+              for needle in needles:
+                for m in list(re.finditer(needle,t,re.I))[:5]:
+                  print('\nFOUND',needle,'AT',m.start())
+                  print(t[max(0,m.start()-1800):m.start()+5000])
           PY

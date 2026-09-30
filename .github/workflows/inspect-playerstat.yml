@@ -7,23 +7,40 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect official teamcolor search results
+      - name: Test summary mode
         run: |
           python - <<'PY'
           import requests,re,html as h
           s=requests.Session(); s.headers.update({'User-Agent':'Mozilla/5.0','Accept-Language':'ko-KR,ko;q=0.9'})
-          for q in ['레알 마드리드','레알','바이에른 뮌헨']:
-            r=s.get('https://fconline.nexon.com/datacenter/teamcolor',params={'strTeamColorName':q},timeout=30)
+          page=s.get('https://fconline.nexon.com/DataCenter',timeout=30).text
+          form=re.search(r'<form[^>]+id=["\']form1["\'][^>]*>([\s\S]*?)</form>',page,re.I).group(1)
+          pairs=[]
+          for tag in re.findall(r'<input\b[^>]*>',form,re.I):
+            nm=re.search(r'\bname=["\']([^"\']+)["\']',tag,re.I)
+            if not nm: continue
+            typ=(re.search(r'\btype=["\']([^"\']+)["\']',tag,re.I).group(1).lower() if re.search(r'\btype=["\']([^"\']+)["\']',tag,re.I) else 'text')
+            if typ in ('checkbox','radio') and 'checked' not in tag.lower(): continue
+            val=re.search(r'\bvalue=["\']([^"\']*)["\']',tag,re.I)
+            pairs.append((nm.group(1),h.unescape(val.group(1) if val else '')))
+          def test(summary):
+            overrides={'teamcolorid':'40417','strTeamColorName':'22-23 레알 마드리드','n1Strong':'1','n1Grow':'0','IsSummaryPlayer':str(summary)}
+            d=[]; seen=set()
+            for k,v in pairs:
+              d.append((k,overrides.get(k,v))); seen.add(k)
+            for k,v in overrides.items():
+              if k not in seen:d.append((k,v))
+            d.append(('n4PageNo','1'))
+            r=s.post('https://fconline.nexon.com/datacenter/PlayerList',data=d,headers={'X-Requested-With':'XMLHttpRequest','Referer':'https://fconline.nexon.com/DataCenter'},timeout=30)
             text=r.text
-            plain=h.unescape(re.sub(r'<[^>]+>',' ',text)); plain=re.sub(r'\s+',' ',plain).strip()
-            print('\nQUERY',q,'STATUS',r.status_code,'LEN',len(text))
+            rows=re.findall(r'<div id="area_playerunit_(\d+)">([\s\S]*?)(?=<div id="area_playerunit_|$)',text,re.I)
             names=[]
-            # list strings around known team-color detail click ids/names
-            for m in re.finditer(r'(?:teamcolorid|data-no)[^0-9]{0,20}(\d+)',text,re.I):
-              snippet=text[max(0,m.start()-600):m.start()+1000]
-              txt=h.unescape(re.sub(r'<[^>]+>',' ',snippet)); txt=re.sub(r'\s+',' ',txt).strip()
-              if txt not in names: names.append(txt)
-            for x in names[:80]: print('ROW',x[:500])
-            for needle in ['로스 블랑코스','갈락티코','22-23 레알 마드리드','23-24 레알 마드리드']:
-              print('HAS',needle,needle in plain)
+            for spid,row in rows:
+              m=re.search(r'<div class="name">([\s\S]*?)</div>',row,re.I)
+              name=re.sub(r'<[^>]+>',' ',m.group(1)) if m else ''
+              name=h.unescape(re.sub(r'\s+',' ',name)).strip()
+              names.append((spid,name))
+            print('SUMMARY',summary,'LEN',len(text),'ROWS',len(rows),'UNIQUE_NAMES',len(set(x[1] for x in names)))
+            print(names[:50])
+            print('HAS_NEXT', 'n4PageNo=2' in text or 'GoPage(2' in text or '>2</a>' in text)
+          test(0);test(1)
           PY

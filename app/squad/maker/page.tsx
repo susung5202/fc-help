@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SquadMaker from "@/components/SquadMaker";
 import SquadShareButton from "@/components/SquadShareButton";
+import SquadTeamColorSearch from "@/components/SquadTeamColorSearch";
 
 export const metadata = {
   title: "스쿼드 메이커 | FC Help",
@@ -32,6 +33,7 @@ export default function SquadMakerPage() {
           <SquadShareButton />
         </div>
 
+        <SquadTeamColorSearch />
         <SquadMaker />
       </section>
     </main>

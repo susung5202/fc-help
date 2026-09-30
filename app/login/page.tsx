@@ -38,6 +38,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [loginId, setLoginId] = useState("");
   const [email, setEmail] = useState("");
+  const [fcNickname, setFcNickname] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
@@ -55,10 +56,17 @@ export default function LoginPage() {
 
     const normalizedLoginId = loginId.trim().toLowerCase();
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedFcNickname = fcNickname.trim();
 
-    if (!normalizedLoginId || !password || (mode === "signup" && !normalizedEmail)) {
+    if (!normalizedLoginId || !password) {
       setSuccess(false);
-      setMessage(mode === "signup" ? "로그인 아이디, 이메일, 비밀번호를 모두 입력해주세요." : "로그인 아이디와 비밀번호를 입력해주세요.");
+      setMessage("로그인 아이디와 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    if (mode === "signup" && (!normalizedEmail || !normalizedFcNickname)) {
+      setSuccess(false);
+      setMessage("이메일, 로그인 아이디, FC Online 닉네임, 비밀번호를 모두 입력해주세요.");
       return;
     }
 
@@ -69,6 +77,12 @@ export default function LoginPage() {
     if (mode === "signup") {
       if (!LOGIN_ID_PATTERN.test(normalizedLoginId)) {
         setMessage("로그인 아이디는 영문 소문자, 숫자, 밑줄(_)만 사용해 3~20자로 입력해주세요.");
+        setLoading(false);
+        return;
+      }
+
+      if (normalizedFcNickname.length > 20) {
+        setMessage("FC Online 닉네임은 20자 이하로 입력해주세요.");
         setLoading(false);
         return;
       }
@@ -102,7 +116,11 @@ export default function LoginPage() {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/login`,
-          data: { login_id: normalizedLoginId },
+          data: {
+            login_id: normalizedLoginId,
+            display_name: normalizedFcNickname,
+            fconline_nickname: normalizedFcNickname,
+          },
         },
       });
 
@@ -171,7 +189,7 @@ export default function LoginPage() {
         <p className="mt-2 text-sm text-gray-400">
           {mode === "login"
             ? "회원가입할 때 만든 로그인 아이디와 비밀번호를 입력해주세요."
-            : "로그인에 사용할 아이디를 만들고 이메일 인증을 진행합니다. 로그인 아이디는 공개 프로필 닉네임과 별개입니다."}
+            : "이메일, 로그인 아이디, FC Online 닉네임을 각각 따로 등록합니다."}
         </p>
 
         <div className="mt-6 grid grid-cols-2 rounded-xl border border-white/10 bg-[#0f1115] p-1">
@@ -226,6 +244,24 @@ export default function LoginPage() {
                 className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-white outline-none transition focus:border-lime-400"
               />
               <p className="mt-1 text-[11px] text-gray-600">이메일 인증과 계정 복구에 사용됩니다.</p>
+            </div>
+          )}
+
+          {mode === "signup" && (
+            <div>
+              <label htmlFor="fcNickname" className="text-sm text-gray-400">FC Online 닉네임</label>
+              <input
+                id="fcNickname"
+                type="text"
+                value={fcNickname}
+                onChange={(e) => setFcNickname(e.target.value)}
+                placeholder="게임에서 사용하는 구단주 닉네임"
+                autoComplete="nickname"
+                maxLength={20}
+                required
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-white outline-none transition focus:border-lime-400"
+              />
+              <p className="mt-1 text-[11px] text-gray-600">FC Help에서 표시되는 닉네임이자 FC Online 연동에 사용됩니다.</p>
             </div>
           )}
 

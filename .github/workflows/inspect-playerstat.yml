@@ -7,54 +7,37 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect general player list teamcolor filter
+      - name: Inspect Real Madrid related teamcolors
         run: |
           python - <<'PY'
-          import requests,re,html as h,urllib.parse
+          import requests,re,html as h
           headers={'User-Agent':'Mozilla/5.0','Accept-Language':'ko-KR,ko;q=0.9'}
           s=requests.Session(); s.headers.update(headers)
-          base='https://fconline.nexon.com/DataCenter'
-          page=s.get(base,timeout=30).text
-          print('PAGE',len(page))
-          # inspect player-list JS function
-          scripts=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',page,re.I)
-          for src in scripts:
-            u=urllib.parse.urljoin(base,src)
-            try: t=s.get(u,timeout=20).text
-            except: continue
-            for needle in ['GetPlayerList:', 'PlayerList"', 'PlayerList\'']:
-              i=t.find(needle)
-              if i>=0:
-                print('\nSCRIPT',u,'NEEDLE',needle)
-                print(t[max(0,i-1800):i+5000])
-          # parse form defaults
-          m=re.search(r'<form[^>]+id=["\']form1["\'][^>]*>([\s\S]*?)</form>',page,re.I)
-          body=m.group(1) if m else ''
-          pairs=[]
-          for tag in re.findall(r'<input\b[^>]*>',body,re.I):
-            nm=re.search(r'\bname=["\']([^"\']+)["\']',tag,re.I)
-            if not nm: continue
-            typ=(re.search(r'\btype=["\']([^"\']+)["\']',tag,re.I).group(1).lower() if re.search(r'\btype=["\']([^"\']+)["\']',tag,re.I) else 'text')
-            if typ in ('checkbox','radio') and not re.search(r'\bchecked(?:\s*=|\s|>)',tag,re.I): continue
-            val=re.search(r'\bvalue=["\']([^"\']*)["\']',tag,re.I)
-            pairs.append((nm.group(1),h.unescape(val.group(1) if val else '')))
-          override={'teamcolorid':'40417','strTeamColorName':'22-23 레알 마드리드','n1Strong':'1','n1Grow':'0'}
-          names={k for k,v in pairs}
-          pairs=[(k,override.get(k,v)) for k,v in pairs]
-          for k,v in override.items():
-            if k not in names: pairs.append((k,v))
-          pairs.append(('n4PageNo','1'))
-          print('\nFORM',urllib.parse.urlencode(pairs))
-          for endpoint in ['/datacenter/PlayerList','/DataCenter/PlayerList']:
-            r=s.post('https://fconline.nexon.com'+endpoint,data=pairs,headers={**headers,'X-Requested-With':'XMLHttpRequest','Referer':base},timeout=30)
+          page=s.get('https://fconline.nexon.com/DataCenter',timeout=30).text
+          anchors=[]
+          pat=re.compile(r'<a\b([^>]*)class=["\']([^"\']*tcboosts_[^"\']*)["\']([^>]*)>([\s\S]*?)</a>',re.I)
+          for m in pat.finditer(page):
+            attrs=m.group(1)+' '+m.group(3); classes=m.group(2)
+            no=re.search(r'data-no=["\'](\d+)["\']',attrs,re.I)
+            name=h.unescape(re.sub(r'<[^>]+>',' ',m.group(4)))
+            name=re.sub(r'\s+',' ',name).strip()
+            if no and ('레알' in name or '로스 블랑코스' in name or '갈락티코' in name):
+              anchors.append((no.group(1),classes,name))
+          print('MATCHES')
+          for x in anchors: print(x)
+          exact=next((x for x in anchors if x[2]=='레알 마드리드'),None)
+          print('EXACT',exact)
+          ids=[]
+          if exact: ids.append(exact[0])
+          ids += [x[0] for x in anchors if x[2] in ('22-23 레알 마드리드','로스 블랑코스 공격 듀오','갈락티코 1기')]
+          for tcid in dict.fromkeys(ids):
+            r=s.get('https://fconline.nexon.com/datacenter/TeamColorDetail',params={'teamcolorid':tcid},timeout=30)
             text=r.text
-            print('\nENDPOINT',endpoint,'STATUS',r.status_code,'LEN',len(text))
-            pats=[r'GetPlayerDetail\([^)]*\)',r'Strong(\d+)',r'data-no=["\'](\d{7,})["\']',r'spid[^0-9]{0,10}(\d{7,})']
-            for pat in pats:
-              vals=[]
-              for x in re.finditer(pat,text,re.I):
-                v=x.group(0)
-                if v not in vals: vals.append(v)
-              print('PAT',pat,'COUNT',len(vals),vals[:15])
-            print(text[:12000])
+            plain=h.unescape(re.sub(r'<[^>]+>',' ',text)); plain=re.sub(r'\s+',' ',plain).strip()
+            print('\nDETAIL',tcid,'STATUS',r.status_code,'LEN',len(text))
+            print('TEXT',plain[:4000])
+            print('IDS/NAMES snippets')
+            for needle in ['레알','로스 블랑코스','갈락티코','선수']:
+              i=plain.find(needle)
+              if i>=0: print(plain[max(0,i-500):i+1800])
           PY

@@ -27,3 +27,61 @@ body {
 main > header:first-child {
   display: none;
 }
+
+/* FC Help v2 brand bridge: older feature pages inherit the blue control-desk identity. */
+.bg-\[\#0f1115\] {
+  background-color: #08111f !important;
+}
+
+.bg-\[\#181b21\],
+.bg-\[\#15191d\],
+.bg-\[\#171b1f\] {
+  background-color: #0b1728 !important;
+}
+
+.bg-\[\#0b0d10\] {
+  background-color: #060d18 !important;
+}
+
+.text-lime-100,
+.text-lime-200,
+.text-lime-300,
+.text-lime-400 {
+  color: #7fa6ff !important;
+}
+
+.bg-lime-300,
+.bg-lime-400 {
+  background-color: #3f75ff !important;
+}
+
+.bg-lime-300.text-black,
+.bg-lime-400.text-black {
+  color: #ffffff !important;
+}
+
+.border-lime-300,
+.border-lime-400 {
+  border-color: #3f75ff !important;
+}
+
+.hover\:bg-lime-200:hover,
+.hover\:bg-lime-300:hover,
+.hover\:bg-lime-400:hover {
+  background-color: #5b88ff !important;
+}
+
+.hover\:text-lime-300:hover,
+.hover\:text-lime-400:hover {
+  color: #9bb6ff !important;
+}
+
+main .rounded-3xl,
+main .rounded-2xl {
+  border-radius: 8px !important;
+}
+
+main .rounded-xl,
+main .rounded-lg {
+  border-radius: 5px !important;
+}

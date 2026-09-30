@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 
 const ITEMS = [
   { href: "/mypage", label: "프로필", exact: true },
-  { href: "/mypage/activity", label: "내 활동" },
-  { href: "/mypage/reports", label: "신고내역" },
-  { href: "/mypage/settings", label: "계정 설정" },
+  { href: "/mypage/activity", label: "내 활동", exact: false },
+  { href: "/mypage/reports", label: "신고내역", exact: false },
+  { href: "/mypage/settings", label: "계정 설정", exact: false },
 ] as const;
 
 export default function MyPageNav() {

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0f1115;
-  --foreground: #ededed;
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
 @theme inline {
@@ -12,184 +12,20 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-}
-
-::selection {
-  background: #a3e635;
-  color: #0f1115;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 /* Page-level legacy headers are replaced by the shared header in app/layout.tsx. */
 main > header:first-child {
   display: none;
-}
-
-/*
- * FC Help control-desk material + original palette.
- * Keep the sharper terminal/panel geometry from v2 while restoring the
- * original dark graphite + lime identity across both new and legacy pages.
- */
-.bg-\[\#07101d\],
-.bg-\[\#08111f\],
-.bg-\[\#0f1115\] {
-  background-color: #0f1115 !important;
-}
-
-.bg-\[\#060d18\],
-.bg-\[\#0b0d10\] {
-  background-color: #0b0d10 !important;
-}
-
-.bg-\[\#0a1525\],
-.bg-\[\#0b1728\],
-.bg-\[\#0a1627\],
-.bg-\[\#0c1c32\],
-.bg-\[\#181b21\],
-.bg-\[\#15191d\],
-.bg-\[\#171b1f\] {
-  background-color: #15191d !important;
-}
-
-.bg-\[\#0b1a31\],
-.bg-\[\#0b1829\],
-.bg-\[\#0d1b2e\],
-.bg-\[\#0d1c30\],
-.bg-\[\#0e1e33\],
-.bg-\[\#102444\],
-.bg-\[\#10264a\] {
-  background-color: #182018 !important;
-}
-
-.bg-\[\#3f75ff\] {
-  background-color: #a3e635 !important;
-}
-
-.hover\:bg-\[\#5b88ff\]:hover,
-.hover\:bg-\[\#102444\]:hover,
-.hover\:bg-\[\#0b1829\]:hover,
-.hover\:bg-\[\#0d1b2e\]:hover,
-.hover\:bg-\[\#0d1c30\]:hover,
-.hover\:bg-\[\#0e1e33\]:hover {
-  background-color: #20291f !important;
-}
-
-.hover\:bg-\[\#5b88ff\]:hover {
-  background-color: #bef264 !important;
-}
-
-.border-\[\#1b2940\],
-.border-\[\#1e2c43\],
-.border-\[\#1f2d45\],
-.border-\[\#23324d\],
-.border-\[\#263750\],
-.border-\[\#2b3c5c\],
-.border-\[\#2c4670\],
-.border-\[\#3b5277\] {
-  border-color: #2a302b !important;
-}
-
-.border-\[\#3f75ff\] {
-  border-color: #a3e635 !important;
-}
-
-.hover\:border-\[\#3f75ff\]:hover,
-.hover\:border-\[\#3b5277\]:hover,
-.active\:border-\[\#23324d\]:active {
-  border-color: #a3e635 !important;
-}
-
-.text-\[\#3f75ff\],
-.text-\[\#6f98ff\],
-.text-\[\#78a0ff\],
-.text-\[\#7fa6ff\],
-.text-\[\#8daeff\],
-.text-\[\#8eacff\] {
-  color: #bef264 !important;
-}
-
-.text-\[\#486182\],
-.text-\[\#4d6385\],
-.text-\[\#4f6587\],
-.text-\[\#516a8e\],
-.text-\[\#53637d\],
-.text-\[\#53647e\],
-.text-\[\#536b90\],
-.text-\[\#586984\],
-.text-\[\#58719a\],
-.text-\[\#5f7290\],
-.text-\[\#657693\],
-.text-\[\#687b99\],
-.text-\[\#71829d\],
-.text-\[\#72839d\],
-.text-\[\#7587a3\],
-.text-\[\#8292aa\],
-.text-\[\#8795ad\],
-.text-\[\#93a4bc\],
-.text-\[\#9aabc3\] {
-  color: #858f87 !important;
-}
-
-.text-\[\#dce5f6\],
-.text-\[\#eef3fb\] {
-  color: #f0f2f0 !important;
-}
-
-/* Keep refresh information as the old supporting cyan instead of cobalt blue. */
-.text-\[\#67d5ff\] {
-  color: #67e8f9 !important;
-}
-
-.hover\:text-\[\#7fa6ff\]:hover,
-.hover\:text-\[\#8daeff\]:hover,
-.hover\:text-\[\#93a4bc\]:hover {
-  color: #bef264 !important;
-}
-
-.group:hover .group-hover\:text-\[\#3f75ff\],
-.group:hover .group-hover\:text-\[\#6f98ff\],
-.group:hover .group-hover\:text-\[\#7fa6ff\] {
-  color: #bef264 !important;
-}
-
-.bg-\[\#3f75ff\].text-white,
-.bg-\[\#3f75ff\] .text-white {
-  color: #10130f !important;
-}
-
-/* Legacy Tailwind lime utilities retain the original FC Help accent. */
-.text-lime-100 { color: #ecfccb !important; }
-.text-lime-200 { color: #d9f99d !important; }
-.text-lime-300 { color: #bef264 !important; }
-.text-lime-400 { color: #a3e635 !important; }
-.bg-lime-300 { background-color: #bef264 !important; }
-.bg-lime-400 { background-color: #a3e635 !important; }
-.border-lime-300 { border-color: #bef264 !important; }
-.border-lime-400 { border-color: #a3e635 !important; }
-
-.hover\:bg-lime-200:hover { background-color: #d9f99d !important; }
-.hover\:bg-lime-300:hover { background-color: #d9f99d !important; }
-.hover\:bg-lime-400:hover { background-color: #bef264 !important; }
-.hover\:text-lime-300:hover { color: #bef264 !important; }
-.hover\:text-lime-400:hover { color: #a3e635 !important; }
-
-/* Restore the original lime wash in the new angular lobby hero. */
-main.bg-\[\#08111f\] > section:first-child > div[aria-hidden="true"] {
-  background-image:
-    linear-gradient(120deg, rgba(163, 230, 53, 0.12), transparent 42%),
-    linear-gradient(rgba(190, 242, 100, 0.045) 1px, transparent 1px) !important;
-}
-
-/* Keep the sharper control-desk material. */
-main .rounded-3xl,
-main .rounded-2xl {
-  border-radius: 8px !important;
-}
-
-main .rounded-xl,
-main .rounded-lg {
-  border-radius: 5px !important;
 }

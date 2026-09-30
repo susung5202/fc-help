@@ -15,7 +15,7 @@ export default function MobileNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-[60] border-t border-[#23324d] bg-[#07101d]/95 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] backdrop-blur-xl md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-[#111318]/95 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] backdrop-blur-xl md:hidden">
       <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
         {ITEMS.map((item) => {
           const active =
@@ -27,10 +27,10 @@ export default function MobileNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-h-11 items-center justify-center border px-1 text-center text-[10px] font-black transition ${
+              className={`flex min-h-11 items-center justify-center rounded-xl px-1 text-center text-[10px] font-bold transition ${
                 active
-                  ? "border-[#3f75ff] bg-[#10264a] text-[#8eacff]"
-                  : "border-transparent text-[#72839d] active:border-[#23324d] active:bg-[#0b1829] active:text-white"
+                  ? "bg-lime-400/15 text-lime-300"
+                  : "text-gray-400 active:bg-white/5 active:text-white"
               }`}
             >
               {item.label}

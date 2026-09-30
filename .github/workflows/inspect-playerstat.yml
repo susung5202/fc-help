@@ -7,17 +7,29 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect selected teamcolor players
+      - name: Inspect general player list teamcolor filter
         run: |
           python - <<'PY'
-          import requests,re,html as h
-          from urllib.parse import urlencode
+          import requests,re,html as h,urllib.parse
           headers={'User-Agent':'Mozilla/5.0','Accept-Language':'ko-KR,ko;q=0.9'}
-          base='https://fconline.nexon.com/DataCenter/PlayerStat'
           s=requests.Session(); s.headers.update(headers)
+          base='https://fconline.nexon.com/DataCenter'
           page=s.get(base,timeout=30).text
-          form=re.search(r'<form[^>]+id=["\']form1["\'][^>]*>([\s\S]*?)</form>',page,re.I)
-          body=form.group(1) if form else ''
+          print('PAGE',len(page))
+          # inspect player-list JS function
+          scripts=re.findall(r'<script[^>]+src=["\']([^"\']+)["\']',page,re.I)
+          for src in scripts:
+            u=urllib.parse.urljoin(base,src)
+            try: t=s.get(u,timeout=20).text
+            except: continue
+            for needle in ['GetPlayerList:', 'PlayerList"', 'PlayerList\'']:
+              i=t.find(needle)
+              if i>=0:
+                print('\nSCRIPT',u,'NEEDLE',needle)
+                print(t[max(0,i-1800):i+5000])
+          # parse form defaults
+          m=re.search(r'<form[^>]+id=["\']form1["\'][^>]*>([\s\S]*?)</form>',page,re.I)
+          body=m.group(1) if m else ''
           pairs=[]
           for tag in re.findall(r'<input\b[^>]*>',body,re.I):
             nm=re.search(r'\bname=["\']([^"\']+)["\']',tag,re.I)
@@ -26,34 +38,23 @@ jobs:
             if typ in ('checkbox','radio') and not re.search(r'\bchecked(?:\s*=|\s|>)',tag,re.I): continue
             val=re.search(r'\bvalue=["\']([^"\']*)["\']',tag,re.I)
             pairs.append((nm.group(1),h.unescape(val.group(1) if val else '')))
-          # override team color and stable defaults relevant to AJAX
-          override={'teamcolorid':'40417','strTeamColorName':'22-23 레알 마드리드','n1Strong':'1','n1Grow':'0','n1PlayType':'50'}
+          override={'teamcolorid':'40417','strTeamColorName':'22-23 레알 마드리드','n1Strong':'1','n1Grow':'0'}
           names={k for k,v in pairs}
           pairs=[(k,override.get(k,v)) for k,v in pairs]
           for k,v in override.items():
             if k not in names: pairs.append((k,v))
           pairs.append(('n4PageNo','1'))
-          print('FORM_PAIRS')
-          print(urlencode(pairs))
-          url='https://fconline.nexon.com/datacenter/PlayerRankerStatList'
-          r=s.post(url,data=pairs,headers={**headers,'X-Requested-With':'XMLHttpRequest','Referer':base},timeout=30)
-          text=r.text
-          print('STATUS',r.status_code,'LEN',len(text),'TYPE',r.headers.get('content-type'))
-          # likely identifiers / onclicks / images / names
-          patterns=[
-            r'GetPlayerDetail\([^)]*\)',
-            r'\bspid\s*[=:]\s*["\']?(\d+)',
-            r'PlayerInfo[^"\']*spid=(\d+)',
-            r'Strong(\d+)',
-            r'data-spid=["\']?(\d+)',
-          ]
-          for pat in patterns:
-            vals=[]
-            for m in re.finditer(pat,text,re.I):
-              v=m.group(0)
-              if v not in vals: vals.append(v)
-            print('\nPAT',pat,'COUNT',len(vals))
-            print('\n'.join(vals[:30]))
-          print('\nFIRST_HTML')
-          print(text[:18000])
+          print('\nFORM',urllib.parse.urlencode(pairs))
+          for endpoint in ['/datacenter/PlayerList','/DataCenter/PlayerList']:
+            r=s.post('https://fconline.nexon.com'+endpoint,data=pairs,headers={**headers,'X-Requested-With':'XMLHttpRequest','Referer':base},timeout=30)
+            text=r.text
+            print('\nENDPOINT',endpoint,'STATUS',r.status_code,'LEN',len(text))
+            pats=[r'GetPlayerDetail\([^)]*\)',r'Strong(\d+)',r'data-no=["\'](\d{7,})["\']',r'spid[^0-9]{0,10}(\d{7,})']
+            for pat in pats:
+              vals=[]
+              for x in re.finditer(pat,text,re.I):
+                v=x.group(0)
+                if v not in vals: vals.append(v)
+              print('PAT',pat,'COUNT',len(vals),vals[:15])
+            print(text[:12000])
           PY

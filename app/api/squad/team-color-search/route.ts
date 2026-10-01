@@ -382,17 +382,45 @@ function evenlySample<T>(items: T[], max: number) {
   return result;
 }
 
+function getRelationStem(name: string) {
+  const cleaned = name
+    .replace(/\b\d{2,4}\s*[-~–]\s*\d{2,4}\b/g, " ")
+    .replace(/\b\d+기\b/g, " ")
+    .replace(/\b(공격|수비|중원|뉴|유럽|역대|전설|듀오|트리오|황금세대)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalize(cleaned).length >= 4 ? cleaned : "";
+}
+
+function getPlayerNameSet(players: TeamColorPlayer[]) {
+  return new Set(players.map((player) => normalize(player.name)).filter(Boolean));
+}
+
+async function getRelatedFit(
+  teamColor: TeamColorCatalogItem,
+  baseNames: Set<string>
+) {
+  const players = await getPlayersForTeamColor(teamColor, 4, 160);
+  if (players.length === 0) return null;
+  const matched = players.filter((player) => baseNames.has(normalize(player.name))).length;
+  const ratio = matched / players.length;
+  const requiredRatio = players.length <= 4 ? 0.5 : players.length <= 8 ? 0.6 : 0.72;
+  if (matched < 2 || ratio < requiredRatio) return null;
+  return { matched, ratio, playerCount: players.length };
+}
+
 async function discoverRelatedTeamColors(
   affiliation: TeamColorCatalogItem,
   catalog: TeamColorCatalogItem[]
 ): Promise<TeamColorSearchItem[]> {
-  const basePlayers = await getPlayersForTeamColor(affiliation, 5, 160);
-  const samples = evenlySample(basePlayers, 48);
+  const basePlayers = await getPlayersForTeamColor(affiliation, 8, 240);
+  const baseNames = getPlayerNameSet(basePlayers);
+  const samples = evenlySample(basePlayers, 64);
   const counts = new Map<string, { count: number; ids: Set<number> }>();
 
-  for (let index = 0; index < samples.length; index += 6) {
+  for (let index = 0; index < samples.length; index += 8) {
     const batch = await Promise.all(
-      samples.slice(index, index + 6).map((player) => getRelationshipOptions(player.sampleSpid))
+      samples.slice(index, index + 8).map((player) => getRelationshipOptions(player.sampleSpid))
     );
     for (const options of batch) {
       const seen = new Set<string>();
@@ -410,7 +438,7 @@ async function discoverRelatedTeamColors(
 
   const catalogByName = new Map(catalog.map((item) => [normalize(item.name), item]));
   const catalogById = new Map(catalog.map((item) => [item.id, item]));
-  const related: TeamColorSearchItem[] = [];
+  const discovered: Array<{ item: TeamColorCatalogItem; overlap: number }> = [];
 
   for (const [key, meta] of counts) {
     if (meta.count < 2) continue;
@@ -425,10 +453,56 @@ async function discoverRelatedTeamColors(
       }
     }
     if (!official || official.category !== "feature") continue;
-    related.push({ ...official, related: true, overlap: meta.count });
+    discovered.push({ item: official, overlap: meta.count });
   }
 
-  return related.sort(
+  const verified = new Map<number, TeamColorSearchItem>();
+  for (let index = 0; index < discovered.length; index += 5) {
+    const batch = await Promise.all(
+      discovered.slice(index, index + 5).map(async ({ item, overlap }) => {
+        const fit = await getRelatedFit(item, baseNames);
+        return fit ? { item, overlap: Math.max(overlap, fit.matched) } : null;
+      })
+    );
+    for (const result of batch) {
+      if (!result) continue;
+      verified.set(result.item.id, {
+        ...result.item,
+        related: true,
+        overlap: result.overlap,
+      });
+    }
+  }
+
+  const stems = Array.from(verified.values())
+    .map((item) => getRelationStem(item.name))
+    .filter(Boolean);
+  const stemKeys = Array.from(new Set(stems.map(normalize).filter((key) => key.length >= 4)));
+
+  const expanded = catalog.filter((item) => {
+    if (item.category !== "feature" || verified.has(item.id)) return false;
+    const key = normalize(item.name);
+    return stemKeys.some((stem) => key.startsWith(stem));
+  });
+
+  for (let index = 0; index < expanded.length; index += 5) {
+    const batch = await Promise.all(
+      expanded.slice(index, index + 5).map(async (item) => {
+        const fit = await getRelatedFit(item, baseNames);
+        return fit ? { item, overlap: fit.matched } : null;
+      })
+    );
+    for (const result of batch) {
+      if (!result) continue;
+      verified.set(result.item.id, {
+        ...result.item,
+        related: true,
+        overlap: result.overlap,
+      });
+    }
+  }
+
+  return Array.from(verified.values()).sort(
     (a, b) => (b.overlap ?? 0) - (a.overlap ?? 0) || a.name.localeCompare(b.name, "ko-KR")
   );
 }

@@ -625,7 +625,7 @@ async function searchTeamColors(query: string) {
   if (cached && cached.expiresAt > Date.now()) return cached.items;
 
   const catalog = await getCatalog();
-  let direct = catalog
+  let direct: TeamColorSearchItem[] = catalog
     .filter((item) => normalize(item.name).includes(normalizedQuery))
     .sort((a, b) => {
       const score = directMatchScore(a, normalizedQuery) - directMatchScore(b, normalizedQuery);

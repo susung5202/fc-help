@@ -1,0 +1,32 @@
+name: fix-teamcolor-types
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-teamcolor-types.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix inferred teamcolor type
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/api/squad/team-color-search/route.ts')
+          t=p.read_text()
+          old='  let direct = catalog\n'
+          new='  let direct: TeamColorSearchItem[] = catalog\n'
+          if old not in t: raise SystemExit('marker missing')
+          p.write_text(t.replace(old,new,1))
+          PY
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add app/api/squad/team-color-search/route.ts
+          git commit -m "fix teamcolor search result typing"
+          git push
+      - name: Typecheck
+        run: |
+          npm ci
+          npx tsc --noEmit

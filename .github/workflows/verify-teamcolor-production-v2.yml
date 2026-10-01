@@ -1,0 +1,32 @@
+name: verify-teamcolor-production-v2
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-teamcolor-production-v2.yml'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production API
+        run: |
+          python - <<'PY'
+          import requests
+          base='https://fchelp.xyz/api/squad/team-color-search'
+          s=requests.Session(); s.headers.update({'User-Agent':'Mozilla/5.0'})
+          for q in ['프랑스','벨기에','레알마드리드','레알 마드리드']:
+            r=s.get(base,params={'q':q},timeout=60)
+            print('SEARCH',q,r.status_code)
+            data=r.json()
+            print([x['name'] for x in data.get('teamColors',[])][:30])
+          for tc,name in [(2002,'프랑스'),(2008,'벨기에'),(40364,'2022 프랑스')]:
+            pages=[]
+            for page in [1,2]:
+              r=s.get(base,params={'teamColorId':tc,'page':page,'target':'field'},timeout=60)
+              print('CARDS',name,'page',page,r.status_code)
+              data=r.json()
+              print('total',data.get('total'),'totalPages',data.get('totalPages'),'count',len(data.get('players',[])))
+              ids=[x['id'] for x in data.get('players',[])]
+              print('ids',ids[:5], 'names/seasons', [(x['name'],x['seasonName']) for x in data.get('players',[])[:5]])
+              pages.append(ids)
+            print('PAGES_DIFFER',pages[0]!=pages[1])
+          PY

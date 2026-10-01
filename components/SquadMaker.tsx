@@ -442,6 +442,22 @@ export default function SquadMaker() {
   }, [formationKey, players, customPositions, hydrated]);
 
   useEffect(() => {
+  const handleTeamColorSeasonSelection = (event: Event) => {
+    const player = (event as CustomEvent<SearchPlayer>).detail;
+    if (!player || !selectedSlotId) return;
+    const targetSlot = formation.slots.find((slot) => slot.slotId === selectedSlotId);
+    if (!targetSlot) return;
+    if (isGoalkeeperSlot(targetSlot.label) !== isGoalkeeperPlayer(player)) return;
+    choosePlayer({
+      ...player,
+      newTraits: Array.isArray(player.newTraits) ? player.newTraits : [],
+    }, grade);
+  };
+  window.addEventListener("fc-help:squad-select-player", handleTeamColorSeasonSelection);
+  return () => window.removeEventListener("fc-help:squad-select-player", handleTeamColorSeasonSelection);
+}, [selectedSlotId, formation, grade]);
+
+  useEffect(() => {
     if (!selectedSlotId || query.trim().length < 1) {
       setResults([]);
       setLoading(false);

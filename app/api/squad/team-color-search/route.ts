@@ -19,6 +19,27 @@ type TeamColorPlayer = {
   position: string | null;
 };
 
+type PlayerMeta = {
+  id: number;
+  name: string;
+};
+
+type SeasonMeta = {
+  seasonId: number;
+  className: string;
+  seasonImg: string;
+};
+
+type TeamColorSeasonCard = {
+  id: number;
+  name: string;
+  seasonName: string;
+  seasonImg: string | null;
+  ovr: number | null;
+  position: string | null;
+  newTraits: string[];
+};
+
 type RelationshipOption = {
   id: number | null;
   name: string;
@@ -27,6 +48,8 @@ type RelationshipOption = {
 const DATA_CENTER_URL = "https://fconline.nexon.com/DataCenter";
 const PLAYER_LIST_URL = "https://fconline.nexon.com/datacenter/PlayerList";
 const PLAYER_ABILITY_URL = "https://fconline.nexon.com/datacenter/PlayerAbility";
+const PLAYER_META_URL = "https://open.api.nexon.com/static/fconline/meta/spid.json";
+const SEASON_META_URL = "https://open.api.nexon.com/static/fconline/meta/seasonid.json";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 const CATALOG_CACHE_MS = 6 * 60 * 60 * 1000;
@@ -35,8 +58,13 @@ const PLAYER_CACHE_MS = 60 * 60 * 1000;
 const RELATIONSHIP_CACHE_MS = 6 * 60 * 60 * 1000;
 
 let catalogCache: { expiresAt: number; items: TeamColorCatalogItem[] } | null = null;
+let nationNameKeys = new Set<string>();
+let playerMetaPromise: Promise<PlayerMeta[]> | null = null;
+let seasonMetaPromise: Promise<SeasonMeta[]> | null = null;
+let metadataExpiresAt = 0;
 const queryCache = new Map<string, { expiresAt: number; items: TeamColorSearchItem[] }>();
 const playerCache = new Map<number, { expiresAt: number; items: TeamColorPlayer[] }>();
+const seasonCardCache = new Map<string, { expiresAt: number; items: TeamColorSeasonCard[] }>();
 const relationshipCache = new Map<number, { expiresAt: number; items: RelationshipOption[] }>();
 
 export const maxDuration = 60;
@@ -128,24 +156,29 @@ function parseId(markup: string) {
 
 function parseCatalog(html: string) {
   const result = new Map<number, TeamColorCatalogItem>();
+  const nationalities = new Set<string>();
   const anchorPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
 
   for (const match of html.matchAll(anchorPattern)) {
     const attributes = match[1];
     const className = attributes.match(/\bclass\s*=\s*["']([^"']*)["']/i)?.[1] ?? "";
+    const name = htmlToText(match[2]);
+    if (className.includes("nationality_item")) {
+      const key = normalize(name);
+      if (key) nationalities.add(key);
+      continue;
+    }
     const category: TeamColorCategory | null = className.includes("tcboosts_affiliation")
       ? "affiliation"
       : className.includes("tcboosts_feature")
         ? "feature"
         : null;
     if (!category) continue;
-
     const id = parseId(attributes);
-    const name = htmlToText(match[2]);
     if (!id || !name || name.length > 80) continue;
     result.set(id, { id, name, category });
   }
-
+  nationNameKeys = nationalities;
   return Array.from(result.values());
 }
 
@@ -165,6 +198,36 @@ async function getCatalog() {
   const items = parseCatalog(await response.text());
   catalogCache = { expiresAt: Date.now() + CATALOG_CACHE_MS, items };
   return items;
+}
+
+async function getPlayerMeta(): Promise<PlayerMeta[]> {
+  if (playerMetaPromise && Date.now() < metadataExpiresAt) return playerMetaPromise;
+  playerMetaPromise = fetch(PLAYER_META_URL, { cache: "no-store" })
+    .then((response) => {
+      if (!response.ok) throw new Error("player metadata request failed");
+      return response.json() as Promise<PlayerMeta[]>;
+    })
+    .catch((error) => {
+      playerMetaPromise = null;
+      throw error;
+    });
+  metadataExpiresAt = Date.now() + CATALOG_CACHE_MS;
+  return playerMetaPromise;
+}
+
+async function getSeasonMeta(): Promise<SeasonMeta[]> {
+  if (seasonMetaPromise && Date.now() < metadataExpiresAt) return seasonMetaPromise;
+  seasonMetaPromise = fetch(SEASON_META_URL, { cache: "no-store" })
+    .then((response) => {
+      if (!response.ok) throw new Error("season metadata request failed");
+      return response.json() as Promise<SeasonMeta[]>;
+    })
+    .catch((error) => {
+      seasonMetaPromise = null;
+      throw error;
+    });
+  metadataExpiresAt = Date.now() + CATALOG_CACHE_MS;
+  return seasonMetaPromise;
 }
 
 function buildPlayerListBody(teamColor: TeamColorCatalogItem, page: number) {
@@ -300,6 +363,47 @@ async function getPlayersForTeamColor(teamColor: TeamColorCatalogItem, pageLimit
 
   const items = Array.from(byName.values());
   playerCache.set(teamColor.id, { expiresAt: Date.now() + PLAYER_CACHE_MS, items });
+  return items;
+}
+
+async function getAllSeasonCardsForTeamColor(
+  teamColor: TeamColorCatalogItem,
+  target: "field" | "gk"
+) {
+  const cacheKey = `${teamColor.id}:${target}`;
+  const cached = seasonCardCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.items;
+
+  const [eligiblePlayers, playerMeta, seasons] = await Promise.all([
+    getPlayersForTeamColor(teamColor, 2, 240),
+    getPlayerMeta(),
+    getSeasonMeta(),
+  ]);
+  const identityMap = new Map<number, TeamColorPlayer>();
+  for (const player of eligiblePlayers) {
+    const identity = player.sampleSpid % 1_000_000;
+    if (!identityMap.has(identity)) identityMap.set(identity, player);
+  }
+  const seasonMap = new Map(seasons.map((season) => [Number(season.seasonId), season]));
+  const items: TeamColorSeasonCard[] = [];
+  for (const player of playerMeta) {
+    const eligible = identityMap.get(player.id % 1_000_000);
+    if (!eligible) continue;
+    const isGoalkeeper = eligible.position === "GK";
+    if ((target === "gk" && !isGoalkeeper) || (target === "field" && isGoalkeeper)) continue;
+    const season = seasonMap.get(Math.floor(player.id / 1_000_000));
+    items.push({
+      id: player.id,
+      name: player.name,
+      seasonName: season?.className ?? "시즌 미확인",
+      seasonImg: season?.seasonImg ?? null,
+      ovr: null,
+      position: eligible.position,
+      newTraits: [],
+    });
+  }
+  items.sort((a, b) => a.name.localeCompare(b.name, "ko-KR") || b.id - a.id);
+  seasonCardCache.set(cacheKey, { expiresAt: Date.now() + PLAYER_CACHE_MS, items });
   return items;
 }
 
@@ -521,7 +625,7 @@ async function searchTeamColors(query: string) {
   if (cached && cached.expiresAt > Date.now()) return cached.items;
 
   const catalog = await getCatalog();
-  const direct = catalog
+  let direct = catalog
     .filter((item) => normalize(item.name).includes(normalizedQuery))
     .sort((a, b) => {
       const score = directMatchScore(a, normalizedQuery) - directMatchScore(b, normalizedQuery);
@@ -535,9 +639,15 @@ async function searchTeamColors(query: string) {
   const exactAffiliation = catalog.find(
     (item) => item.category === "affiliation" && normalize(item.name) === normalizedQuery
   );
+  const isNationalTeam = Boolean(exactAffiliation && nationNameKeys.has(normalizedQuery));
+  if (isNationalTeam) {
+    direct = direct.map((item) =>
+      item.category === "feature" ? { ...item, related: true } : item
+    );
+  }
 
   let related: TeamColorSearchItem[] = [];
-  if (exactAffiliation) {
+  if (exactAffiliation && !isNationalTeam) {
     try {
       related = await discoverRelatedTeamColors(exactAffiliation, catalog);
     } catch (error) {
@@ -590,9 +700,17 @@ export async function GET(request: Request) {
       if (!teamColor) {
         return NextResponse.json({ error: "팀컬러를 찾을 수 없습니다." }, { status: 404 });
       }
-      const players = await getPlayersForTeamColor(teamColor);
+      const pageRaw = Number(searchParams.get("page") ?? "1");
+      const page = Number.isInteger(pageRaw) && pageRaw > 0 ? Math.min(pageRaw, 500) : 1;
+      const target = searchParams.get("target") === "gk" ? "gk" : "field";
+      const pageSize = 30;
+      const allCards = await getAllSeasonCardsForTeamColor(teamColor, target);
+      const start = (page - 1) * pageSize;
+      const players = allCards.slice(start, start + pageSize);
       return NextResponse.json(
-        { teamColor, players },
+        { teamColor, players, page, pageSize, total: allCards.length,
+          totalPages: Math.max(1, Math.ceil(allCards.length / pageSize)),
+          hasNext: start + pageSize < allCards.length },
         { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=21600" } }
       );
     } catch (error) {
@@ -601,7 +719,7 @@ export async function GET(request: Request) {
     }
   }
 
-  if (query.length < 2) {
+  if (normalize(query).length < 2) {
     return NextResponse.json({ teamColors: [] });
   }
   if (query.length > 40) {

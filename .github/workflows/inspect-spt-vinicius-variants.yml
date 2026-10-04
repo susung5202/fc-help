@@ -9,26 +9,17 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Compare official metadata and FC Help variants
+      - name: Inspect official mobile position markup
         run: |
           python - <<'PY'
-          import requests
-          s=requests.Session(); s.headers.update({'User-Agent':'Mozilla/5.0'})
-          meta=s.get('https://open.api.nexon.com/static/fconline/meta/spid.json',timeout=90).json()
-          seasons=s.get('https://open.api.nexon.com/static/fconline/meta/seasonid.json',timeout=90).json()
-          sm={int(x['seasonId']):x['className'] for x in seasons}
-          cur=next(x for x in meta if x['id']==834238794)
-          same=[x for x in meta if x['name']==cur['name']]
-          print('NAME',cur['name'],'OFFICIAL_COUNT',len(same))
-          print('OFFICIAL',[(x['id'],sm.get(x['id']//1000000)) for x in same])
-          r=s.get('https://fchelp.xyz/api/squad/variants',params={'spid':834238794},timeout=120)
-          print('STATUS',r.status_code)
-          d=r.json()
-          vv=d.get('variants',[])
-          print('API_COUNT',len(vv))
-          print('API',[(x.get('id'),x.get('seasonName'),x.get('position')) for x in vv])
-          official_ids={x['id'] for x in same}
-          api_ids={x.get('id') for x in vv}
-          print('MISSING',[(x['id'],sm.get(x['id']//1000000)) for x in same if x['id'] not in api_ids])
-          print('EXTRA',[x for x in api_ids if x not in official_ids])
+          import requests,re
+          s=requests.Session(); s.headers.update({'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1'})
+          for spid in [834238794,848238794,867238794]:
+            h=s.get('https://m.fconline.nexon.com/datacenter/playerinfo',params={'spid':spid},timeout=90).text
+            print('\nSPID',spid,'LEN',len(h))
+            for pat in ['position','LW','GK','ovr','ability']:
+              m=re.search(pat,h,re.I)
+              if m:
+                a=max(0,m.start()-500); b=min(len(h),m.start()+1200)
+                print('PAT',pat, re.sub(r'\\s+',' ',h[a:b])[:1800])
           PY

@@ -1,0 +1,34 @@
+name: inspect-spt-vinicius-variants
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-spt-vinicius-variants.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare official metadata and FC Help variants
+        run: |
+          python - <<'PY'
+          import requests
+          s=requests.Session(); s.headers.update({'User-Agent':'Mozilla/5.0'})
+          meta=s.get('https://open.api.nexon.com/static/fconline/meta/spid.json',timeout=90).json()
+          seasons=s.get('https://open.api.nexon.com/static/fconline/meta/seasonid.json',timeout=90).json()
+          sm={int(x['seasonId']):x['className'] for x in seasons}
+          cur=next(x for x in meta if x['id']==834238794)
+          same=[x for x in meta if x['name']==cur['name']]
+          print('NAME',cur['name'],'OFFICIAL_COUNT',len(same))
+          print('OFFICIAL',[(x['id'],sm.get(x['id']//1000000)) for x in same])
+          r=s.get('https://fchelp.xyz/api/squad/variants',params={'spid':834238794},timeout=120)
+          print('STATUS',r.status_code)
+          d=r.json()
+          vv=d.get('variants',[])
+          print('API_COUNT',len(vv))
+          print('API',[(x.get('id'),x.get('seasonName'),x.get('position')) for x in vv])
+          official_ids={x['id'] for x in same}
+          api_ids={x.get('id') for x in vv}
+          print('MISSING',[(x['id'],sm.get(x['id']//1000000)) for x in same if x['id'] not in api_ids])
+          print('EXTRA',[x for x in api_ids if x not in official_ids])
+          PY

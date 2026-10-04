@@ -704,13 +704,36 @@ export async function GET(request: Request) {
       const page = Number.isInteger(pageRaw) && pageRaw > 0 ? Math.min(pageRaw, 500) : 1;
       const target = searchParams.get("target") === "gk" ? "gk" : "field";
       const pageSize = 30;
+      const rawCardQuery = (searchParams.get("cardQuery") ?? "").trim().slice(0, 40);
       const allCards = await getAllSeasonCardsForTeamColor(teamColor, target);
+      const cardQuery = normalize(rawCardQuery);
+      const queryTerms = rawCardQuery
+        .normalize("NFKC")
+        .toLowerCase()
+        .split(/\s+/)
+        .map((term) => normalize(term))
+        .filter(Boolean);
+      const filteredCards = cardQuery
+        ? allCards.filter((card) => {
+            const name = normalize(card.name);
+            const season = normalize(card.seasonName);
+            const combined = normalize(`${card.name}${card.seasonName}`);
+            const reverseCombined = normalize(`${card.seasonName}${card.name}`);
+            return (
+              name.includes(cardQuery) ||
+              season.includes(cardQuery) ||
+              combined.includes(cardQuery) ||
+              reverseCombined.includes(cardQuery) ||
+              queryTerms.every((term) => name.includes(term) || season.includes(term))
+            );
+          })
+        : allCards;
       const start = (page - 1) * pageSize;
-      const players = allCards.slice(start, start + pageSize);
+      const players = filteredCards.slice(start, start + pageSize);
       return NextResponse.json(
-        { teamColor, players, page, pageSize, total: allCards.length,
-          totalPages: Math.max(1, Math.ceil(allCards.length / pageSize)),
-          hasNext: start + pageSize < allCards.length },
+        { teamColor, players, page, pageSize, total: filteredCards.length,
+          totalPages: Math.max(1, Math.ceil(filteredCards.length / pageSize)),
+          hasNext: start + pageSize < filteredCards.length },
         { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=21600" } }
       );
     } catch (error) {

@@ -79,13 +79,22 @@ function parseSalary(html: string, playerName: string): number | null {
 function parseOvrPositionTraits(html: string) {
   const text = htmlToText(html);
 
-  // The player card header is the authoritative source for base OVR/position.
-  // Scanning the whole page can accidentally match ability-table text or other
-  // position labels and misclassify field players as GK.
-  const ovrMatch = html.match(
+  // Only inspect the selected player's own card. The full page also contains
+  // quick-search/recommended players whose OVR/position can appear earlier.
+  const detailStart = html.search(
+    /<div[^>]*class=["'][^"']*\bdetailInfo\b[^"']*["'][^>]*>/i
+  );
+  const detailHtml = detailStart >= 0 ? html.slice(detailStart, detailStart + 20_000) : "";
+  const playerWrapStart = detailHtml.search(
+    /<div[^>]*class=["'][^"']*\bplayerWrap\b[^"']*["'][^>]*>/i
+  );
+  const playerCardHtml =
+    playerWrapStart >= 0 ? detailHtml.slice(playerWrapStart, playerWrapStart + 5_000) : "";
+
+  const ovrMatch = playerCardHtml.match(
     /<span[^>]*class=["'][^"']*\bovr\b[^"']*["'][^>]*>\s*(\d{2,3})\s*<\/span>/i
   );
-  const positionMatch = html.match(
+  const positionMatch = playerCardHtml.match(
     /<span[^>]*class=["'][^"']*\bposition\b[^"']*["'][^>]*>\s*([A-Z]{1,3})\s*<\/span>/i
   );
 

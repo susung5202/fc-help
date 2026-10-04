@@ -1,0 +1,33 @@
+name: inspect-ws-vinicius
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-ws-vinicius.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect WS Vinicius
+        run: |
+          python - <<'PY'
+          import requests
+          base='https://fchelp.xyz/api/squad/team-color-search'
+          s=requests.Session(); s.headers.update({'User-Agent':'Mozilla/5.0'})
+          sr=s.get(base,params={'q':'레알마드리드'},timeout=90).json()
+          print('TEAMCOLORS',[(x.get('id'),x.get('name')) for x in sr.get('teamColors',[])[:20]])
+          real=next((x for x in sr.get('teamColors',[]) if x.get('name')=='레알 마드리드'),None)
+          print('REAL',real)
+          if real:
+            found=[]
+            for p in range(1,120):
+              d=s.get(base,params={'teamColorId':real['id'],'page':p,'target':'field'},timeout=90).json()
+              for x in d.get('players',[]):
+                if x.get('id')==848238794 or ('비니시우스' in x.get('name','') and 'WS' in x.get('seasonName','')):
+                  found.append((p,x))
+              if p>=d.get('totalPages',1): break
+            print('FOUND',found)
+          meta=s.get('https://open.api.nexon.com/static/fconline/meta/spid.json',timeout=90).json()
+          print('META_WS',[x for x in meta if x.get('id')==848238794])
+          PY

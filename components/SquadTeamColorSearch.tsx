@@ -55,7 +55,10 @@ export default function SquadTeamColorSearch() {
   const [teamColors, setTeamColors] = useState<TeamColorItem[]>([]);
   const [selectedTeamColor, setSelectedTeamColor] = useState<TeamColorItem | null>(null);
   const [players, setPlayers] = useState<TeamColorSeasonCard[]>([]);
+  const [playerQuery, setPlayerQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [loadingColors, setLoadingColors] = useState(false);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
@@ -168,6 +171,7 @@ export default function SquadTeamColorSearch() {
       page: String(page),
       target: goalkeeperOnly ? "gk" : "field",
     });
+    if (playerQuery.trim()) params.set("cardQuery", playerQuery.trim());
 
     void fetch(`/api/squad/team-color-search?${params.toString()}`, {
       signal: controller.signal,
@@ -180,6 +184,8 @@ export default function SquadTeamColorSearch() {
       .then((data) => {
         if (controller.signal.aborted) return;
         setPlayers(Array.isArray(data.players) ? data.players : []);
+        setTotal(Number(data.total) || 0);
+        setTotalPages(Math.max(1, Number(data.totalPages) || 1));
         setHasNext(Boolean(data.hasNext));
       })
       .catch((requestError) => {
@@ -195,11 +201,14 @@ export default function SquadTeamColorSearch() {
       });
 
     return () => controller.abort();
-  }, [mountNode, selectedTeamColor, page, goalkeeperOnly]);
+  }, [mountNode, selectedTeamColor, page, goalkeeperOnly, playerQuery]);
 
   function resetSelection(nextQuery = query) {
     setSelectedTeamColor(null);
     setPlayers([]);
+    setPlayerQuery("");
+    setTotal(0);
+    setTotalPages(1);
     setHasNext(false);
     setPage(1);
     setPlayerError("");
@@ -287,6 +296,7 @@ export default function SquadTeamColorSearch() {
                   key={teamColor.id}
                   type="button"
                   onClick={() => {
+                    setPlayerQuery("");
                     setPage(1);
                     setSelectedTeamColor(teamColor);
                   }}
@@ -340,6 +350,16 @@ export default function SquadTeamColorSearch() {
             </button>
           </div>
 
+          <input
+            value={playerQuery}
+            onChange={(event) => {
+              setPlayerQuery(event.target.value);
+              setPage(1);
+            }}
+            placeholder="선수명 또는 시즌 검색 · 예: 비니시우스, WS"
+            className="mt-2.5 w-full rounded-lg border border-white/10 bg-[#0f1115] px-3 py-2.5 text-xs font-bold text-white outline-none placeholder:font-medium placeholder:text-gray-600 focus:border-lime-400/50"
+          />
+
           {loadingPlayers && (
             <p className="mt-3 py-5 text-center text-[10px] font-bold text-gray-500">
               시즌카드를 불러오는 중...
@@ -352,14 +372,16 @@ export default function SquadTeamColorSearch() {
           )}
           {!loadingPlayers && !playerError && players.length === 0 && (
             <p className="mt-3 py-5 text-center text-[10px] text-gray-500">
-              현재 포지션에 표시할 시즌카드가 없습니다.
+              {playerQuery.trim()
+                ? `"${playerQuery.trim()}" 검색 결과가 없습니다.`
+                : "현재 포지션에 표시할 시즌카드가 없습니다."}
             </p>
           )}
 
           {!loadingPlayers && !playerError && players.length > 0 && (
             <>
               <div className="mt-3 flex items-center justify-between text-[9px] font-bold text-gray-500">
-                <span>시즌카드 {players.length}개 · {page}페이지</span>
+                <span>시즌카드 {total}개 · {page}/{totalPages}페이지</span>
                 <span>{goalkeeperOnly ? "GK 시즌만" : "필드 선수 시즌"}</span>
               </div>
               <div className="mt-2 grid max-h-[420px] grid-cols-1 gap-1.5 overflow-y-auto rounded-lg border border-white/[0.07] bg-[#0f1115] p-1.5 sm:grid-cols-2">
@@ -408,7 +430,9 @@ export default function SquadTeamColorSearch() {
                 >
                   ← 이전
                 </button>
-                <span className="min-w-12 text-center text-[10px] font-black text-white">{page}</span>
+                <span className="min-w-16 text-center text-[10px] font-black text-white">
+                  {page} / {totalPages}
+                </span>
                 <button
                   type="button"
                   disabled={!hasNext || loadingPlayers}

@@ -91,23 +91,17 @@ function parseOvrPositionTraits(html: string) {
   const playerCardHtml =
     playerWrapStart >= 0 ? detailHtml.slice(playerWrapStart, playerWrapStart + 5_000) : "";
 
-  const ovrMatch = playerCardHtml.match(
-    /<span[^>]*class=["'][^"']*\bovr\b[^"']*["'][^>]*>\s*(\d{2,3})\s*<\/span>/i
-  );
-  const positionMatch = playerCardHtml.match(
-    /<span[^>]*class=["'][^"']*\bposition\b[^"']*["'][^>]*>\s*([A-Z]{1,3})\s*<\/span>/i
+  const headerMatch = playerCardHtml.match(
+    /<span[^>]*class=["'][^"']*ovr[^"']*["'][^>]*>\s*(\d{2,3})\s*<\/span>[\s\S]{0,300}?<span[^>]*class=["'][^"']*position[^"']*["'][^>]*>\s*([A-Z]{1,3})\s*<\/span>/i
   );
 
-  const parsedOvr = ovrMatch ? Number(ovrMatch[1]) : null;
+  const parsedOvr = headerMatch ? Number(headerMatch[1]) : null;
   const ovr =
     parsedOvr !== null && Number.isFinite(parsedOvr) && parsedOvr >= 40 && parsedOvr <= 200
       ? parsedOvr
       : null;
-  const parsedPosition = positionMatch?.[1]?.toUpperCase() ?? null;
-  const position =
-    parsedPosition && POSITIONS.includes(parsedPosition as (typeof POSITIONS)[number])
-      ? parsedPosition
-      : null;
+  const parsedPosition = headerMatch?.[2]?.toUpperCase() ?? null;
+  const position = POSITIONS.find((item) => item === parsedPosition) ?? null;
 
   const compactText = compact(text);
   const newTraits = NEW_TRAITS.filter((trait) => compactText.includes(compact(trait)));
@@ -173,15 +167,16 @@ export async function GET(request: Request) {
     if (!current) return NextResponse.json({ variants: [] });
 
     const seasonMap = new Map(seasons.map((season) => [Number(season.seasonId), season]));
-    const sameName = players
-      .filter((player) => player.name === current.name)
+    const playerIdentity = current.id % 1_000_000;
+    const samePlayer = players
+      .filter((player) => player.id % 1_000_000 === playerIdentity)
       .sort((a, b) => b.id - a.id);
 
-    // Do not truncate historical seasons. The old 18-card cap hid classes such as EBS
-    // for players with many released versions.
+    // Use the stable player identity embedded in spid instead of the display name.
+    // Exact-name matching mixes unrelated namesakes and can hide/show the wrong seasons.
     const selected = [
       current,
-      ...sameName.filter((player) => player.id !== current.id),
+      ...samePlayer.filter((player) => player.id !== current.id),
     ];
 
     const variants = await Promise.all(selected.map((player) => fetchVariant(player, seasonMap)));

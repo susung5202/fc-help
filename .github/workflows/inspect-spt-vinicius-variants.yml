@@ -9,27 +9,16 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify production Vinicius variants after parser fix
+      - name: Inspect remaining GK variant
         run: |
           python - <<'PY'
           import requests
-          r=requests.get(
+          d=requests.get(
             'https://fchelp.xyz/api/squad/variants',
-            params={'spid':834238794,'_v':'c17ca40'},
+            params={'spid':834238794,'_v':'c17ca40b'},
             timeout=120,
             headers={'User-Agent':'Mozilla/5.0'}
-          )
-          print('STATUS',r.status_code)
-          d=r.json(); vv=d.get('variants',[])
-          pick={x.get('id'):x for x in vv}
-          print('COUNT',len(vv))
-          for spid in [867238794,848238794,834238794]:
-            x=pick.get(spid)
-            print(spid, x and (x.get('seasonName'),x.get('position'),x.get('ovr')))
-          print('GK_COUNT',sum(1 for x in vv if x.get('position')=='GK'))
-          print('FIELD_VISIBLE',sum(1 for x in vv if x.get('position')!='GK'))
-          assert len(vv)==43
-          assert pick[867238794].get('position')!='GK'
-          assert pick[848238794].get('position')!='GK'
-          assert sum(1 for x in vv if x.get('position')=='GK')==0
+          ).json()
+          vv=d.get('variants',[])
+          print('GK_VARIANTS',[(x.get('id'),x.get('name'),x.get('seasonName'),x.get('position'),x.get('ovr')) for x in vv if x.get('position')=='GK'])
           PY

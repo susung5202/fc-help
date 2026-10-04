@@ -9,16 +9,35 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect remaining GK variant
+      - name: Verify final Vinicius season variants
         run: |
           python - <<'PY'
           import requests
-          d=requests.get(
+          s=requests.Session(); s.headers.update({'User-Agent':'Mozilla/5.0'})
+          meta=s.get('https://open.api.nexon.com/static/fconline/meta/spid.json',timeout=90).json()
+          identity=834238794 % 1000000
+          expected=[x for x in meta if x['id'] % 1000000 == identity]
+          print('EXPECTED_COUNT',len(expected))
+          r=s.get(
             'https://fchelp.xyz/api/squad/variants',
-            params={'spid':834238794,'_v':'c17ca40b'},
-            timeout=120,
-            headers={'User-Agent':'Mozilla/5.0'}
-          ).json()
-          vv=d.get('variants',[])
-          print('GK_VARIANTS',[(x.get('id'),x.get('name'),x.get('seasonName'),x.get('position'),x.get('ovr')) for x in vv if x.get('position')=='GK'])
+            params={'spid':834238794,'_v':'60b75fb'},
+            timeout=120
+          )
+          print('STATUS',r.status_code)
+          d=r.json(); vv=d.get('variants',[])
+          ids={x.get('id') for x in vv}
+          pick={x.get('id'):x for x in vv}
+          print('API_COUNT',len(vv))
+          print('SPT',pick.get(867238794))
+          print('WS',pick.get(848238794))
+          print('PTG',pick.get(863238794))
+          print('UNRELATED_18LIVE',pick.get(318245564))
+          print('MISSING',[x['id'] for x in expected if x['id'] not in ids])
+          print('EXTRA',[x for x in ids if x not in {p['id'] for p in expected}])
+          assert len(vv)==len(expected)
+          assert not [x for x in expected if x['id'] not in ids]
+          assert 867238794 in ids and 848238794 in ids and 863238794 in ids
+          assert 318245564 not in ids
+          assert pick[867238794].get('position') != 'GK'
+          assert pick[848238794].get('position') != 'GK'
           PY

@@ -78,19 +78,27 @@ function parseSalary(html: string, playerName: string): number | null {
 
 function parseOvrPositionTraits(html: string) {
   const text = htmlToText(html);
-  const positionPattern = POSITIONS.join("|");
-  const pattern = new RegExp(`(?:^|\\s)(\\d{2,3})\\s+(${positionPattern})(?=\\s|$)`, "g");
-  let ovr: number | null = null;
-  let position: string | null = null;
 
-  for (const match of text.matchAll(pattern)) {
-    const value = Number(match[1]);
-    if (Number.isFinite(value) && value >= 40 && value <= 200) {
-      ovr = value;
-      position = match[2];
-      break;
-    }
-  }
+  // The player card header is the authoritative source for base OVR/position.
+  // Scanning the whole page can accidentally match ability-table text or other
+  // position labels and misclassify field players as GK.
+  const ovrMatch = html.match(
+    /<span[^>]*class=["'][^"']*\\bovr\\b[^"']*["'][^>]*>\\s*(\\d{2,3})\\s*<\\/span>/i
+  );
+  const positionMatch = html.match(
+    /<span[^>]*class=["'][^"']*\\bposition\\b[^"']*["'][^>]*>\\s*([A-Z]{1,3})\\s*<\\/span>/i
+  );
+
+  const parsedOvr = ovrMatch ? Number(ovrMatch[1]) : null;
+  const ovr =
+    parsedOvr !== null && Number.isFinite(parsedOvr) && parsedOvr >= 40 && parsedOvr <= 200
+      ? parsedOvr
+      : null;
+  const parsedPosition = positionMatch?.[1]?.toUpperCase() ?? null;
+  const position =
+    parsedPosition && POSITIONS.includes(parsedPosition as (typeof POSITIONS)[number])
+      ? parsedPosition
+      : null;
 
   const compactText = compact(text);
   const newTraits = NEW_TRAITS.filter((trait) => compactText.includes(compact(trait)));

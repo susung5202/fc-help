@@ -83,10 +83,10 @@ function parseOvrPositionTraits(html: string) {
   // Scanning the whole page can accidentally match ability-table text or other
   // position labels and misclassify field players as GK.
   const ovrMatch = html.match(
-    /<span[^>]*class=["'][^"']*\\bovr\\b[^"']*["'][^>]*>\\s*(\\d{2,3})\\s*<\\/span>/i
+    /<span[^>]*class=["'][^"']*\bovr\b[^"']*["'][^>]*>\s*(\d{2,3})\s*<\/span>/i
   );
   const positionMatch = html.match(
-    /<span[^>]*class=["'][^"']*\\bposition\\b[^"']*["'][^>]*>\\s*([A-Z]{1,3})\\s*<\\/span>/i
+    /<span[^>]*class=["'][^"']*\bposition\b[^"']*["'][^>]*>\s*([A-Z]{1,3})\s*<\/span>/i
   );
 
   const parsedOvr = ovrMatch ? Number(ovrMatch[1]) : null;

@@ -9,8 +9,20 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Typecheck current source
+      - name: Verify production Vinicius variants
         run: |
-          npm ci
-          npx tsc --noEmit --pretty false || true
+          python - <<'PY'
+          import requests
+          r=requests.get('https://fchelp.xyz/api/squad/variants',params={'spid':834238794},timeout=120,headers={'User-Agent':'Mozilla/5.0'})
+          print('STATUS',r.status_code)
+          d=r.json(); vv=d.get('variants',[])
+          pick={x.get('id'):x for x in vv}
+          print('COUNT',len(vv))
+          for spid in [867238794,848238794,834238794]:
+            x=pick.get(spid)
+            print(spid, x and (x.get('seasonName'),x.get('position'),x.get('ovr')))
+          print('GK_COUNT',sum(1 for x in vv if x.get('position')=='GK'))
+          assert len(vv)==43
+          assert pick[867238794].get('position')!='GK'
+          assert pick[848238794].get('position')!='GK'
+          PY

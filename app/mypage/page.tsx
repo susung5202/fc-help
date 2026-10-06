@@ -19,7 +19,6 @@ type Profile = {
   bio: string;
   avatar_url: string | null;
   fconline_nickname: string | null;
-  fconline_ouid: string | null;
 };
 
 type MySquad = {
@@ -111,7 +110,7 @@ export default function MyPage() {
         await Promise.all([
           supabase
             .from("profiles")
-            .select("id,username,display_name,bio,avatar_url,fconline_nickname,fconline_ouid")
+            .select("id,username,display_name,bio,avatar_url,fconline_nickname")
             .eq("id", user.id)
             .maybeSingle(),
           supabase
@@ -134,7 +133,7 @@ export default function MyPage() {
             display_name: fallbackDisplayName,
             bio: "",
           })
-          .select("id,username,display_name,bio,avatar_url,fconline_nickname,fconline_ouid")
+          .select("id,username,display_name,bio,avatar_url,fconline_nickname")
           .single();
         if (!createError) loadedProfile = createdProfile as Profile;
       }
@@ -147,7 +146,6 @@ export default function MyPage() {
           bio: "",
           avatar_url: null,
           fconline_nickname: null,
-          fconline_ouid: null,
         };
       }
 
@@ -207,10 +205,6 @@ export default function MyPage() {
         if (!response.ok) throw new Error(payload.error || "FC Online 정보를 불러오지 못했습니다.");
         if (!active) return;
         setFcProfile(payload);
-
-        if (userId && payload.ouid && profile?.fconline_ouid !== payload.ouid) {
-          await supabase.from("profiles").update({ fconline_ouid: payload.ouid }).eq("id", userId);
-        }
       } catch (error) {
         if (!active) return;
         setFcProfile(null);
@@ -224,7 +218,7 @@ export default function MyPage() {
     return () => {
       active = false;
     };
-  }, [profile?.fconline_nickname, profile?.fconline_ouid, supabase, userId]);
+  }, [profile?.fconline_nickname, supabase, userId]);
 
   const totalLikes = useMemo(
     () => squads.reduce((sum, squad) => sum + Number(squad.likes_count || 0), 0),
@@ -334,10 +328,9 @@ export default function MyPage() {
         bio,
         avatar_url: avatarUrl || null,
         fconline_nickname: fcNickname || null,
-        fconline_ouid: fcNickname === profile.fconline_nickname ? profile.fconline_ouid : null,
         updated_at: new Date().toISOString(),
       })
-      .select("id,username,display_name,bio,avatar_url,fconline_nickname,fconline_ouid")
+      .select("id,username,display_name,bio,avatar_url,fconline_nickname")
       .single();
 
     if (error) {

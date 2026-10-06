@@ -32,19 +32,6 @@ export default function PasswordRecoveryPage() {
       }
     });
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!active || recoveryEventSeen) return;
-
-      let requestedHere = false;
-      try {
-        requestedHere = localStorage.getItem("fchelp-password-recovery-requested") === "1";
-      } catch {}
-
-      if (requestedHere && data.session?.user) {
-        allowRecovery();
-      }
-    });
-
     const timer = window.setTimeout(() => {
       if (!active || recoveryEventSeen) return;
       setChecking(false);
@@ -84,11 +71,6 @@ export default function PasswordRecoveryPage() {
       setSaving(false);
       return;
     }
-
-    try {
-      localStorage.removeItem("fchelp-password-recovery-requested");
-    } catch {}
-
     await supabase.auth.signOut();
 
     setPassword("");

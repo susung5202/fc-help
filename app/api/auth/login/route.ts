@@ -52,10 +52,17 @@ export async function POST(request: Request) {
     const { data, error } = await client.auth.signInWithPassword({ email, password });
 
     if (error || !data.session) {
-      const message = error?.message?.toLowerCase().includes("email not confirmed")
+      const emailNotConfirmed = error?.message?.toLowerCase().includes("email not confirmed") ?? false;
+      const message = emailNotConfirmed
         ? "이메일 인증이 아직 완료되지 않았습니다. 받은 편지함의 인증 메일을 확인해주세요."
         : "로그인 아이디 또는 비밀번호가 맞지 않습니다.";
-      return NextResponse.json({ error: message }, { status: 401 });
+      return NextResponse.json(
+        {
+          error: message,
+          code: emailNotConfirmed ? "email_not_confirmed" : "invalid_credentials",
+        },
+        { status: 401 }
+      );
     }
 
     return NextResponse.json({

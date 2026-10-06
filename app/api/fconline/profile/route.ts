@@ -99,12 +99,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
+  let viewerId = "";
+  let admin: ReturnType<typeof createAdminClient>;
   try {
-    const admin = createAdminClient();
+    admin = createAdminClient();
     const { data, error } = await admin.auth.getUser(accessToken);
     if (error || !data.user) {
       return NextResponse.json({ error: "로그인 정보를 확인할 수 없습니다." }, { status: 401 });
     }
+    viewerId = data.user.id;
   } catch (error) {
     console.error("FC Online profile auth check failed", error);
     return NextResponse.json({ error: "로그인 확인에 실패했습니다." }, { status: 500 });
@@ -192,6 +195,14 @@ export async function GET(request: Request) {
         divisionId = fallbackDivision;
         tierSource = "historical_best";
       }
+    }
+
+    const { error: linkStoreError } = await admin
+      .from("profiles")
+      .update({ fconline_ouid: ouid, updated_at: new Date().toISOString() })
+      .eq("id", viewerId);
+    if (linkStoreError) {
+      console.warn("FC Online OUID private persistence failed", linkStoreError);
     }
 
     return NextResponse.json(

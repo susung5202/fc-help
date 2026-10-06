@@ -107,7 +107,7 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
 
   useEffect(() => {
     void load();
-    void supabase.rpc("increment_squad_post_views", { target_id: id });
+    void fetch("/api/squad/view", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 

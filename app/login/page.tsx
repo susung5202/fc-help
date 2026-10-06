@@ -305,6 +305,17 @@ export default function LoginPage() {
             />
           </div>
 
+          {mode === "login" && (
+            <div className="flex justify-end">
+              <Link
+                href="/recover"
+                className="text-xs font-bold text-gray-500 transition hover:text-lime-300"
+              >
+                아이디 찾기 · 비밀번호 재설정
+              </Link>
+            </div>
+          )}
+
           {message && (
             <p className={`rounded-lg px-3 py-2 text-sm ${success ? "bg-lime-400/10 text-lime-200" : "bg-amber-300/10 text-amber-200"}`}>
               {message}

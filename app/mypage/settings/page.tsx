@@ -30,7 +30,6 @@ export default function AccountSettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fcNickname, setFcNickname] = useState("");
   const [linkedFcNickname, setLinkedFcNickname] = useState("");
-  const [linkedOuid, setLinkedOuid] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [busy, setBusy] = useState<"email" | "password" | "fc" | "delete" | null>(null);
@@ -50,7 +49,7 @@ export default function AccountSettingsPage() {
 
       const [{ data: loginRow }, { data: profileRow }] = await Promise.all([
         supabase.from("account_login_ids").select("login_id").eq("user_id", user.id).maybeSingle(),
-        supabase.from("profiles").select("fconline_nickname,fconline_ouid").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("fconline_nickname").eq("id", user.id).maybeSingle(),
       ]);
 
       if (!active) return;
@@ -60,7 +59,6 @@ export default function AccountSettingsPage() {
       setLoginId(loginRow?.login_id ?? "");
       setFcNickname(profileRow?.fconline_nickname ?? "");
       setLinkedFcNickname(profileRow?.fconline_nickname ?? "");
-      setLinkedOuid(profileRow?.fconline_ouid ?? "");
       setLoading(false);
     }
 
@@ -181,7 +179,6 @@ export default function AccountSettingsPage() {
           .update({
             display_name: canonicalNickname.slice(0, 20),
             fconline_nickname: canonicalNickname,
-            fconline_ouid: payload.ouid,
             updated_at: now,
           })
           .eq("id", userId),
@@ -203,7 +200,6 @@ export default function AccountSettingsPage() {
 
       setFcNickname(canonicalNickname);
       setLinkedFcNickname(canonicalNickname);
-      setLinkedOuid(payload.ouid);
       setMessage(`FC Online '${canonicalNickname}' 구단주로 다시 연동했습니다.`);
     } catch (relinkError) {
       setError(relinkError instanceof Error ? relinkError.message : "FC Online 연동에 실패했습니다.");
@@ -372,7 +368,7 @@ export default function AccountSettingsPage() {
             {linkedFcNickname && (
               <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
                 <p className="text-sm font-black text-white">{linkedFcNickname}</p>
-                <p className="mt-1 break-all text-[10px] text-gray-600">OUID · {linkedOuid || "확인 중"}</p>
+                <p className="mt-1 text-[10px] text-gray-600">연동 식별 정보는 서버에서 비공개로 관리됩니다.</p>
               </div>
             )}
 
@@ -384,7 +380,7 @@ export default function AccountSettingsPage() {
               maxLength={30}
               className="mt-4 w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm outline-none focus:border-lime-300/40"
             />
-            <p className="mt-2 text-[11px] text-gray-600">넥슨 Open API에서 실제 존재하는 구단주인지 확인한 뒤 OUID까지 자동 갱신합니다.</p>
+            <p className="mt-2 text-[11px] text-gray-600">넥슨 Open API에서 실제 존재하는 구단주인지 확인한 뒤 연동 정보를 서버에 안전하게 저장합니다.</p>
             <button
               type="button"
               onClick={() => void relinkFcOnline()}

@@ -45,14 +45,6 @@ export default function RecoveryPage() {
         setLoading(false);
         return;
       }
-
-      try {
-        localStorage.setItem(
-          mode === "find-id" ? "fchelp-find-id-requested" : "fchelp-password-recovery-requested",
-          "1"
-        );
-      } catch {}
-
       setSuccess(true);
       setMessage(
         payload.message ||

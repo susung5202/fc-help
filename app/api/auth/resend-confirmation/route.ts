@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enforceRateLimit } from "@/lib/security/rateLimit";
 
 const LOGIN_ID_PATTERN = /^[a-z0-9_]{3,20}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,6 +45,15 @@ export async function POST(request: Request) {
     if (!identifier || identifier.length > 254) {
       return NextResponse.json({ error: "아이디 또는 이메일을 입력해주세요." }, { status: 400 });
     }
+
+    const rateLimited = await enforceRateLimit(request, {
+      scope: "auth:resend-confirmation",
+      rules: [
+        { name: "ip", limit: 10, windowSeconds: 3600 },
+        { name: "identifier", value: identifier, limit: 3, windowSeconds: 1800 },
+      ],
+    });
+    if (rateLimited) return rateLimited;
 
     let email = identifier;
 

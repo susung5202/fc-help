@@ -49,10 +49,10 @@ export async function enforceRateLimit(
   options: RateLimitOptions
 ): Promise<NextResponse | null> {
   const ip = clientAddress(request);
-  const admin = createAdminClient();
   let retryAfter = 0;
 
   try {
+    const admin = createAdminClient();
     for (const rule of options.rules) {
       const rawValue =
         rule.value == null

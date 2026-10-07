@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enforceRateLimit } from "@/lib/security/rateLimit";
 
 const LOGIN_ID_PATTERN = /^[a-z0-9_]{3,20}$/;
 const NEXON_BASE_URL = "https://open.api.nexon.com/fconline/v1";
@@ -83,6 +84,16 @@ export async function POST(request: Request) {
     if (password.length < 6) {
       return NextResponse.json({ error: "비밀번호는 6자 이상 입력해주세요." }, { status: 400 });
     }
+
+    const rateLimited = await enforceRateLimit(request, {
+      scope: "auth:signup",
+      rules: [
+        { name: "ip", limit: 8, windowSeconds: 3600 },
+        { name: "email", value: email, limit: 3, windowSeconds: 3600 },
+        { name: "login_id", value: loginId, limit: 5, windowSeconds: 3600 },
+      ],
+    });
+    if (rateLimited) return rateLimited;
 
     const admin = createAdminClient();
     const { data: existingLoginId, error: loginIdError } = await admin

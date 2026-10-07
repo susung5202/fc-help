@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { enforceRateLimit } from "@/lib/security/rateLimit";
 
 type RecoveryAction = "find-id" | "reset-password";
 
@@ -33,6 +34,15 @@ export async function POST(request: Request) {
   if ((action !== "find-id" && action !== "reset-password") || !EMAIL_PATTERN.test(email) || email.length > 254) {
     return response("이메일 주소를 확인해주세요.", 400);
   }
+
+  const rateLimited = await enforceRateLimit(request, {
+    scope: "auth:recovery",
+    rules: [
+      { name: "ip", limit: 10, windowSeconds: 3600 },
+      { name: "email", value: email, limit: 4, windowSeconds: 3600 },
+    ],
+  });
+  if (rateLimited) return rateLimited;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishableKey =

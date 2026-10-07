@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enforceRateLimit } from "@/lib/security/rateLimit";
 
 const LOGIN_ID_PATTERN = /^[a-z0-9_]{3,20}$/;
 
@@ -11,6 +12,15 @@ export async function POST(request: Request) {
     if (!LOGIN_ID_PATTERN.test(loginId)) {
       return NextResponse.json({ available: false, valid: false });
     }
+
+    const rateLimited = await enforceRateLimit(request, {
+      scope: "auth:login-id",
+      rules: [
+        { name: "ip", limit: 50, windowSeconds: 600 },
+        { name: "login_id", value: loginId, limit: 10, windowSeconds: 600 },
+      ],
+    });
+    if (rateLimited) return rateLimited;
 
     const admin = createAdminClient();
     const { data, error } = await admin

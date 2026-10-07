@@ -185,9 +185,14 @@ export default function AdminReports() {
       resolved_at: resolved ? new Date().toISOString() : null,
       resolved_by: resolved ? viewerId : null,
     };
-    const { error } = await supabase.from("content_reports").update(payload).eq("id", report.id);
-    if (error) {
-      setMessage(error.message);
+    const { data: updatedRow, error } = await supabase
+      .from("content_reports")
+      .update(payload)
+      .eq("id", report.id)
+      .select("id")
+      .maybeSingle();
+    if (error || !updatedRow) {
+      setMessage(error?.message || "신고 상태를 변경하지 못했습니다. 목록을 새로고침해주세요.");
       setBusyId(null);
       return;
     }
@@ -200,31 +205,83 @@ export default function AdminReports() {
     if (!viewerId || busyId) return;
     const target = targets[targetKey(report.target_type, report.target_id)];
     if (!target?.exists) return;
-    if (!window.confirm(`신고 대상 ${TARGET_LABEL[report.target_type]}을(를) 삭제할까요? 삭제 후 되돌릴 수 없습니다.`)) return;
+    if (!window.confirm(`신고 대상 ${TARGET_LABEL[report.target_type]}을(를) 삭제할까요? 삭제와 신고 처리가 동시에 완료되며 되돌릴 수 없습니다.`)) return;
 
     setBusyId(report.id);
     setMessage("");
-    let error: { message: string } | null = null;
-    if (report.target_type === "community_post") {
-      ({ error } = await supabase.from("community_posts").delete().eq("id", report.target_id));
-    } else if (report.target_type === "community_comment") {
-      ({ error } = await supabase.from("community_comments").delete().eq("id", Number(report.target_id)));
-    } else if (report.target_type === "squad_post") {
-      ({ error } = await supabase.from("squad_posts").delete().eq("id", report.target_id));
-    } else {
-      ({ error } = await supabase.from("squad_comments").delete().eq("id", Number(report.target_id)));
-    }
 
-    if (error) {
-      setMessage(error.message);
+    const resolutionNote =
+      (notes[report.id] || "신고 대상 콘텐츠 삭제").trim().slice(0, 500) ||
+      "신고 대상 콘텐츠 삭제";
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        setMessage("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
+        setBusyId(null);
+        return;
+      }
+
+      const response = await fetch("/api/admin/reports/delete-target", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          reportId: report.id,
+          resolutionNote,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+        status?: ReportStatus;
+        resolvedAt?: string;
+        resolvedBy?: string;
+        resolutionNote?: string;
+      };
+
+      if (!response.ok || payload.status !== "resolved" || !payload.resolvedAt) {
+        setMessage(payload.error || "콘텐츠 삭제 처리에 실패했습니다.");
+        setBusyId(null);
+        return;
+      }
+
+      setTargets((current) => ({
+        ...current,
+        [targetKey(report.target_type, report.target_id)]: {
+          exists: false,
+          label: `${TARGET_LABEL[report.target_type]} · 삭제됨`,
+          preview: "관리자가 신고 대상 콘텐츠를 삭제했습니다.",
+          href: null,
+        },
+      }));
+
+      setReports((current) =>
+        current.map((item) =>
+          item.id === report.id
+            ? {
+                ...item,
+                status: "resolved",
+                resolution_note: payload.resolutionNote || resolutionNote,
+                resolved_at: payload.resolvedAt || null,
+                resolved_by: payload.resolvedBy || viewerId,
+              }
+            : item
+        )
+      );
+      setNotes((current) => ({
+        ...current,
+        [report.id]: payload.resolutionNote || resolutionNote,
+      }));
+      setMessage("신고 대상 콘텐츠를 삭제하고 신고를 처리 완료했습니다.");
+    } catch {
+      setMessage("콘텐츠 삭제 처리 중 오류가 발생했습니다.");
+    } finally {
       setBusyId(null);
-      return;
     }
-
-    setTargets((current) => ({ ...current, [targetKey(report.target_type, report.target_id)]: { exists: false, label: `${TARGET_LABEL[report.target_type]} · 삭제됨`, preview: "관리자가 신고 대상 콘텐츠를 삭제했습니다.", href: null } }));
-    setBusyId(null);
-    setNotes((current) => ({ ...current, [report.id]: "신고 대상 콘텐츠 삭제" }));
-    await updateStatus(report, "resolved", "신고 대상 콘텐츠 삭제");
   }
 
   if (access === "loading") {

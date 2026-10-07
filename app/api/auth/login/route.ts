@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enforceRateLimit } from "@/lib/security/rateLimit";
 
 const LOGIN_ID_PATTERN = /^[a-z0-9_]{3,20}$/;
 
@@ -22,6 +23,15 @@ export async function POST(request: Request) {
     if (!identifier || !password) {
       return NextResponse.json({ error: "로그인 아이디와 비밀번호를 입력해주세요." }, { status: 400 });
     }
+
+    const rateLimited = await enforceRateLimit(request, {
+      scope: "auth:login",
+      rules: [
+        { name: "ip", limit: 25, windowSeconds: 600 },
+        { name: "identifier", value: identifier, limit: 8, windowSeconds: 600 },
+      ],
+    });
+    if (rateLimited) return rateLimited;
 
     let email = identifier;
 

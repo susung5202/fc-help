@@ -27,6 +27,9 @@ const defaultDescription =
   "FC 온라인 선수 정보, 공개 참고값과 유저 제보 기반 갱신시간, 브라우저 알림과 스쿼드 메이커를 제공하는 비공식 팬 서비스입니다.";
 
 export const metadata: Metadata = {
+  verification: {
+    google: "Cj6ye7aiUb-_oDNXGyz4lPTpv2NlztkP9GCJ2I_1rZE",
+  },
   metadataBase: new URL(siteUrl),
   alternates: {
     canonical: siteUrl,

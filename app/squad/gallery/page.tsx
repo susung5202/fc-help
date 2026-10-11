@@ -1,9 +1,11 @@
 import Link from "next/link";
 import SquadGallery from "@/components/SquadGallery";
+import ServiceUsageNotes from "@/components/ServiceUsageNotes";
 
 export const metadata = {
   title: "스쿼드 갤러리 | FC Help",
   description: "FC 온라인 유저 스쿼드를 공유하고 검색하고 복사할 수 있는 FC Help 스쿼드 갤러리입니다.",
+  alternates: { canonical: "/squad/gallery" },
 };
 
 export default function SquadGalleryPage() {
@@ -22,6 +24,7 @@ export default function SquadGalleryPage() {
         </div>
       </header>
       <SquadGallery />
+      <ServiceUsageNotes section="gallery" />
     </main>
   );
 }

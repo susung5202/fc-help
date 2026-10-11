@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
 
 type HourType = "odd" | "even" | "every" | "unknown";
 
@@ -16,6 +17,13 @@ type Props = {
   playerSpid: number;
 };
 
+type Reference = RefreshReferencePatternRow & {
+  source_name: string;
+  source_url: string;
+  source_published_at: string | null;
+  confidence: "community_reference" | "verified" | "estimated";
+};
+
 type Distribution = {
   key: string;
   hourType: HourType;
@@ -28,6 +36,7 @@ export default function RefreshReportSummary({
   playerSpid,
 }: Props) {
   const [reports, setReports] = useState<Report[]>([]);
+  const [reference, setReference] = useState<Reference | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
 
@@ -35,21 +44,33 @@ export default function RefreshReportSummary({
     async function loadReports() {
       const supabase = createClient();
 
-      const { data, error } = await supabase
-        .from("refresh_reports")
-        .select("id, hour_type, refresh_minute, created_at")
-        .eq("player_spid", playerSpid)
-        .order("created_at", {
-          ascending: false,
-        });
+      const [
+        { data: reportData, error: reportError },
+        { data: referenceData, error: referenceError },
+      ] = await Promise.all([
+        supabase
+          .from("refresh_reports")
+          .select("id, hour_type, refresh_minute, created_at")
+          .eq("player_spid", playerSpid)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("refresh_reference_times")
+          .select("hour_type, refresh_minute, source_name, source_url, source_published_at, confidence")
+          .eq("player_spid", playerSpid)
+          .maybeSingle(),
+      ]);
 
-      if (error) {
-        console.log("갱신 제보 불러오기 실패:", error.message);
+      if (reportError || referenceError) {
+        console.log(
+          "갱신시간 정보 불러오기 실패:",
+          reportError?.message || referenceError?.message
+        );
         setLoading(false);
         return;
       }
 
-      setReports((data ?? []) as Report[]);
+      setReports((reportData ?? []) as Report[]);
+      setReference((referenceData as Reference | null) ?? null);
       setLoading(false);
     }
 
@@ -154,6 +175,23 @@ export default function RefreshReportSummary({
     };
   }, [reports]);
 
+  const resolvedPattern = useMemo(
+    () =>
+      resolveRefreshPattern(
+        reports,
+        reference
+          ? {
+              hour_type: reference.hour_type,
+              refresh_minute: reference.refresh_minute,
+              source_name: reference.source_name,
+              source_url: reference.source_url,
+              confidence: reference.confidence,
+            }
+          : null
+      ),
+    [reports, reference]
+  );
+
   if (loading) {
     return (
       <div className="mt-12 rounded-2xl border border-white/10 bg-[#181b21] p-8 text-center text-sm text-gray-500">
@@ -162,24 +200,19 @@ export default function RefreshReportSummary({
     );
   }
 
-  const expectedRefresh =
-    stats?.winner
-      ? formatRefreshPattern(
-          stats.winner.hourType,
-          stats.winner.minute
-        )
-      : stats?.isTie
-        ? "의견 갈림"
-        : "-";
-
-  const nextRefresh =
-    stats?.winner
-      ? getNextRefresh(
-          stats.winner.hourType,
-          stats.winner.minute,
-          now
-        )
+  const expectedRefresh = resolvedPattern
+    ? formatRefreshPattern(resolvedPattern.hourType, resolvedPattern.minute)
+    : stats?.isTie
+      ? "의견 갈림"
       : "-";
+
+  const nextRefresh = resolvedPattern
+    ? getNextRefresh(
+        resolvedPattern.hourType,
+        resolvedPattern.minute,
+        now
+      )
+    : "-";
 
   return (
     <>
@@ -208,11 +241,15 @@ export default function RefreshReportSummary({
           />
 
           <InfoBox
-            title="신뢰도"
+            title="근거"
             value={
-              stats
-                ? `${stats.confidence}%`
-                : "-"
+              resolvedPattern?.source === "reference"
+                ? reference?.confidence === "verified"
+                  ? "검증 기준값"
+                  : "공개 참고값"
+                : stats
+                  ? `제보 ${stats.confidence}%`
+                  : "-"
             }
           />
 
@@ -222,7 +259,7 @@ export default function RefreshReportSummary({
           />
         </div>
 
-        {!stats && (
+        {!stats && !reference && (
           <div className="mt-6 rounded-xl border border-dashed border-white/10 px-5 py-10 text-center">
             <p className="font-semibold">
               아직 확인된 갱신시간이 없습니다.
@@ -233,6 +270,43 @@ export default function RefreshReportSummary({
             </p>
           </div>
         )}
+
+        {reference && (
+          <div className="mt-6 rounded-xl border border-sky-300/15 bg-sky-300/[0.04] p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-sky-200">
+                  초기 참고값 · {formatRefreshPattern(reference.hour_type, reference.refresh_minute)}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-gray-500">
+                  유저 제보가 충분히 쌓이기 전까지 사용하는 공개 자료 기반 값입니다.
+                  제보가 2건 이상 같은 다른 시간을 가리키면 제보값이 우선됩니다.
+                </p>
+              </div>
+              <a
+                href={reference.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-white/5"
+              >
+                출처 보기
+              </a>
+            </div>
+            <p className="mt-3 text-[11px] text-gray-600">
+              {reference.source_name}
+              {reference.source_published_at
+                ? ` · ${new Date(reference.source_published_at).toLocaleDateString("ko-KR")}`
+                : ""}
+            </p>
+          </div>
+        )}
+
+        {resolvedPattern?.source === "reference" &&
+          resolvedPattern.conflictsWithReference && (
+            <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.05] px-4 py-3 text-xs leading-5 text-amber-100">
+              참고값과 다른 유저 제보가 있어 확인 중입니다. 한 건의 제보만으로 기존 기준값을 바로 덮어쓰지는 않습니다.
+            </div>
+          )}
 
         {stats?.isTie && (
           <div className="mt-6 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-5">

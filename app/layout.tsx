@@ -31,9 +31,6 @@ export const metadata: Metadata = {
     google: "Cj6ye7aiUb-_oDNXGyz4lPTpv2NlztkP9GCJ2I_1rZE",
   },
   metadataBase: new URL(siteUrl),
-  alternates: {
-    canonical: siteUrl,
-  },
   applicationName: "FC Help",
   title: defaultTitle,
   description: defaultDescription,

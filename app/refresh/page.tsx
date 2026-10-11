@@ -257,7 +257,7 @@ export default async function RefreshPage({
   ]);
 
   const playerMap = new Map(players.map((player) => [player.id, player]));
-  const featuredRank = new Map(
+  const featuredRank = new Map<string, number>(
     FEATURED_REFRESH_NAMES.map((name, index) => [name, index])
   );
   const showcaseCards = showcase.rows

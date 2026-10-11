@@ -162,7 +162,11 @@ export default async function RefreshDetailPage({
           </div>
         </div>
 
-        <RefreshReportSummary playerSpid={player.id} />
+        <RefreshReportSummary
+          playerSpid={player.id}
+          playerName={player.name}
+          seasonName={seasonName}
+        />
       </section>
 
       <footer className="mt-20 border-t border-white/10 px-6 py-8 text-center text-sm text-gray-500">

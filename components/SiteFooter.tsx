@@ -29,6 +29,7 @@ export default function SiteFooter() {
                 Services
               </p>
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-bold md:max-w-[260px] md:justify-end">
+                <Link href="/guide" className="text-gray-300 transition hover:text-lime-300">정보 활용 가이드</Link>
                 <Link href="/players" className="text-gray-300 transition hover:text-lime-300">
                   선수 DB
                 </Link>

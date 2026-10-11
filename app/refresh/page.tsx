@@ -182,6 +182,21 @@ type RefreshShowcaseRow = {
   refresh_minute: number;
 };
 
+const FEATURED_REFRESH_NAMES = [
+  "크리스티아누 호날두",
+  "리오넬 메시",
+  "손흥민",
+  "킬리안 음바페",
+  "엘링 홀란",
+  "모하메드 살라",
+  "해리 케인",
+  "주드 벨링엄",
+  "우스만 뎀벨레",
+  "비니시우스",
+  "콜 파머",
+  "버질 반다이크",
+] as const;
+
 async function getRefreshShowcase() {
   try {
     const supabase = createAdminClient();
@@ -189,7 +204,7 @@ async function getRefreshShowcase() {
       .from("refresh_reference_times")
       .select("player_spid, hour_type, refresh_minute", { count: "exact" })
       .order("player_spid", { ascending: true })
-      .limit(12);
+      .limit(200);
 
     if (error) throw error;
 
@@ -242,6 +257,9 @@ export default async function RefreshPage({
   ]);
 
   const playerMap = new Map(players.map((player) => [player.id, player]));
+  const featuredRank = new Map(
+    FEATURED_REFRESH_NAMES.map((name, index) => [name, index])
+  );
   const showcaseCards = showcase.rows
     .map((row) => {
       const spid = Number(row.player_spid);
@@ -255,7 +273,13 @@ export default async function RefreshPage({
     .filter(
       (item): item is { player: Player; refresh: NearestRefreshInfo | null } =>
         item !== null
-    );
+    )
+    .sort((a, b) => {
+      const aRank = featuredRank.get(a.player.name) ?? Number.MAX_SAFE_INTEGER;
+      const bRank = featuredRank.get(b.player.name) ?? Number.MAX_SAFE_INTEGER;
+      return aRank - bRank;
+    })
+    .slice(0, 12);
 
   const results = [...matchedPlayers].sort((a, b) => {
     if (sortMode === "ovr") {

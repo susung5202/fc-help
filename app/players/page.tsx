@@ -1,11 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import PlayerArtwork from "@/components/PlayerArtwork";
+import ServiceUsageNotes from "@/components/ServiceUsageNotes";
 import {
   getPlayerRankings,
   type PlayerRankingItem,
 } from "@/lib/fconline/playerRankings";
 import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
 import { getEnhancementBadgeTone } from "@/lib/ui/enhancementBadge";
+
+export const metadata: Metadata = {
+  title: "선수 DB | FC Help",
+  description: "FC 온라인 선수와 시즌별 정보를 검색하고 공식경기 통계를 확인하세요.",
+  alternates: { canonical: "/players" },
+};
 
 type Player = {
   id: number;
@@ -233,6 +241,7 @@ export default async function PlayersPage({
           )}
         </div>
       </section>
+      <ServiceUsageNotes section="players" />
     </main>
   );
 }

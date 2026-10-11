@@ -18,6 +18,9 @@ export default function SiteFooter() {
               FC Help는 FC 온라인을 즐기는 이용자를 위해 제작된 비공식 팬 사이트이며,
               NEXON 및 EA와 공식적인 제휴 관계가 없습니다.
             </p>
+            <p className="mt-2 text-xs leading-5 text-gray-500">
+              Data based on NEXON Open API · 선수명, 시즌 등 게임 메타데이터는 NEXON Open API를 기반으로 표시합니다.
+            </p>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 md:text-right">

@@ -229,14 +229,19 @@ export default function RefreshReportSummary({
           </div>
         </div>
 
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-400">
+          여기에서 표시하는 갱신시간은 2시간 거래량이 갱신되는 기준 시각입니다.
+          기준가·상한가·하한가는 이 시각 이후 약 0~20분 사이에 변동될 수 있습니다.
+        </p>
+
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <InfoBox
-            title="예상 갱신"
+            title="갱신 기준 시각"
             value={expectedRefresh}
           />
 
           <InfoBox
-            title="다음 예상 갱신"
+            title="다음 구간 시작"
             value={nextRefresh}
           />
 
@@ -266,7 +271,7 @@ export default function RefreshReportSummary({
             </p>
 
             <p className="mt-2 text-sm text-gray-500">
-              갱신시간을 제보하면 자동으로 집계됩니다.
+              첫 갱신시간 제보를 남기면 대표값과 알림 계산에 자동으로 반영됩니다.
             </p>
           </div>
         )}
@@ -276,10 +281,10 @@ export default function RefreshReportSummary({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-sky-200">
-                  초기 참고값 · {formatRefreshPattern(reference.hour_type, reference.refresh_minute)}
+                  초기 참고 기준값 · {formatRefreshPattern(reference.hour_type, reference.refresh_minute)}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-gray-500">
-                  유저 제보가 충분히 쌓이기 전까지 사용하는 공개 자료 기반 값입니다.
+                  유저 제보가 충분히 쌓이기 전까지 사용하는 공개 자료 기반 거래량 갱신 기준값입니다.
                   제보가 2건 이상 같은 다른 시간을 가리키면 제보값이 우선됩니다.
                 </p>
               </div>

@@ -302,6 +302,64 @@ async function getRefreshDemandQueue(): Promise<RefreshDemandRow[]> {
   }
 }
 
+async function getObservationHintMap(
+  players: Player[],
+  seasonMap: Map<number, Season>
+): Promise<Map<number, string>> {
+  const result = new Map<number, string>();
+  if (players.length === 0) return result;
+
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("refresh_observations")
+      .select("player_spid, player_name, season_name, observation_kind")
+      .limit(500);
+
+    if (error) throw error;
+
+    const direct = new Map<number, "exact" | "range">();
+    const byNameSeason = new Map<string, "exact" | "range">();
+
+    for (const row of (data ?? []) as Array<{
+      player_spid: number | string | null;
+      player_name: string;
+      season_name: string;
+      observation_kind: "exact" | "range";
+    }>) {
+      const kind = row.observation_kind;
+      const spid = row.player_spid === null ? null : Number(row.player_spid);
+
+      if (spid !== null && Number.isFinite(spid)) {
+        const current = direct.get(spid);
+        if (!current || kind === "exact") direct.set(spid, kind);
+      }
+
+      const key = `${row.player_name}::${row.season_name}`;
+      const current = byNameSeason.get(key);
+      if (!current || kind === "exact") byNameSeason.set(key, kind);
+    }
+
+    for (const player of players) {
+      const directKind = direct.get(player.id);
+      const seasonId = Math.floor(player.id / 1_000_000);
+      const seasonName = seasonMap.get(seasonId)?.className ?? "";
+      const namedKind = byNameSeason.get(`${player.name}::${seasonName}`);
+      const kind = directKind ?? namedKind;
+
+      if (kind === "exact") {
+        result.set(player.id, "웹 exact 참고값 있음");
+      } else if (kind === "range") {
+        result.set(player.id, "웹 관측 범위 있음");
+      }
+    }
+  } catch (error) {
+    console.error("웹 관측 표시 조회 실패", error);
+  }
+
+  return result;
+}
+
 export default async function RefreshPage({
   searchParams,
 }: {
@@ -332,13 +390,16 @@ export default async function RefreshPage({
         .slice(0, 100)
     : [];
 
-  const [ovrMap, nearestRefreshMap] = await Promise.all([
+  const [ovrMap, nearestRefreshMap, observationHintMap] = await Promise.all([
     query && sortMode === "ovr"
       ? getPlayerOvrMap(matchedPlayers.map((player) => player.id))
       : Promise.resolve(new Map<number, PlayerOvrInfo | null>()),
     query
       ? getNearestRefreshMap(matchedPlayers.map((player) => player.id))
       : Promise.resolve(new Map<number, NearestRefreshInfo | null>()),
+    query
+      ? getObservationHintMap(matchedPlayers, seasonMap)
+      : Promise.resolve(new Map<number, string>()),
   ]);
 
   const playerMap = new Map(players.map((player) => [player.id, player]));
@@ -580,6 +641,7 @@ export default async function RefreshPage({
                       season={season}
                       ovrInfo={ovrMap.get(player.id) ?? null}
                       nearestRefresh={nearestRefreshMap.get(player.id) ?? null}
+                      observationHint={observationHintMap.get(player.id)}
                     />
                   );
                 })}
@@ -622,12 +684,14 @@ function RefreshPlayerCard({
   ovrInfo,
   nearestRefresh,
   demandCount,
+  observationHint,
 }: {
   player: Player;
   season?: Season;
   ovrInfo?: PlayerOvrInfo | null;
   nearestRefresh?: NearestRefreshInfo | null;
   demandCount?: number;
+  observationHint?: string;
 }) {
   const imageUrl = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.id}.png`;
 
@@ -667,6 +731,10 @@ function RefreshPlayerCard({
         {nearestRefresh ? (
           <p className="mt-2 text-sm font-semibold text-lime-300">
             다음 갱신 구간 시작 {nearestRefresh.label}
+          </p>
+        ) : observationHint ? (
+          <p className="mt-2 text-sm font-semibold text-violet-200">
+            {observationHint} · 상세에서 확인
           </p>
         ) : demandCount ? (
           <p className="mt-2 text-sm font-semibold text-amber-200">

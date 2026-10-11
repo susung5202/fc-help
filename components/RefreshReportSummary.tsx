@@ -251,7 +251,7 @@ export default function RefreshReportSummary({
               resolvedPattern?.source === "reference"
                 ? reference?.confidence === "verified"
                   ? "검증 기준값"
-                  : "공개 참고값"
+                  : "공개 참고 · 미검증"
                 : stats
                   ? `제보 ${stats.confidence}%`
                   : "-"
@@ -286,7 +286,7 @@ export default function RefreshReportSummary({
                 </p>
                 <p className="mt-1 text-xs leading-5 text-gray-500">
                   유저 제보가 충분히 쌓이기 전까지 사용하는 공개 자료 기반 거래량 갱신 기준값입니다.
-                  제보가 2건 이상 같은 다른 시간을 가리키면 제보값이 우선됩니다.
+                  FC Help가 아직 독립 검증하지 않은 참고값이며, 제보가 2건 이상 같은 다른 시간을 가리키면 제보값이 우선됩니다.
                 </p>
               </div>
               <a

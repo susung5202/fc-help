@@ -182,6 +182,11 @@ type RefreshShowcaseRow = {
   refresh_minute: number;
 };
 
+type RefreshDemandRow = {
+  playerSpid: number;
+  requestCount: number;
+};
+
 const FEATURED_REFRESH_NAMES = [
   "크리스티아누 호날두",
   "리오넬 메시",
@@ -218,6 +223,84 @@ async function getRefreshShowcase() {
   }
 }
 
+async function getRefreshDemandQueue(): Promise<RefreshDemandRow[]> {
+  try {
+    const supabase = createAdminClient();
+    const { data: alertsData, error: alertsError } = await supabase
+      .from("refresh_alerts")
+      .select("player_spid")
+      .eq("enabled", true)
+      .limit(2000);
+
+    if (alertsError) throw alertsError;
+
+    const requestCounts = new Map<number, number>();
+    for (const row of (alertsData ?? []) as Array<{ player_spid: number | string }>) {
+      const spid = Number(row.player_spid);
+      if (!Number.isFinite(spid)) continue;
+      requestCounts.set(spid, (requestCounts.get(spid) ?? 0) + 1);
+    }
+
+    const candidateSpids = Array.from(requestCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 100)
+      .map(([spid]) => spid);
+
+    if (candidateSpids.length === 0) return [];
+
+    const [
+      { data: referenceData, error: referenceError },
+      { data: reportData, error: reportError },
+    ] = await Promise.all([
+      supabase
+        .from("refresh_reference_times")
+        .select("player_spid")
+        .in("player_spid", candidateSpids),
+      supabase
+        .from("refresh_reports")
+        .select("player_spid, hour_type, refresh_minute")
+        .in("player_spid", candidateSpids),
+    ]);
+
+    if (referenceError || reportError) {
+      throw referenceError ?? reportError;
+    }
+
+    const knownSpids = new Set<number>();
+
+    for (const row of (referenceData ?? []) as Array<{ player_spid: number | string }>) {
+      const spid = Number(row.player_spid);
+      if (Number.isFinite(spid)) knownSpids.add(spid);
+    }
+
+    for (const row of (reportData ?? []) as RefreshReportRow[]) {
+      const spid = Number(row.player_spid);
+      if (
+        Number.isFinite(spid) &&
+        row.hour_type !== "unknown" &&
+        row.refresh_minute !== null
+      ) {
+        knownSpids.add(spid);
+      }
+    }
+
+    return Array.from(requestCounts.entries())
+      .filter(([spid]) => !knownSpids.has(spid))
+      .sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1];
+        return b[0] - a[0];
+      })
+      .slice(0, 8)
+      .map(([playerSpid, requestCount]) => ({
+        playerSpid,
+        requestCount,
+      }));
+  } catch (error) {
+    console.error("갱신시간 수요 목록 조회 실패", error);
+    return [];
+  }
+}
+
 export default async function RefreshPage({
   searchParams,
 }: {
@@ -228,10 +311,11 @@ export default async function RefreshPage({
   const sortMode: SortMode =
     sort === "ovr" ? "ovr" : sort === "nearest" ? "nearest" : "default";
 
-  const [players, seasons, showcase] = await Promise.all([
+  const [players, seasons, showcase, demandQueue] = await Promise.all([
     getPlayers(),
     getSeasons(),
     getRefreshShowcase(),
+    getRefreshDemandQueue(),
   ]);
 
   const seasonMap = new Map(
@@ -280,6 +364,19 @@ export default async function RefreshPage({
       return aRank - bRank;
     })
     .slice(0, 12);
+
+  const demandCards = demandQueue
+    .map((item) => {
+      const player = playerMap.get(item.playerSpid);
+      if (!player) return null;
+      return {
+        player,
+        requestCount: item.requestCount,
+      };
+    })
+    .filter(
+      (item): item is { player: Player; requestCount: number } => item !== null
+    );
 
   const results = [...matchedPlayers].sort((a, b) => {
     if (sortMode === "ovr") {
@@ -395,6 +492,38 @@ export default async function RefreshPage({
                   <p className="text-lg font-semibold">갱신시간을 확인할 선수를 검색해주세요.</p>
                 </div>
               )}
+
+              {demandCards.length > 0 && (
+                <section className="mt-12">
+                  <p className="text-xs font-black tracking-[0.14em] text-amber-300">
+                    REQUEST QUEUE
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <h2 className="text-2xl font-black">갱신시간 요청 많은 선수</h2>
+                      <p className="mt-2 text-sm leading-6 text-gray-400">
+                        아직 기준값이 없는 선수 중 갱신 알림 등록이 많은 순서입니다.
+                        먼저 알림을 등록해두면 데이터가 확보된 뒤 기존 설정으로 알림이 적용됩니다.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                    {demandCards.map(({ player, requestCount }) => {
+                      const seasonId = Math.floor(player.id / 1_000_000);
+                      const season = seasonMap.get(seasonId);
+                      return (
+                        <RefreshPlayerCard
+                          key={player.id}
+                          player={player}
+                          season={season}
+                          demandCount={requestCount}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
             </div>
           ) : results.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-[#181b21] px-6 py-16 text-center">
@@ -490,11 +619,13 @@ function RefreshPlayerCard({
   season,
   ovrInfo,
   nearestRefresh,
+  demandCount,
 }: {
   player: Player;
   season?: Season;
   ovrInfo?: PlayerOvrInfo | null;
   nearestRefresh?: NearestRefreshInfo | null;
+  demandCount?: number;
 }) {
   const imageUrl = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.id}.png`;
 
@@ -534,6 +665,10 @@ function RefreshPlayerCard({
         {nearestRefresh ? (
           <p className="mt-2 text-sm font-semibold text-lime-300">
             다음 갱신 구간 시작 {nearestRefresh.label}
+          </p>
+        ) : demandCount ? (
+          <p className="mt-2 text-sm font-semibold text-amber-200">
+            알림 요청 {demandCount}건 · 첫 제보 기다리는 중
           </p>
         ) : (
           <p className="mt-2 text-sm text-gray-500">갱신시간 확인하기 →</p>

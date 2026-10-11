@@ -144,7 +144,7 @@ export default async function RefreshDetailPage({
             </h1>
 
             <p className="mt-4 max-w-xl text-gray-400">
-              유저 제보를 기반으로 대표 갱신시간을 확인하고 알림을 설정할 수 있습니다.
+              공개 참고값과 유저 제보를 바탕으로 2시간 거래량 갱신 기준 시각을 확인하고 알림을 설정할 수 있습니다. 실제 기준가·상한가·하한가는 이후 약 0~20분 사이에 변동될 수 있습니다.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">

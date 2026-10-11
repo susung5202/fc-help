@@ -15,6 +15,22 @@ type Report = {
 
 type Props = {
   playerSpid: number;
+  playerName: string;
+  seasonName: string;
+};
+
+type Observation = {
+  id: number;
+  observation_kind: "exact" | "range";
+  start_hour_type: Exclude<HourType, "unknown">;
+  start_minute: number;
+  end_hour_type: Exclude<HourType, "unknown">;
+  end_minute: number;
+  source_name: string;
+  source_url: string;
+  source_observation_count: number;
+  source_status: "estimated" | "reported" | "confirmed";
+  source_observed_date: string | null;
 };
 
 type Reference = RefreshReferencePatternRow & {
@@ -34,9 +50,12 @@ type Distribution = {
 
 export default function RefreshReportSummary({
   playerSpid,
+  playerName,
+  seasonName,
 }: Props) {
   const [reports, setReports] = useState<Report[]>([]);
   const [reference, setReference] = useState<Reference | null>(null);
+  const [observations, setObservations] = useState<Observation[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
 
@@ -47,6 +66,8 @@ export default function RefreshReportSummary({
       const [
         { data: reportData, error: reportError },
         { data: referenceData, error: referenceError },
+        { data: observationsBySpid, error: observationsBySpidError },
+        { data: observationsByName, error: observationsByNameError },
       ] = await Promise.all([
         supabase
           .from("refresh_reports")
@@ -58,24 +79,49 @@ export default function RefreshReportSummary({
           .select("hour_type, refresh_minute, source_name, source_url, source_published_at, confidence")
           .eq("player_spid", playerSpid)
           .maybeSingle(),
+        supabase
+          .from("refresh_observations")
+          .select("id, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_name, source_url, source_observation_count, source_status, source_observed_date")
+          .eq("player_spid", playerSpid)
+          .order("source_observed_date", { ascending: false }),
+        supabase
+          .from("refresh_observations")
+          .select("id, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_name, source_url, source_observation_count, source_status, source_observed_date")
+          .eq("player_name", playerName)
+          .eq("season_name", seasonName)
+          .order("source_observed_date", { ascending: false }),
       ]);
 
-      if (reportError || referenceError) {
+      const observationError =
+        observationsBySpidError || observationsByNameError;
+
+      if (reportError || referenceError || observationError) {
         console.log(
           "갱신시간 정보 불러오기 실패:",
-          reportError?.message || referenceError?.message
+          reportError?.message ||
+            referenceError?.message ||
+            observationError?.message
         );
         setLoading(false);
         return;
       }
 
+      const mergedObservations = new Map<number, Observation>();
+      for (const row of [
+        ...((observationsBySpid ?? []) as Observation[]),
+        ...((observationsByName ?? []) as Observation[]),
+      ]) {
+        mergedObservations.set(row.id, row);
+      }
+
       setReports((reportData ?? []) as Report[]);
       setReference((referenceData as Reference | null) ?? null);
+      setObservations(Array.from(mergedObservations.values()));
       setLoading(false);
     }
 
     loadReports();
-  }, [playerSpid]);
+  }, [playerSpid, playerName, seasonName]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -274,6 +320,55 @@ export default function RefreshReportSummary({
               첫 갱신시간 제보를 남기면 대표값과 알림 계산에 자동으로 반영됩니다.
               위에서 알림을 먼저 등록해두면 갱신시간이 확보된 뒤 기존 설정으로 알림이 적용됩니다.
             </p>
+          </div>
+        )}
+
+        {observations.length > 0 && (
+          <div className="mt-6 rounded-xl border border-violet-300/15 bg-violet-300/[0.04] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-violet-200">
+                  웹 관측 데이터 {observations.length}건
+                </p>
+                <p className="mt-1 text-xs leading-5 text-gray-500">
+                  공개 웹에서 수집한 참고 정보입니다. 범위 관측은 정확한 알림 시각으로 사용하지 않습니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {observations.slice(0, 5).map((observation) => (
+                <div
+                  key={observation.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/5 bg-black/10 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-gray-200">
+                      {formatObservation(observation)}
+                    </p>
+                    <p className="mt-1 text-[11px] text-gray-600">
+                      {observation.source_name}
+                      {observation.source_observation_count > 1
+                        ? ` · 관측 ${observation.source_observation_count}회`
+                        : ""}
+                      {observation.source_observed_date
+                        ? ` · ${new Date(
+                            `${observation.source_observed_date}T00:00:00+09:00`
+                          ).toLocaleDateString("ko-KR")}`
+                        : ""}
+                    </p>
+                  </div>
+                  <a
+                    href={observation.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-white/5"
+                  >
+                    출처
+                  </a>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -495,6 +590,28 @@ function formatRefreshPattern(
   }
 
   return "미확인";
+}
+
+function formatObservation(observation: Observation) {
+  const start = formatRefreshPattern(
+    observation.start_hour_type,
+    observation.start_minute
+  );
+
+  if (
+    observation.observation_kind === "exact" ||
+    (observation.start_hour_type === observation.end_hour_type &&
+      observation.start_minute === observation.end_minute)
+  ) {
+    return `${start} · 외부 exact 참고`;
+  }
+
+  const end = formatRefreshPattern(
+    observation.end_hour_type,
+    observation.end_minute
+  );
+
+  return `${start} ~ ${end} · 관측 범위`;
 }
 
 function formatReport(report: Report) {

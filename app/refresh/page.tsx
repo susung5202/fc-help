@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import ServiceUsageNotes from "@/components/ServiceUsageNotes";
 import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
+
+export const metadata: Metadata = {
+  title: "갱신시간 | FC Help",
+  description: "FC 온라인 갱신시간 제보 및 공개 참고값을 확인하고 알림을 설정해 보세요.",
+  alternates: { canonical: "/refresh" },
+};
 
 type Player = {
   id: number;
@@ -580,6 +588,7 @@ export default async function RefreshPage({
           )}
         </div>
       </section>
+      <ServiceUsageNotes section="refresh" />
     </main>
   );
 }

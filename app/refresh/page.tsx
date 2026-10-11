@@ -309,7 +309,7 @@ export default async function RefreshPage({
         <p className="text-sm font-semibold text-lime-400">REFRESH TIME</p>
         <h1 className="mt-2 text-4xl font-bold">갱신시간</h1>
         <p className="mt-3 text-gray-400">
-          선수별 유저 제보 갱신시간을 검색하고 알림을 설정할 수 있습니다.
+          선수별 2시간 거래량 갱신 기준 시각을 확인하고 알림을 설정할 수 있습니다. 기준가·상한가·하한가는 이 시각 이후 약 0~20분 사이에 변동될 수 있습니다.
         </p>
 
         <form
@@ -342,7 +342,7 @@ export default async function RefreshPage({
                   <div>
                     <h2 className="text-2xl font-black">바로 확인 가능한 갱신시간</h2>
                     <p className="mt-2 text-sm leading-6 text-gray-400">
-                      초기 공개 참고값 {showcase.count}장을 먼저 제공하고, FC Help 유저 제보가 쌓이면 제보 결과로 계속 보정합니다.
+                      출처가 표시된 초기 공개 참고값 {showcase.count}장을 먼저 제공하고, FC Help 유저 제보가 쌓이면 제보 결과로 계속 보정합니다.
                     </p>
                   </div>
                   <span className="rounded-full border border-lime-300/20 bg-black/20 px-3 py-1.5 text-xs font-black text-lime-200">
@@ -509,7 +509,7 @@ function RefreshPlayerCard({
         <h3 className="mt-3 text-lg font-bold">{player.name}</h3>
         {nearestRefresh ? (
           <p className="mt-2 text-sm font-semibold text-lime-300">
-            다음 예상 갱신 {nearestRefresh.label}
+            다음 갱신 구간 시작 {nearestRefresh.label}
           </p>
         ) : (
           <p className="mt-2 text-sm text-gray-500">갱신시간 확인하기 →</p>

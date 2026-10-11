@@ -272,6 +272,7 @@ export default function RefreshReportSummary({
 
             <p className="mt-2 text-sm text-gray-500">
               첫 갱신시간 제보를 남기면 대표값과 알림 계산에 자동으로 반영됩니다.
+              위에서 알림을 먼저 등록해두면 갱신시간이 확보된 뒤 기존 설정으로 알림이 적용됩니다.
             </p>
           </div>
         )}

@@ -189,17 +189,10 @@ type RefreshDemandRow = {
 
 const FEATURED_REFRESH_NAMES = [
   "크리스티아누 호날두",
-  "리오넬 메시",
   "손흥민",
-  "킬리안 음바페",
-  "엘링 홀란",
-  "모하메드 살라",
-  "해리 케인",
-  "주드 벨링엄",
-  "우스만 뎀벨레",
-  "비니시우스",
-  "콜 파머",
-  "버질 반다이크",
+  "루드 굴리트",
+  "차범근",
+  "안드리 셰우첸코",
 ] as const;
 
 async function getRefreshShowcase() {

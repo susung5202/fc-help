@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import PlayerArtwork from "@/components/PlayerArtwork";
 import PushNotificationSetup from "@/components/PushNotificationSetup";
 import { getPlayerRankings, type PlayerRankingItem } from "@/lib/fconline/playerRankings";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export const revalidate = 60;
 

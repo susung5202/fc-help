@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
 
 type Player = {
   id: number;
@@ -110,18 +111,28 @@ async function getNearestRefreshMap(spids: number[]) {
 
   try {
     const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("refresh_reports")
-      .select("player_spid, hour_type, refresh_minute")
-      .in("player_spid", spids);
+    const [{ data: reportsData, error: reportsError }, { data: referenceData, error: referenceError }] =
+      await Promise.all([
+        supabase
+          .from("refresh_reports")
+          .select("player_spid, hour_type, refresh_minute")
+          .in("player_spid", spids),
+        supabase
+          .from("refresh_reference_times")
+          .select("player_spid, hour_type, refresh_minute")
+          .in("player_spid", spids),
+      ]);
 
-    if (error) {
-      console.error("갱신시간 정렬용 제보 조회 실패", error.message);
+    if (reportsError || referenceError) {
+      console.error(
+        "갱신시간 정렬용 조회 실패",
+        reportsError?.message || referenceError?.message
+      );
       return result;
     }
 
     const grouped = new Map<number, RefreshReportRow[]>();
-    for (const row of (data ?? []) as RefreshReportRow[]) {
+    for (const row of (reportsData ?? []) as RefreshReportRow[]) {
       const spid = Number(row.player_spid);
       if (!Number.isFinite(spid)) continue;
       const rows = grouped.get(spid) ?? [];
@@ -129,50 +140,33 @@ async function getNearestRefreshMap(spids: number[]) {
       grouped.set(spid, rows);
     }
 
+    const references = new Map<number, RefreshReferencePatternRow>();
+    for (const row of (referenceData ?? []) as Array<{
+      player_spid: number | string;
+      hour_type: "odd" | "even" | "every";
+      refresh_minute: number;
+    }>) {
+      const spid = Number(row.player_spid);
+      if (!Number.isFinite(spid)) continue;
+      references.set(spid, {
+        hour_type: row.hour_type,
+        refresh_minute: row.refresh_minute,
+      });
+    }
+
     const now = new Date();
 
     for (const spid of spids) {
-      const rows = (grouped.get(spid) ?? []).filter(
-        (row) => row.hour_type !== "unknown" && row.refresh_minute !== null
+      const resolved = resolveRefreshPattern(
+        grouped.get(spid) ?? [],
+        references.get(spid) ?? null
       );
 
-      if (rows.length === 0) {
-        result.set(spid, null);
-        continue;
-      }
-
-      const counts = new Map<string, { hourType: HourType; minute: number; count: number }>();
-      for (const row of rows) {
-        if (row.refresh_minute === null) continue;
-        const key = `${row.hour_type}-${row.refresh_minute}`;
-        const current = counts.get(key);
-        if (current) {
-          current.count += 1;
-        } else {
-          counts.set(key, {
-            hourType: row.hour_type,
-            minute: row.refresh_minute,
-            count: 1,
-          });
-        }
-      }
-
-      const distribution = Array.from(counts.values()).sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return a.minute - b.minute;
-      });
-      const topCount = distribution[0]?.count ?? 0;
-      const topCandidates = distribution.filter((item) => item.count === topCount);
-
-      if (topCandidates.length !== 1) {
-        result.set(spid, null);
-        continue;
-      }
-
-      const winner = topCandidates[0];
       result.set(
         spid,
-        getNextRefreshInfo(winner.hourType, winner.minute, now)
+        resolved
+          ? getNextRefreshInfo(resolved.hourType, resolved.minute, now)
+          : null
       );
     }
   } catch (error) {
@@ -214,7 +208,7 @@ export default async function RefreshPage({
     query && sortMode === "ovr"
       ? getPlayerOvrMap(matchedPlayers.map((player) => player.id))
       : Promise.resolve(new Map<number, PlayerOvrInfo | null>()),
-    query && sortMode === "nearest"
+    query
       ? getNearestRefreshMap(matchedPlayers.map((player) => player.id))
       : Promise.resolve(new Map<number, NearestRefreshInfo | null>()),
   ]);

@@ -176,6 +176,33 @@ async function getNearestRefreshMap(spids: number[]) {
   return result;
 }
 
+type RefreshShowcaseRow = {
+  player_spid: number | string;
+  hour_type: "odd" | "even" | "every";
+  refresh_minute: number;
+};
+
+async function getRefreshShowcase() {
+  try {
+    const supabase = createAdminClient();
+    const { data, error, count } = await supabase
+      .from("refresh_reference_times")
+      .select("player_spid, hour_type, refresh_minute", { count: "exact" })
+      .order("player_spid", { ascending: true })
+      .limit(12);
+
+    if (error) throw error;
+
+    return {
+      count: count ?? 0,
+      rows: (data ?? []) as RefreshShowcaseRow[],
+    };
+  } catch (error) {
+    console.error("갱신시간 초기 데이터 조회 실패", error);
+    return { count: 0, rows: [] as RefreshShowcaseRow[] };
+  }
+}
+
 export default async function RefreshPage({
   searchParams,
 }: {
@@ -186,9 +213,10 @@ export default async function RefreshPage({
   const sortMode: SortMode =
     sort === "ovr" ? "ovr" : sort === "nearest" ? "nearest" : "default";
 
-  const [players, seasons] = await Promise.all([
+  const [players, seasons, showcase] = await Promise.all([
     getPlayers(),
     getSeasons(),
+    getRefreshShowcase(),
   ]);
 
   const seasonMap = new Map(
@@ -212,6 +240,22 @@ export default async function RefreshPage({
       ? getNearestRefreshMap(matchedPlayers.map((player) => player.id))
       : Promise.resolve(new Map<number, NearestRefreshInfo | null>()),
   ]);
+
+  const playerMap = new Map(players.map((player) => [player.id, player]));
+  const showcaseCards = showcase.rows
+    .map((row) => {
+      const spid = Number(row.player_spid);
+      const player = playerMap.get(spid);
+      if (!player) return null;
+      return {
+        player,
+        refresh: getNextRefreshInfo(row.hour_type, row.refresh_minute, new Date()),
+      };
+    })
+    .filter(
+      (item): item is { player: Player; refresh: NearestRefreshInfo | null } =>
+        item !== null
+    );
 
   const results = [...matchedPlayers].sort((a, b) => {
     if (sortMode === "ovr") {
@@ -291,11 +335,42 @@ export default async function RefreshPage({
 
         <div className="mt-12">
           {!query ? (
-            <div className="rounded-2xl border border-white/10 bg-[#181b21] px-6 py-16 text-center">
-              <p className="text-lg font-semibold">갱신시간을 확인할 선수를 검색해주세요.</p>
-              <p className="mt-2 text-sm text-gray-500">
-                검색 후 시즌을 선택하면 제보된 갱신시간과 알림 설정을 확인할 수 있습니다.
-              </p>
+            <div>
+              <div className="rounded-2xl border border-lime-300/15 bg-lime-300/[0.04] px-5 py-5 sm:px-6">
+                <p className="text-xs font-black tracking-[0.14em] text-lime-400">DATA BOOTSTRAP</p>
+                <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-black">바로 확인 가능한 갱신시간</h2>
+                    <p className="mt-2 text-sm leading-6 text-gray-400">
+                      초기 공개 참고값 {showcase.count}장을 먼저 제공하고, FC Help 유저 제보가 쌓이면 제보 결과로 계속 보정합니다.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-lime-300/20 bg-black/20 px-3 py-1.5 text-xs font-black text-lime-200">
+                    현재 {showcase.count}장
+                  </span>
+                </div>
+              </div>
+
+              {showcaseCards.length > 0 ? (
+                <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {showcaseCards.map(({ player, refresh }) => {
+                    const seasonId = Math.floor(player.id / 1_000_000);
+                    const season = seasonMap.get(seasonId);
+                    return (
+                      <RefreshPlayerCard
+                        key={player.id}
+                        player={player}
+                        season={season}
+                        nearestRefresh={refresh}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-[#181b21] px-6 py-16 text-center">
+                  <p className="text-lg font-semibold">갱신시간을 확인할 선수를 검색해주세요.</p>
+                </div>
+              )}
             </div>
           ) : results.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-[#181b21] px-6 py-16 text-center">

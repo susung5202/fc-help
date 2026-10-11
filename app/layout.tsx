@@ -24,7 +24,7 @@ const shareImage = `${siteUrl}/fc-help-share-v2.jpg`;
 const adsenseClient = "ca-pub-6735658400194219";
 const defaultTitle = "FC Help - FC 온라인 선수 DB·갱신시간·스쿼드 메이커";
 const defaultDescription =
-  "FC 온라인 선수 정보, 유저 제보 기반 갱신시간, 브라우저 알림과 스쿼드 메이커를 제공하는 비공식 팬 서비스입니다.";
+  "FC 온라인 선수 정보, 공개 참고값과 유저 제보 기반 갱신시간, 브라우저 알림과 스쿼드 메이커를 제공하는 비공식 팬 서비스입니다.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

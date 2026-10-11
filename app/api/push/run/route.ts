@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveRefreshPattern } from "@/lib/refresh/resolvePattern";
 
 type HourType =
   | "odd"
@@ -13,6 +14,12 @@ type RefreshReport = {
   player_spid: number;
   hour_type: HourType;
   refresh_minute: number | null;
+};
+
+type RefreshReference = {
+  player_spid: number;
+  hour_type: "odd" | "even" | "every";
+  refresh_minute: number;
 };
 
 type Alert = {
@@ -155,12 +162,29 @@ export async function GET(
     const reports =
       (reportsData ?? []) as RefreshReport[];
 
+    const {
+      data: referencesData,
+      error: referencesError,
+    } = await supabase
+      .from("refresh_reference_times")
+      .select("player_spid, hour_type, refresh_minute")
+      .in("player_spid", playerSpids);
+
+    if (referencesError) {
+      throw referencesError;
+    }
+
+    const references =
+      (referencesData ?? []) as RefreshReference[];
+
     /*
      * 선수별 대표 갱신 패턴 계산
+     * 공개 참고값은 제보가 부족할 때 fallback으로 사용한다.
      */
     const patternMap =
       buildPatternMap(
-        reports
+        reports,
+        references
       );
 
     let sentCount = 0;
@@ -440,120 +464,47 @@ export async function GET(
  * 자동 알림을 보내지 않는다.
  */
 function buildPatternMap(
-  reports: RefreshReport[]
+  reports: RefreshReport[],
+  references: RefreshReference[]
 ) {
-  const grouped =
-    new Map<
-      number,
-      RefreshReport[]
-    >();
+  const grouped = new Map<number, RefreshReport[]>();
 
   for (const report of reports) {
-    if (
-      report.hour_type ===
-        "unknown" ||
-      report.refresh_minute ===
-        null
-    ) {
-      continue;
-    }
-
-    const current =
-      grouped.get(
-        report.player_spid
-      ) ?? [];
-
+    const current = grouped.get(report.player_spid) ?? [];
     current.push(report);
-
-    grouped.set(
-      report.player_spid,
-      current
-    );
+    grouped.set(report.player_spid, current);
   }
 
-  const result =
-    new Map<
-      number,
-      Pattern
-    >();
+  const referenceMap = new Map(
+    references.map((reference) => [
+      Number(reference.player_spid),
+      {
+        hour_type: reference.hour_type,
+        refresh_minute: reference.refresh_minute,
+      },
+    ])
+  );
 
-  for (
-    const [
-      playerSpid,
-      playerReports,
-    ] of grouped
-  ) {
-    const counts =
-      new Map<
-        string,
-        Pattern
-      >();
+  const playerSpids = new Set<number>([
+    ...grouped.keys(),
+    ...referenceMap.keys(),
+  ]);
 
-    for (
-      const report
-      of playerReports
-    ) {
-      if (
-        report.refresh_minute ===
-        null
-      ) {
-        continue;
-      }
+  const result = new Map<number, Pattern>();
 
-      const key =
-        `${report.hour_type}-${report.refresh_minute}`;
-
-      const current =
-        counts.get(key);
-
-      if (current) {
-        current.count += 1;
-      } else {
-        counts.set(
-          key,
-          {
-            hourType:
-              report.hour_type,
-
-            minute:
-              report.refresh_minute,
-
-            count: 1,
-          }
-        );
-      }
-    }
-
-    const patterns =
-      Array.from(
-        counts.values()
-      ).sort(
-        (a, b) =>
-          b.count -
-          a.count
-      );
-
-    if (
-      patterns.length === 0
-    ) {
-      continue;
-    }
-
-    /*
-     * 1위와 2위 표가 같으면 의견 갈림
-     */
-    if (
-      patterns.length > 1 &&
-      patterns[0].count ===
-        patterns[1].count
-    ) {
-      continue;
-    }
-
-    result.set(
-      playerSpid,
-      patterns[0]
+  for (const playerSpid of playerSpids) {
+    const resolved = resolveRefreshPattern(
+      grouped.get(playerSpid) ?? [],
+      referenceMap.get(playerSpid) ?? null
     );
+
+    if (!resolved) continue;
+
+    result.set(playerSpid, {
+      hourType: resolved.hourType,
+      minute: resolved.minute,
+      count: Math.max(1, resolved.matchingReportCount),
+    });
   }
 
   return result;

@@ -322,6 +322,9 @@ const SOURCES: SourceConfig[] = [
   },
 ];
 
+// Daily refresh focuses on current/high-demand seasons. Legacy observations remain in DB.
+const ACTIVE_SOURCES = SOURCES.slice(0, 15);
+
 function decodeHtmlEntities(value: string) {
   return value
     .replace(/&nbsp;/gi, " ")
@@ -609,7 +612,7 @@ export async function GET(request: Request) {
       sample: string[];
     }> = [];
 
-    for (const source of SOURCES) {
+    for (const source of ACTIVE_SOURCES) {
       const response = await fetch(source.url, {
         cache: "no-store",
         headers: {
@@ -777,7 +780,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      sourcePages: SOURCES.length,
+      sourcePages: ACTIVE_SOURCES.length,
       totalParsed,
       totalUpserted,
       pages,

@@ -202,27 +202,10 @@ export async function GET(request: Request) {
       if (error) throw error;
     }
 
-    const mapperUrl = new URL(
-      "/api/refresh/map-observations/cron",
-      request.url
-    );
-    const mapperResponse = await fetch(mapperUrl, {
-      headers: { "x-fc-help-cron-secret": auth.secret },
-      cache: "no-store",
-    });
-
-    let mapping: unknown = null;
-    try {
-      mapping = await mapperResponse.json();
-    } catch {
-      mapping = { status: mapperResponse.status };
-    }
-
     return NextResponse.json({
       success: true,
       parsed: parsed.length,
       upserted: rows.length,
-      mapping,
     });
   } catch (error) {
     console.error("21TOTY refresh scrape failed:", error);

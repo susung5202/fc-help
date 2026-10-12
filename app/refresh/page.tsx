@@ -357,46 +357,86 @@ async function getObservationHintMap(
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("refresh_observations")
-      .select("player_spid, player_name, season_name, observation_kind")
+      .select("player_spid, player_name, season_name, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_status")
       .limit(500);
 
     if (error) throw error;
 
-    const direct = new Map<number, "exact" | "range">();
-    const byNameSeason = new Map<string, "exact" | "range">();
-
-    for (const row of (data ?? []) as Array<{
+    type HintRow = {
       player_spid: number | string | null;
       player_name: string;
       season_name: string;
       observation_kind: "exact" | "range";
-    }>) {
-      const kind = row.observation_kind;
+      start_hour_type: "odd" | "even" | "every";
+      start_minute: number;
+      end_hour_type: "odd" | "even" | "every";
+      end_minute: number;
+      source_status: "estimated" | "reported" | "confirmed";
+    };
+
+    const formatHint = (row: HintRow) => {
+      const statusLabel =
+        row.source_status === "confirmed"
+          ? "확인됨"
+          : row.source_status === "reported"
+            ? "제보"
+            : "추정";
+      const startHour =
+        row.start_hour_type === "odd"
+          ? "홀수"
+          : row.start_hour_type === "even"
+            ? "짝수"
+            : "매시";
+
+      if (
+        row.observation_kind === "exact" ||
+        (row.start_hour_type === row.end_hour_type &&
+          row.start_minute === row.end_minute)
+      ) {
+        return `${startHour} ${row.start_minute}분 (${statusLabel})`;
+      }
+
+      const endHour =
+        row.end_hour_type === "odd"
+          ? "홀수"
+          : row.end_hour_type === "even"
+            ? "짝수"
+            : "매시";
+
+      return row.start_hour_type === row.end_hour_type
+        ? `${startHour} ${row.start_minute}분~${row.end_minute}분 (${statusLabel})`
+        : `${startHour} ${row.start_minute}분~${endHour} ${row.end_minute}분 (${statusLabel})`;
+    };
+
+    const direct = new Map<number, HintRow>();
+    const byNameSeason = new Map<string, HintRow>();
+
+    for (const row of (data ?? []) as HintRow[]) {
       const spid = row.player_spid === null ? null : Number(row.player_spid);
 
       if (spid !== null && Number.isFinite(spid)) {
         const current = direct.get(spid);
-        if (!current || kind === "exact") direct.set(spid, kind);
+        if (!current || row.observation_kind === "exact") direct.set(spid, row);
       }
 
       const key = `${row.player_name}::${row.season_name}`;
       const current = byNameSeason.get(key);
-      if (!current || kind === "exact") byNameSeason.set(key, kind);
+      if (!current || row.observation_kind === "exact") byNameSeason.set(key, row);
     }
 
     for (const player of players) {
-      const directKind = direct.get(player.id);
-      const namedKind = Array.from(byNameSeason.entries()).find(([key]) => {
+      const directRow = direct.get(player.id);
+      const namedRow = Array.from(byNameSeason.entries()).find(([key]) => {
         const [playerName, seasonName] = key.split("::");
-        return matchObservationSpid({ player_spid: null, player_name: playerName, season_name: seasonName }, players, seasons) === player.id;
+        return matchObservationSpid(
+          { player_spid: null, player_name: playerName, season_name: seasonName },
+          players,
+          seasons
+        ) === player.id;
       })?.[1];
-      const kind = directKind ?? namedKind;
+      const row = directRow ?? namedRow;
 
-      if (kind === "exact") {
-        result.set(player.id, "웹 exact 참고값 있음");
-      } else if (kind === "range") {
-        result.set(player.id, "웹 관측 범위 있음");
-      }
+      if (row) result.set(player.id, formatHint(row));
     }
   } catch (error) {
     console.error("웹 관측 표시 조회 실패", error);
@@ -779,7 +819,7 @@ function RefreshPlayerCard({
           </p>
         ) : observationHint ? (
           <p className="mt-2 text-sm font-semibold text-violet-200">
-            {observationHint} · 상세에서 확인
+            {observationHint}
           </p>
         ) : demandCount ? (
           <p className="mt-2 text-sm font-semibold text-amber-200">

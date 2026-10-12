@@ -169,11 +169,21 @@ export async function GET(request: Request) {
     }
 
     const playersByName = new Map<string, PlayerMeta[]>();
+    const playersBySeasonKey = new Map<string, PlayerMeta[]>();
+
     for (const player of players) {
       const key = normalizePlayerName(player.name);
       const rows = playersByName.get(key) ?? [];
       rows.push(player);
       playersByName.set(key, rows);
+
+      const seasonId = Math.floor(Number(player.id) / 1_000_000);
+      const seasonKey = seasonKeyById.get(seasonId) ?? "";
+      if (seasonKey) {
+        const seasonRows = playersBySeasonKey.get(seasonKey) ?? [];
+        seasonRows.push(player);
+        playersBySeasonKey.set(seasonKey, seasonRows);
+      }
     }
 
     const mapped = new Map<number, number[]>();
@@ -191,7 +201,7 @@ export async function GET(request: Request) {
       const storedSeasonKey = normalizeSeasonKey(observation.season_name);
       const sourceSeasonKey = seasonKeyFromSourceUrl(observation.source_url);
 
-      const sameSeason = candidates.filter((candidate) => {
+      let sameSeason = candidates.filter((candidate) => {
         const seasonId = Math.floor(Number(candidate.id) / 1_000_000);
         const candidateKey = seasonKeyById.get(seasonId) ?? "";
 
@@ -200,6 +210,28 @@ export async function GET(request: Request) {
           (sourceSeasonKey !== "" && candidateKey === sourceSeasonKey)
         );
       });
+
+      if (sameSeason.length !== 1) {
+        const targetSeasonKey = storedSeasonKey || sourceSeasonKey;
+        const observationNameKey = normalizePlayerName(
+          observation.player_name
+        );
+
+        const fuzzySameSeason = (playersBySeasonKey.get(targetSeasonKey) ?? [])
+          .filter((candidate) => {
+            const candidateNameKey = normalizePlayerName(candidate.name);
+
+            return (
+              candidateNameKey === observationNameKey ||
+              candidateNameKey.endsWith(observationNameKey) ||
+              observationNameKey.endsWith(candidateNameKey)
+            );
+          });
+
+        if (fuzzySameSeason.length === 1) {
+          sameSeason = fuzzySameSeason;
+        }
+      }
 
       if (sameSeason.length !== 1) {
         unmatched.push({

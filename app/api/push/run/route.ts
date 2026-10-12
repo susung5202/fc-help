@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveRefreshPattern } from "@/lib/refresh/resolvePattern";
+import { observationConflictsWithPattern } from "@/lib/refresh/observationConflict";
 
 type HourType =
   | "odd"
@@ -25,8 +26,11 @@ type RefreshReference = {
 
 type RefreshObservation = {
   player_spid: number;
+  observation_kind: "exact" | "range";
   start_hour_type: "odd" | "even" | "every";
   start_minute: number;
+  end_hour_type: "odd" | "even" | "every";
+  end_minute: number;
 };
 
 type Alert = {
@@ -189,9 +193,8 @@ export async function GET(
       error: observationsError,
     } = await supabase
       .from("refresh_observations")
-      .select("player_spid, start_hour_type, start_minute")
+      .select("player_spid, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute")
       .in("player_spid", playerSpids)
-      .eq("observation_kind", "exact")
       .eq("source_type", "scraped_public")
       .in("source_status", ["reported", "confirmed"]);
 
@@ -515,10 +518,12 @@ function buildPatternMap(
     references.map((reference) => {
       const spid = Number(reference.player_spid);
       const hasExternalConflict =
-        (observationsBySpid.get(spid) ?? []).some(
-          (observation) =>
-            observation.start_hour_type !== reference.hour_type ||
-            observation.start_minute !== reference.refresh_minute
+        (observationsBySpid.get(spid) ?? []).some((observation) =>
+          observationConflictsWithPattern(
+            observation,
+            reference.hour_type,
+            reference.refresh_minute
+          )
         );
 
       return [

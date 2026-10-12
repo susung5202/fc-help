@@ -515,7 +515,6 @@ function buildPatternMap(
     references.map((reference) => {
       const spid = Number(reference.player_spid);
       const hasExternalConflict =
-        reference.confidence !== "verified" &&
         (observationsBySpid.get(spid) ?? []).some(
           (observation) =>
             observation.start_hour_type !== reference.hour_type ||

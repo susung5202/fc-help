@@ -121,6 +121,24 @@ function hourType(value: string): HourType {
   return value === "홀수" ? "odd" : "even";
 }
 
+function sanitizePlayerName(value: string) {
+  let name = value.replace(/\s+/g, " ").trim();
+
+  const alertMarker = "알림 받기 ";
+  const alertIndex = name.lastIndexOf(alertMarker);
+  if (alertIndex >= 0) {
+    name = name.slice(alertIndex + alertMarker.length).trim();
+  }
+
+  const observationMarker = "상태 관측 ";
+  const observationIndex = name.lastIndexOf(observationMarker);
+  if (observationIndex >= 0) {
+    name = name.slice(observationIndex + observationMarker.length).trim();
+  }
+
+  return name;
+}
+
 function normalizePlayerKey(value: string) {
   return value
     .normalize("NFKC")
@@ -158,7 +176,7 @@ function parsePage(text: string, source: SourceConfig): ParsedObservation[] {
   const seen = new Set<string>();
 
   for (const match of text.matchAll(rowPattern)) {
-    const playerName = match[1].trim();
+    const playerName = sanitizePlayerName(match[1]);
     const startHourType = hourType(match[2]);
     const startMinute = Number(match[3]);
     const endHourType = match[4] ? hourType(match[4]) : startHourType;

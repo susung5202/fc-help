@@ -314,25 +314,36 @@ export async function GET(request: Request) {
     }
 
     let updated = 0;
+    const mappedEntries = Array.from(mapped.entries());
+    const updateBatchSize = 20;
 
-    for (const [spid, ids] of mapped.entries()) {
-      const { error, count } = await supabase
-        .from("refresh_observations")
-        .update(
-          {
-            player_spid: spid,
-            updated_at: new Date().toISOString(),
-          },
-          { count: "exact" }
-        )
-        .in("id", ids)
-        .is("player_spid", null);
+    for (
+      let offset = 0;
+      offset < mappedEntries.length;
+      offset += updateBatchSize
+    ) {
+      const batch = mappedEntries.slice(offset, offset + updateBatchSize);
 
-      if (error) {
-        throw error;
-      }
+      const results = await Promise.all(
+        batch.map(async ([spid, ids]) => {
+          const { error, count } = await supabase
+            .from("refresh_observations")
+            .update(
+              {
+                player_spid: spid,
+                updated_at: new Date().toISOString(),
+              },
+              { count: "exact" }
+            )
+            .in("id", ids)
+            .is("player_spid", null);
 
-      updated += count ?? 0;
+          if (error) throw error;
+          return count ?? 0;
+        })
+      );
+
+      updated += results.reduce((sum, count) => sum + count, 0);
     }
 
     return NextResponse.json({

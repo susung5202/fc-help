@@ -24,6 +24,7 @@ const SEASONS = [
   ["LH", "LH (Loyal Heroes)"],
   ["TKL", "TKL (TEAM K LEAGUE)"],
   ["20KL", "20KLeague (20KLeague)"],
+  ["19S", "19 PLS (19 Premium Live Spring)"],
   ["19UCL", "19 UCL (19 UEFA Champions League)"],
   ["HOT", "HOT (Heroes Of the Team)"],
   ["NG", "19NG (19 NEW GENERATION)"],
@@ -85,7 +86,7 @@ function parseLegacyPage(text: string): LegacyObservation[] {
     .join("|");
 
   const sectionPattern = new RegExp(
-    `\\[(${aliases})\\]([\\s\\S]*?)(?=\\[(?:${aliases}|MCICON|18TOTY)\\]|$)`,
+    `\\[(${aliases})\\]([\\s\\S]*?)(?=\\[[^\\]]+\\]|$)`,
     "gi"
   );
 

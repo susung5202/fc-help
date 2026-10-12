@@ -224,7 +224,9 @@ export async function GET(request: Request) {
             return (
               candidateNameKey === observationNameKey ||
               candidateNameKey.endsWith(observationNameKey) ||
-              observationNameKey.endsWith(candidateNameKey)
+              observationNameKey.endsWith(candidateNameKey) ||
+              candidateNameKey.startsWith(observationNameKey) ||
+              observationNameKey.startsWith(candidateNameKey)
             );
           });
 

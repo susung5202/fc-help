@@ -254,6 +254,18 @@ const SOURCES: SourceConfig[] = [
     seasonName: "21 UCL (21 UEFA Champions League)",
     url: "https://fconlab.com/refresh/seasons/21ucl",
   },
+  {
+    slug: "icontm",
+    seasonCode: "ICON TM",
+    seasonName: "ICON TM (ICON The Moment)",
+    url: "https://fconlab.com/refresh/seasons/icontm",
+  },
+  {
+    slug: "icon",
+    seasonCode: "ICON",
+    seasonName: "ICON (ICON)",
+    url: "https://fconlab.com/refresh/seasons/icon",
+  },
 ];
 
 function decodeHtmlEntities(value: string) {

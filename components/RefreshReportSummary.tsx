@@ -28,6 +28,7 @@ type Observation = {
   end_minute: number;
   source_name: string;
   source_url: string;
+  source_type: "scraped_public" | "user_report" | "manual" | "fc_help";
   source_observation_count: number;
   source_status: "estimated" | "reported" | "confirmed";
   source_observed_date: string | null;
@@ -81,12 +82,12 @@ export default function RefreshReportSummary({
           .maybeSingle(),
         supabase
           .from("refresh_observations")
-          .select("id, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_name, source_url, source_observation_count, source_status, source_observed_date")
+          .select("id, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_name, source_url, source_type, source_observation_count, source_status, source_observed_date")
           .eq("player_spid", playerSpid)
           .order("source_observed_date", { ascending: false }),
         supabase
           .from("refresh_observations")
-          .select("id, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_name, source_url, source_observation_count, source_status, source_observed_date")
+          .select("id, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_name, source_url, source_type, source_observation_count, source_status, source_observed_date")
           .eq("player_name", playerName)
           .eq("season_name", seasonName)
           .order("source_observed_date", { ascending: false }),
@@ -221,6 +222,23 @@ export default function RefreshReportSummary({
     };
   }, [reports]);
 
+  const hasExternalConflict = useMemo(
+    () =>
+      Boolean(
+        reference &&
+          reference.confidence !== "verified" &&
+          observations.some(
+            (observation) =>
+              observation.observation_kind === "exact" &&
+              observation.source_type === "scraped_public" &&
+              observation.source_status !== "estimated" &&
+              (observation.start_hour_type !== reference.hour_type ||
+                observation.start_minute !== reference.refresh_minute)
+          )
+      ),
+    [observations, reference]
+  );
+
   const resolvedPattern = useMemo(
     () =>
       resolveRefreshPattern(
@@ -232,10 +250,11 @@ export default function RefreshReportSummary({
               source_name: reference.source_name,
               source_url: reference.source_url,
               confidence: reference.confidence,
+              has_external_conflict: hasExternalConflict,
             }
           : null
       ),
-    [reports, reference]
+    [reports, reference, hasExternalConflict]
   );
 
   if (loading) {
@@ -399,6 +418,13 @@ export default function RefreshReportSummary({
                 ? ` · ${new Date(reference.source_published_at).toLocaleDateString("ko-KR")}`
                 : ""}
             </p>
+          </div>
+        )}
+
+        {hasExternalConflict && (
+          <div className="mt-4 rounded-xl border border-red-300/20 bg-red-300/[0.05] px-4 py-3 text-xs leading-5 text-red-100">
+            독립 공개 출처의 exact 기록과 기존 참고값이 충돌해 자동 알림 기준에서 제외했습니다.
+            추가 관측이 쌓여 값이 확인되면 다시 적용됩니다.
           </div>
         )}
 

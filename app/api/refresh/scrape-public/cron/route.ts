@@ -68,6 +68,15 @@ const INVEN_SEASON_ALIASES = [
   ["FA", "FA (FREE AGENT)"],
   ["23KFA", "23 KFA (23 KFA)"],
   ["HG", "HG (Home Grown)"],
+  ["22챔", "22 UCL (22 UEFA Champions League)"],
+  ["23히어로즈", "23HR (23 Heroes)"],
+  ["23TS", "23 TOTS (23 Team Of The Season)"],
+  ["CC", "CC (CenturyClub)"],
+  ["DC", "DC (Decade)"],
+  ["23챔", "23 UCL (23 UEFA Champions League)"],
+  ["24HR", "24HR (24 Heroes)"],
+  ["LN", "LN (LEGENDARY NUMBERS)"],
+  ["RTN", "RTN (Returnees)"],
 ] as const;
 
 const SOURCES: SourceConfig[] = [
@@ -471,7 +480,7 @@ function parseInvenBulkPage(text: string): ParsedBulkObservation[] {
   const pattern = new RegExp(
     `(${aliases})\\s+([가-힣A-Za-z.· ]{1,30}?)\\s+` +
       `(홀수|짝수|홀|짝)\\s*(\\d{1,2})` +
-      `(?:\\s*~\\s*(\\d{1,2}))?\\s*분`,
+      `(?:\\s*~\\s*(\\d{1,2}))?\\s*(분)?`,
     "gi"
   );
 
@@ -516,6 +525,13 @@ function parseInvenBulkPage(text: string): ParsedBulkObservation[] {
     if (seen.has(key)) continue;
     seen.add(key);
 
+    const nearbyText = text.slice(
+      (match.index ?? 0) + match[0].length,
+      (match.index ?? 0) + match[0].length + 12
+    );
+    const isApproximate =
+      !match[6] || /전|근처|사이|초반|이전|뒤/.test(nearbyText);
+
     results.push({
       playerName,
       seasonName,
@@ -526,7 +542,7 @@ function parseInvenBulkPage(text: string): ParsedBulkObservation[] {
       endHourType: startHourType,
       endMinute,
       sourceObservationCount: 1,
-      sourceStatus: "reported",
+      sourceStatus: isApproximate ? "estimated" : "reported",
       sourceObservedDate: "2024-01-31",
     });
   }

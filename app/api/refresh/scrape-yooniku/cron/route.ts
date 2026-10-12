@@ -199,18 +199,60 @@ export async function GET(request: Request) {
 
     const { data: existingData, error: existingError } = await supabase
       .from("refresh_observations")
-      .select("source_record_key, player_spid")
-      .eq("source_name", "이쿠로그 시즌 갱신시간 모음")
-      .not("source_record_key", "is", null)
+      .select(
+        "source_record_key, player_spid, player_name, season_name, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_url"
+      )
+      .in(
+        "source_url",
+        SOURCES.map((source) => source.url)
+      )
       .limit(10000);
 
     if (existingError) throw existingError;
 
     const existingSpidByKey = new Map<string, number | null>();
+    const existingPatternKeys = new Set<string>();
+
+    const patternKey = (row: {
+      source_url: string;
+      player_name: string;
+      season_name: string;
+      observation_kind: string;
+      start_hour_type: string;
+      start_minute: number;
+      end_hour_type: string;
+      end_minute: number;
+    }) =>
+      [
+        row.source_url,
+        row.player_name,
+        row.season_name,
+        row.observation_kind,
+        row.start_hour_type,
+        row.start_minute,
+        row.end_hour_type,
+        row.end_minute,
+      ].join("::");
+
     for (const row of existingData ?? []) {
-      existingSpidByKey.set(
-        String(row.source_record_key),
-        row.player_spid === null ? null : Number(row.player_spid)
+      if (row.source_record_key) {
+        existingSpidByKey.set(
+          String(row.source_record_key),
+          row.player_spid === null ? null : Number(row.player_spid)
+        );
+      }
+
+      existingPatternKeys.add(
+        patternKey({
+          source_url: String(row.source_url),
+          player_name: String(row.player_name),
+          season_name: String(row.season_name),
+          observation_kind: String(row.observation_kind),
+          start_hour_type: String(row.start_hour_type),
+          start_minute: Number(row.start_minute),
+          end_hour_type: String(row.end_hour_type),
+          end_minute: Number(row.end_minute),
+        })
       );
     }
 
@@ -258,29 +300,46 @@ export async function GET(request: Request) {
       const parsed = parsePage(page.html);
       totalParsed += parsed.length;
 
-      const rows = parsed.map((item) => {
+      const rows = parsed.flatMap((item) => {
         const sourceRecordKey =
           `yooniku:${page.source.slug}:${normalizePlayerKey(item.playerName)}`;
 
-        return {
+        const row = {
           player_spid: existingSpidByKey.get(sourceRecordKey) ?? null,
           player_name: item.playerName,
           season_name: page.source.seasonName,
-          observation_kind: "exact",
+          observation_kind: "exact" as const,
           start_hour_type: item.hourType,
           start_minute: item.minute,
           end_hour_type: item.hourType,
           end_minute: item.minute,
-          source_type: "scraped_public",
+          source_type: "scraped_public" as const,
           source_name: "이쿠로그 시즌 갱신시간 모음",
           source_url: page.source.url,
           source_observation_count: 1,
-          source_status: "reported",
+          source_status: "reported" as const,
           source_observed_date: "2025-07-01",
           observer_key: sourceRecordKey,
           source_record_key: sourceRecordKey,
           updated_at: new Date().toISOString(),
         };
+
+        const hasOwnRow = existingSpidByKey.has(sourceRecordKey);
+        const hasExistingPattern = existingPatternKeys.has(
+          patternKey({
+            source_url: row.source_url,
+            player_name: row.player_name,
+            season_name: row.season_name,
+            observation_kind: row.observation_kind,
+            start_hour_type: row.start_hour_type,
+            start_minute: row.start_minute,
+            end_hour_type: row.end_hour_type,
+            end_minute: row.end_minute,
+          })
+        );
+
+        if (!hasOwnRow && hasExistingPattern) return [];
+        return [row];
       });
 
       if (rows.length > 0) {
@@ -314,7 +373,10 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Yooniku refresh scrape failed:", error);
     return NextResponse.json(
-      { error: "Yooniku refresh scrape failed" },
+      {
+        error: "Yooniku refresh scrape failed",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

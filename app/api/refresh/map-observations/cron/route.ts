@@ -137,6 +137,47 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const bootstrapSources = [
+      {
+        sourceUrl: "https://www.inven.co.kr/board/fifaonline4/3145/41287",
+        route: "/api/refresh/scrape-legacy/cron",
+      },
+      {
+        sourceUrl: "https://www.inven.co.kr/board/fifaonline4/3145/41940",
+        route: "/api/refresh/scrape-legacy-v5/cron",
+      },
+      {
+        sourceUrl: "https://www.inven.co.kr/board/fifaonline4/3145/43315",
+        route: "/api/refresh/scrape-legacy-21toty/cron",
+      },
+    ];
+
+    for (const source of bootstrapSources) {
+      const { count, error } = await supabase
+        .from("refresh_observations")
+        .select("id", { count: "exact", head: true })
+        .eq("source_url", source.sourceUrl);
+
+      if (error) throw error;
+      if ((count ?? 0) > 0) continue;
+
+      const bootstrapUrl = new URL(source.route, request.url);
+      const response = await fetch(bootstrapUrl, {
+        headers: {
+          "x-fc-help-cron-secret": suppliedSecret,
+        },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        console.warn(
+          "Legacy refresh bootstrap failed:",
+          source.route,
+          response.status
+        );
+      }
+    }
+
     const [
       players,
       seasons,

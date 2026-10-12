@@ -40,14 +40,11 @@ export default function PlayerArtwork({
   }, [spid]);
 
   const tryNextSource = () => {
-    setSourceIndex((index) => {
-      if (index < sources.length - 1) {
-        return index + 1;
-      }
-
+    if (sourceIndex < sources.length - 1) {
+      setSourceIndex(sourceIndex + 1);
+    } else {
       setFailed(true);
-      return index;
-    });
+    }
   };
 
   if (failed || sources.length === 0) return null;

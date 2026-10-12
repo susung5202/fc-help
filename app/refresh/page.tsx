@@ -5,6 +5,7 @@ import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
 import { matchObservationSpid } from "@/lib/refresh/matchObservation";
+import { observationConflictsWithPattern } from "@/lib/refresh/observationConflict";
 
 export const metadata: Metadata = {
   title: "갱신시간 | FC Help",
@@ -34,8 +35,11 @@ type RefreshReportRow = {
 
 type RefreshExternalObservationRow = {
   player_spid: number | string;
+  observation_kind: "exact" | "range";
   start_hour_type: "odd" | "even" | "every";
   start_minute: number;
+  end_hour_type: "odd" | "even" | "every";
+  end_minute: number;
 };
 
 type NearestRefreshInfo = {
@@ -141,9 +145,8 @@ async function getNearestRefreshMap(spids: number[]) {
         .in("player_spid", spids),
       supabase
         .from("refresh_observations")
-        .select("player_spid, start_hour_type, start_minute")
+        .select("player_spid, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute")
         .in("player_spid", spids)
-        .eq("observation_kind", "exact")
         .eq("source_type", "scraped_public")
         .in("source_status", ["reported", "confirmed"]),
     ]);
@@ -187,10 +190,12 @@ async function getNearestRefreshMap(spids: number[]) {
       if (!Number.isFinite(spid)) continue;
 
       const hasExternalConflict =
-        (externalObservations.get(spid) ?? []).some(
-          (observation) =>
-            observation.start_hour_type !== row.hour_type ||
-            observation.start_minute !== row.refresh_minute
+        (externalObservations.get(spid) ?? []).some((observation) =>
+          observationConflictsWithPattern(
+            observation,
+            row.hour_type,
+            row.refresh_minute
+          )
         );
 
       references.set(spid, {

@@ -91,11 +91,7 @@ export function resolveRefreshPattern(
     }
   }
 
-  if (
-    reference &&
-    reference.has_external_conflict &&
-    reference.confidence !== "verified"
-  ) {
+  if (reference?.has_external_conflict) {
     return null;
   }
 

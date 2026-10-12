@@ -32,6 +32,12 @@ type RefreshReportRow = {
   refresh_minute: number | null;
 };
 
+type RefreshExternalObservationRow = {
+  player_spid: number | string;
+  start_hour_type: "odd" | "even" | "every";
+  start_minute: number;
+};
+
 type NearestRefreshInfo = {
   minutesUntil: number;
   label: string;
@@ -120,22 +126,34 @@ async function getNearestRefreshMap(spids: number[]) {
 
   try {
     const supabase = createAdminClient();
-    const [{ data: reportsData, error: reportsError }, { data: referenceData, error: referenceError }] =
-      await Promise.all([
-        supabase
-          .from("refresh_reports")
-          .select("player_spid, hour_type, refresh_minute")
-          .in("player_spid", spids),
-        supabase
-          .from("refresh_reference_times")
-          .select("player_spid, hour_type, refresh_minute")
-          .in("player_spid", spids),
-      ]);
+    const [
+      { data: reportsData, error: reportsError },
+      { data: referenceData, error: referenceError },
+      { data: observationsData, error: observationsError },
+    ] = await Promise.all([
+      supabase
+        .from("refresh_reports")
+        .select("player_spid, hour_type, refresh_minute")
+        .in("player_spid", spids),
+      supabase
+        .from("refresh_reference_times")
+        .select("player_spid, hour_type, refresh_minute, confidence")
+        .in("player_spid", spids),
+      supabase
+        .from("refresh_observations")
+        .select("player_spid, start_hour_type, start_minute")
+        .in("player_spid", spids)
+        .eq("observation_kind", "exact")
+        .eq("source_type", "scraped_public")
+        .in("source_status", ["reported", "confirmed"]),
+    ]);
 
-    if (reportsError || referenceError) {
+    if (reportsError || referenceError || observationsError) {
       console.error(
         "갱신시간 정렬용 조회 실패",
-        reportsError?.message || referenceError?.message
+        reportsError?.message ||
+          referenceError?.message ||
+          observationsError?.message
       );
       return result;
     }
@@ -149,17 +167,38 @@ async function getNearestRefreshMap(spids: number[]) {
       grouped.set(spid, rows);
     }
 
+    const externalObservations = new Map<number, RefreshExternalObservationRow[]>();
+    for (const row of (observationsData ?? []) as RefreshExternalObservationRow[]) {
+      const spid = Number(row.player_spid);
+      if (!Number.isFinite(spid)) continue;
+      const rows = externalObservations.get(spid) ?? [];
+      rows.push(row);
+      externalObservations.set(spid, rows);
+    }
+
     const references = new Map<number, RefreshReferencePatternRow>();
     for (const row of (referenceData ?? []) as Array<{
       player_spid: number | string;
       hour_type: "odd" | "even" | "every";
       refresh_minute: number;
+      confidence: "community_reference" | "verified" | "estimated";
     }>) {
       const spid = Number(row.player_spid);
       if (!Number.isFinite(spid)) continue;
+
+      const hasExternalConflict =
+        row.confidence !== "verified" &&
+        (externalObservations.get(spid) ?? []).some(
+          (observation) =>
+            observation.start_hour_type !== row.hour_type ||
+            observation.start_minute !== row.refresh_minute
+        );
+
       references.set(spid, {
         hour_type: row.hour_type,
         refresh_minute: row.refresh_minute,
+        confidence: row.confidence,
+        has_external_conflict: hasExternalConflict,
       });
     }
 

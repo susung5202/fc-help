@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
+import { observationConflictsWithPattern } from "@/lib/refresh/observationConflict";
 
 type HourType = "odd" | "even" | "every" | "unknown";
 
@@ -228,11 +229,13 @@ export default function RefreshReportSummary({
         reference &&
           observations.some(
             (observation) =>
-              observation.observation_kind === "exact" &&
               observation.source_type === "scraped_public" &&
               observation.source_status !== "estimated" &&
-              (observation.start_hour_type !== reference.hour_type ||
-                observation.start_minute !== reference.refresh_minute)
+              observationConflictsWithPattern(
+                observation,
+                reference.hour_type,
+                reference.refresh_minute
+              )
           )
       ),
     [observations, reference]

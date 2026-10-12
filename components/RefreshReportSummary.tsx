@@ -621,25 +621,34 @@ function formatRefreshPattern(
 }
 
 function formatObservation(observation: Observation) {
-  const start = formatRefreshPattern(
-    observation.start_hour_type,
-    observation.start_minute
-  );
+  const statusLabel =
+    observation.source_status === "confirmed"
+      ? "확인됨"
+      : observation.source_status === "reported"
+        ? "제보"
+        : "추정";
 
   if (
     observation.observation_kind === "exact" ||
     (observation.start_hour_type === observation.end_hour_type &&
       observation.start_minute === observation.end_minute)
   ) {
-    return `${start} · 외부 exact 참고`;
+    return `${formatRefreshPattern(
+      observation.start_hour_type,
+      observation.start_minute
+    )} (${statusLabel})`;
   }
 
-  const end = formatRefreshPattern(
-    observation.end_hour_type,
-    observation.end_minute
-  );
+  const startHour =
+    observation.start_hour_type === "odd" ? "홀수" : "짝수";
+  const endHour =
+    observation.end_hour_type === "odd" ? "홀수" : "짝수";
 
-  return `${start} ~ ${end} · 관측 범위`;
+  if (observation.start_hour_type === observation.end_hour_type) {
+    return `${startHour} ${observation.start_minute}분~${observation.end_minute}분 (${statusLabel})`;
+  }
+
+  return `${startHour} ${observation.start_minute}분~${endHour} ${observation.end_minute}분 (${statusLabel})`;
 }
 
 function formatReport(report: Report) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type PlayerArtworkProps = {
   spid: number;
@@ -20,30 +20,54 @@ export default function PlayerArtwork({
     const pid = Math.abs(numericSpid) % 1_000_000;
 
     return [
+      // 1) 해당 시즌의 액션샷
       `${CDN_BASE}/playersAction/p${numericSpid}.png`,
+      // 2) 선수 공통 액션샷
       `${CDN_BASE}/playersAction/p${pid}.png`,
-      `${CDN_BASE}/players/p${numericSpid}.png`,
+      // 3) 액션샷이 없으면 대갈미페(선수 고유 PID)를 우선 사용
       `${CDN_BASE}/players/p${pid}.png`,
+      // 4) 마지막으로 시즌 SPID 헤드샷 시도
+      `${CDN_BASE}/players/p${numericSpid}.png`,
     ].filter((src, index, array) => array.indexOf(src) === index);
   }, [spid]);
 
   const [sourceIndex, setSourceIndex] = useState(0);
   const [failed, setFailed] = useState(false);
 
+  useEffect(() => {
+    setSourceIndex(0);
+    setFailed(false);
+  }, [spid]);
+
+  const tryNextSource = () => {
+    setSourceIndex((index) => {
+      if (index < sources.length - 1) {
+        return index + 1;
+      }
+
+      setFailed(true);
+      return index;
+    });
+  };
+
   if (failed || sources.length === 0) return null;
 
   return (
     <img
+      key={sources[sourceIndex]}
       src={sources[sourceIndex]}
       alt={alt}
       className={className}
-      onError={() => {
-        if (sourceIndex < sources.length - 1) {
-          setSourceIndex((index) => index + 1);
-        } else {
-          setFailed(true);
+      onLoad={(event) => {
+        const image = event.currentTarget;
+
+        // 일부 구시즌 이미지는 CDN이 HTTP 200으로 빈/극소 PNG를 반환한다.
+        // 브라우저의 onError가 발생하지 않으므로 크기까지 확인해 fallback한다.
+        if (image.naturalWidth <= 4 || image.naturalHeight <= 4) {
+          tryNextSource();
         }
       }}
+      onError={tryNextSource}
     />
   );
 }

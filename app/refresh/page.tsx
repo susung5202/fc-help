@@ -187,7 +187,6 @@ async function getNearestRefreshMap(spids: number[]) {
       if (!Number.isFinite(spid)) continue;
 
       const hasExternalConflict =
-        row.confidence !== "verified" &&
         (externalObservations.get(spid) ?? []).some(
           (observation) =>
             observation.start_hour_type !== row.hour_type ||

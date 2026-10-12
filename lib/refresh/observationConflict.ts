@@ -24,10 +24,7 @@ export function observationConflictsWithPattern(
     }
 
     if (hourType === "every") {
-      return (
-        observation.start_hour_type !== "every" ||
-        observation.start_minute !== minute
-      );
+      return true;
     }
 
     return (

@@ -33,6 +33,16 @@ function getYearPrefix(value: string) {
 }
 
 function normalizeSeasonKey(value: string) {
+  const officialCode = value.match(/^\s*([^()]+?)\s*\(/)?.[1];
+  if (officialCode) {
+    const key = officialCode
+      .normalize("NFKC")
+      .toLocaleLowerCase("en-US")
+      .replace(/[^0-9a-z]+/g, "");
+
+    if (key) return key;
+  }
+
   const normalized = value
     .normalize("NFKC")
     .toLocaleLowerCase("en-US")

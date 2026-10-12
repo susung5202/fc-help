@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ServiceUsageNotes from "@/components/ServiceUsageNotes";
+import PlayerArtwork from "@/components/PlayerArtwork";
 import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
@@ -778,8 +779,6 @@ function RefreshPlayerCard({
   demandCount?: number;
   observationHint?: string;
 }) {
-  const imageUrl = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${player.id}.png`;
-
   return (
     <Link
       href={`/refresh/${player.id}`}
@@ -794,10 +793,10 @@ function RefreshPlayerCard({
           />
         )}
 
-        <img
-          src={imageUrl}
+        <PlayerArtwork
+          spid={player.id}
           alt={player.name}
-          className="max-h-full object-contain transition duration-300 group-hover:scale-105"
+          className="max-h-full max-w-full object-contain transition duration-300 group-hover:scale-105"
         />
       </div>
 

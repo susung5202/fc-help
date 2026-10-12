@@ -17,7 +17,8 @@ export default function PlayerArtwork({
 }: PlayerArtworkProps) {
   const sources = useMemo(() => {
     const numericSpid = Math.trunc(Number(spid));
-    const pid = Math.abs(numericSpid) % 1_000_000;
+    // 선수 PID는 6자리 문자열이다. 예: 호날두 020801 (앞의 0 유지)
+    const pid = String(Math.abs(numericSpid) % 1_000_000).padStart(6, "0");
 
     return [
       // 1) 해당 시즌의 액션샷

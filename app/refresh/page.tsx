@@ -4,6 +4,7 @@ import ServiceUsageNotes from "@/components/ServiceUsageNotes";
 import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
+import { matchObservationSpid } from "@/lib/refresh/matchObservation";
 
 export const metadata: Metadata = {
   title: "갱신시간 | FC Help",
@@ -304,7 +305,7 @@ async function getRefreshDemandQueue(): Promise<RefreshDemandRow[]> {
 
 async function getObservationHintMap(
   players: Player[],
-  seasonMap: Map<number, Season>
+  seasons: Season[]
 ): Promise<Map<number, string>> {
   const result = new Map<number, string>();
   if (players.length === 0) return result;
@@ -342,9 +343,10 @@ async function getObservationHintMap(
 
     for (const player of players) {
       const directKind = direct.get(player.id);
-      const seasonId = Math.floor(player.id / 1_000_000);
-      const seasonName = seasonMap.get(seasonId)?.className ?? "";
-      const namedKind = byNameSeason.get(`${player.name}::${seasonName}`);
+      const namedKind = Array.from(byNameSeason.entries()).find(([key]) => {
+        const [playerName, seasonName] = key.split("::");
+        return matchObservationSpid({ player_spid: null, player_name: playerName, season_name: seasonName }, players, seasons) === player.id;
+      })?.[1];
       const kind = directKind ?? namedKind;
 
       if (kind === "exact") {
@@ -398,7 +400,7 @@ export default async function RefreshPage({
       ? getNearestRefreshMap(matchedPlayers.map((player) => player.id))
       : Promise.resolve(new Map<number, NearestRefreshInfo | null>()),
     query
-      ? getObservationHintMap(matchedPlayers, seasonMap)
+      ? getObservationHintMap(matchedPlayers, seasons)
       : Promise.resolve(new Map<number, string>()),
   ]);
 

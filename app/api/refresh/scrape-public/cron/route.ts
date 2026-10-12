@@ -25,6 +25,51 @@ type ParsedObservation = {
   sourceObservedDate: string | null;
 };
 
+type ParsedBulkObservation = ParsedObservation & {
+  seasonName: string;
+  seasonAlias: string;
+};
+
+const INVEN_BULK_URL =
+  "https://www.inven.co.kr/board/fifaonline4/3145/52273";
+
+const INVEN_SEASON_ALIASES = [
+  ["12KH", "2012 KH (2012 KH)"],
+  ["CAP", "CAP (Captain)"],
+  ["라이브", "23 LIVE (23 LIVE)"],
+  ["20챔", "20 UCL (20 UEFA Champions League)"],
+  ["21PL", "21 PL (21 Premium Live)"],
+  ["TC", "TC (Tournament Champions)"],
+  ["NHD", "NHD (National Hero Debut)"],
+  ["EBS", "EBS (European Best Stars)"],
+  ["19챔", "19 UCL (19 UEFA Champions League)"],
+  ["22PL", "22 PL (22 Premium Live)"],
+  ["19NG", "19NG (19 NEW GENERATION)"],
+  ["BWC", "BWC (Best of World Cup)"],
+  ["21KB", "21KB (21 K-League Best)"],
+  ["23토티", "23 TOTY (23 Team Of The Year)"],
+  ["BTB", "BTB (Back to Back)"],
+  ["BOE", "BOE21 (Best of Europe 21)"],
+  ["21TS", "21 TOTS (21 Team Of The Season)"],
+  ["19A", "19 PLA (19 Premium Live Autumn)"],
+  ["20A", "20 PLA (20 Premium Live)"],
+  ["21챔", "21 UCL (21 UEFA Champions League)"],
+  ["22NG", "22NG (22 NEW GENERATION)"],
+  ["아이콘", "ICON (ICON)"],
+  ["MOG", "MOG (Moments Of Glory)"],
+  ["SPL", "SPL (Spotlight)"],
+  ["WC", "WC22 (World Cup 2022)"],
+  ["UP", "UP (Unsung Players)"],
+  ["MC", "MC (Multi-League Champions)"],
+  ["LOL", "LOL (LEGEND OF THE LOAN)"],
+  ["LH", "LH (Loyal Heroes)"],
+  ["VTR", "VTR (Veteran)"],
+  ["24토티", "24 TOTY (24 Team Of The Year)"],
+  ["FA", "FA (FREE AGENT)"],
+  ["23KFA", "23 KFA (23 KFA)"],
+  ["HG", "HG (Home Grown)"],
+] as const;
+
 const SOURCES: SourceConfig[] = [
   {
     slug: "26fsl",
@@ -411,6 +456,84 @@ function parsePage(text: string, source: SourceConfig): ParsedObservation[] {
   return results;
 }
 
+function parseInvenBulkPage(text: string): ParsedBulkObservation[] {
+  const aliasMap = new Map(
+    INVEN_SEASON_ALIASES.map(([alias, seasonName]) => [
+      alias.toLocaleLowerCase("ko-KR"),
+      seasonName,
+    ])
+  );
+  const aliases = INVEN_SEASON_ALIASES
+    .map(([alias]) => escapeRegExp(alias))
+    .sort((a, b) => b.length - a.length)
+    .join("|");
+
+  const pattern = new RegExp(
+    `(${aliases})\\s+([가-힣A-Za-z.· ]{1,30}?)\\s+` +
+      `(홀수|짝수|홀|짝)\\s*(\\d{1,2})` +
+      `(?:\\s*~\\s*(\\d{1,2}))?\\s*분`,
+    "gi"
+  );
+
+  const results: ParsedBulkObservation[] = [];
+  const seen = new Set<string>();
+
+  for (const match of text.matchAll(pattern)) {
+    const trailing = text.slice(
+      (match.index ?? 0) + match[0].length,
+      (match.index ?? 0) + match[0].length + 20
+    );
+
+    // "29분보다 빠름"처럼 정확한 시각이 아닌 표현은 exact로 오인하지 않는다.
+    if (/보다\s*빠름/.test(trailing)) continue;
+
+    const seasonAlias = match[1];
+    const seasonName = aliasMap.get(
+      seasonAlias.toLocaleLowerCase("ko-KR")
+    );
+    const playerName = sanitizePlayerName(match[2]);
+    const startHourType: HourType =
+      match[3] === "홀수" || match[3] === "홀" ? "odd" : "even";
+    const startMinute = Number(match[4]);
+    const endMinute = match[5] ? Number(match[5]) : startMinute;
+
+    if (
+      !seasonName ||
+      !playerName ||
+      !Number.isInteger(startMinute) ||
+      !Number.isInteger(endMinute) ||
+      startMinute < 0 ||
+      startMinute > 59 ||
+      endMinute < 0 ||
+      endMinute > 59
+    ) {
+      continue;
+    }
+
+    const key = `${seasonAlias.toLocaleLowerCase("ko-KR")}:${normalizePlayerKey(
+      playerName
+    )}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    results.push({
+      playerName,
+      seasonName,
+      seasonAlias,
+      observationKind: startMinute === endMinute ? "exact" : "range",
+      startHourType,
+      startMinute,
+      endHourType: startHourType,
+      endMinute,
+      sourceObservationCount: 1,
+      sourceStatus: "reported",
+      sourceObservedDate: "2024-01-31",
+    });
+  }
+
+  return results;
+}
+
 async function checkCronSecret(request: Request) {
   const suppliedSecret = request.headers.get("x-fc-help-cron-secret");
 
@@ -541,6 +664,78 @@ export async function GET(request: Request) {
         htmlLength: html.length,
         parsed: parsed.length,
         sample: parsed.slice(0, 4).map((item) => item.playerName),
+      });
+    }
+
+    const invenResponse = await fetch(INVEN_BULK_URL, {
+      cache: "no-store",
+      headers: {
+        "user-agent":
+          "FC-Help/1.0 (+https://fchelp.xyz) public-refresh-reference",
+        accept: "text/html,application/xhtml+xml",
+      },
+    });
+
+    const invenHtml = await invenResponse.text();
+    if (invenResponse.ok) {
+      const invenText = htmlToSearchableText(invenHtml);
+      const parsedBulk = parseInvenBulkPage(invenText);
+      totalParsed += parsedBulk.length;
+
+      const rows = parsedBulk.map((item) => {
+        const sourceRecordKey =
+          `inven:52273:${item.seasonAlias.toLocaleLowerCase("ko-KR")}:${normalizePlayerKey(
+            item.playerName
+          )}`;
+
+        return {
+          player_spid: existingSpidByKey.get(sourceRecordKey) ?? null,
+          player_name: item.playerName,
+          season_name: item.seasonName,
+          observation_kind: item.observationKind,
+          start_hour_type: item.startHourType,
+          start_minute: item.startMinute,
+          end_hour_type: item.endHourType,
+          end_minute: item.endMinute,
+          source_type: "scraped_public",
+          source_name: "Inven 갱신시간 공개 정리",
+          source_url: INVEN_BULK_URL,
+          source_observation_count: item.sourceObservationCount,
+          source_status: item.sourceStatus,
+          source_observed_date: item.sourceObservedDate,
+          observer_key: sourceRecordKey,
+          source_record_key: sourceRecordKey,
+          updated_at: new Date().toISOString(),
+        };
+      });
+
+      if (rows.length > 0) {
+        const { error, count } = await supabase
+          .from("refresh_observations")
+          .upsert(rows, {
+            onConflict: "source_record_key",
+            ignoreDuplicates: false,
+            count: "exact",
+          });
+
+        if (error) throw error;
+        totalUpserted += count ?? rows.length;
+      }
+
+      pages.push({
+        slug: "inven-52273",
+        status: invenResponse.status,
+        htmlLength: invenHtml.length,
+        parsed: parsedBulk.length,
+        sample: parsedBulk.slice(0, 4).map((item) => item.playerName),
+      });
+    } else {
+      pages.push({
+        slug: "inven-52273",
+        status: invenResponse.status,
+        htmlLength: invenHtml.length,
+        parsed: 0,
+        sample: [],
       });
     }
 

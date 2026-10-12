@@ -256,26 +256,48 @@ export async function GET(request: Request) {
       );
     }
 
-    const fetched = await Promise.all(
-      SOURCES.map(async (source) => {
-        const response = await fetch(source.url, {
-          cache: "no-store",
-          headers: {
-            "user-agent":
-              "FC-Help/1.0 (+https://fchelp.xyz) public-refresh-reference",
-            accept: "text/html,application/xhtml+xml",
-          },
-        });
-        const html = await response.text();
+    const fetched: Array<{
+      source: SourceConfig;
+      status: number;
+      ok: boolean;
+      html: string;
+      error?: string;
+    }> = [];
 
-        return {
-          source,
-          status: response.status,
-          ok: response.ok,
-          html,
-        };
-      })
-    );
+    for (let index = 0; index < SOURCES.length; index += 4) {
+      const batch = await Promise.all(
+        SOURCES.slice(index, index + 4).map(async (source) => {
+          try {
+            const response = await fetch(source.url, {
+              cache: "no-store",
+              headers: {
+                "user-agent":
+                  "Mozilla/5.0 (compatible; FC-Help/1.0; +https://fchelp.xyz)",
+                accept: "text/html,application/xhtml+xml",
+              },
+            });
+            const html = await response.text();
+
+            return {
+              source,
+              status: response.status,
+              ok: response.ok,
+              html,
+            };
+          } catch (error) {
+            return {
+              source,
+              status: 0,
+              ok: false,
+              html: "",
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+        })
+      );
+
+      fetched.push(...batch);
+    }
 
     let totalParsed = 0;
     let totalUpserted = 0;
@@ -284,6 +306,7 @@ export async function GET(request: Request) {
       status: number;
       parsed: number;
       sample: string[];
+      error?: string;
     }> = [];
 
     for (const page of fetched) {
@@ -293,6 +316,7 @@ export async function GET(request: Request) {
           status: page.status,
           parsed: 0,
           sample: [],
+          error: page.error,
         });
         continue;
       }

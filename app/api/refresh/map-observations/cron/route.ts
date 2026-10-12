@@ -68,6 +68,7 @@ function normalizeSeasonKey(value: string) {
     return `${year}dp`;
   }
 
+  if (compact.includes("teamkoreaicon")) return "tki";
   if (compact.includes("teamkorea")) return "tk";
   if (compact.includes("pathtoglory")) return "ptg";
   if (compact.includes("warriorsofglory")) return "wg";

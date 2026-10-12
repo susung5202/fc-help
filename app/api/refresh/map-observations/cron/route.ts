@@ -159,6 +159,10 @@ export async function GET(request: Request) {
         route: "/api/refresh/scrape-inven-51542/cron",
       },
       {
+        sourceUrl: "https://www.inven.co.kr/board/fifaonline4/3146/7560874",
+        route: "/api/refresh/scrape-inven-7560874/cron",
+      },
+      {
         sourceUrl: "https://www.inven.co.kr/board/fifaonline4/3145/43746",
         route: "/api/refresh/scrape-legacy-collection/cron",
       },

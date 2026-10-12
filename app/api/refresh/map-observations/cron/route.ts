@@ -158,6 +158,10 @@ export async function GET(request: Request) {
         sourceUrl: "https://www.inven.co.kr/board/fifaonline4/3145/43746",
         route: "/api/refresh/scrape-legacy-collection/cron",
       },
+      {
+        sourceUrl: "https://www.yooniku.com/2025/07/fc-le.html",
+        route: "/api/refresh/scrape-yooniku/cron",
+      },
     ];
 
     for (const source of bootstrapSources) {

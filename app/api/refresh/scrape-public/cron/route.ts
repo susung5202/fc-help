@@ -612,82 +612,123 @@ export async function GET(request: Request) {
       sample: string[];
     }> = [];
 
-    for (const source of ACTIVE_SOURCES) {
-      const response = await fetch(source.url, {
-        cache: "no-store",
-        headers: {
-          "user-agent": "FC-Help/1.0 (+https://fchelp.xyz) public-refresh-reference",
-          accept: "text/html,application/xhtml+xml",
-        },
-      });
+    const batchSize = 4;
 
-      const html = await response.text();
+    for (let offset = 0; offset < ACTIVE_SOURCES.length; offset += batchSize) {
+      const batch = ACTIVE_SOURCES.slice(offset, offset + batchSize);
 
-      if (!response.ok) {
-        pages.push({
-          slug: source.slug,
-          status: response.status,
-          htmlLength: html.length,
-          parsed: 0,
-          sample: [],
-        });
-        continue;
+      const results = await Promise.all(
+        batch.map(async (source) => {
+          try {
+            const response = await fetch(source.url, {
+              cache: "no-store",
+              signal: AbortSignal.timeout(9000),
+              headers: {
+                "user-agent":
+                  "FC-Help/1.0 (+https://fchelp.xyz) public-refresh-reference",
+                accept: "text/html,application/xhtml+xml",
+              },
+            });
+
+            const html = await response.text();
+
+            if (!response.ok) {
+              return {
+                parsedCount: 0,
+                upsertedCount: 0,
+                page: {
+                  slug: source.slug,
+                  status: response.status,
+                  htmlLength: html.length,
+                  parsed: 0,
+                  sample: [] as string[],
+                },
+              };
+            }
+
+            const text = htmlToSearchableText(html);
+            const parsed = parsePage(text, source);
+
+            const rows = parsed.map((item) => {
+              const sourceRecordKey = `fconlab:${source.slug}:${normalizePlayerKey(
+                item.playerName
+              )}`;
+
+              return {
+                player_spid: existingSpidByKey.get(sourceRecordKey) ?? null,
+                player_name: item.playerName,
+                season_name: source.seasonName,
+                observation_kind: item.observationKind,
+                start_hour_type: item.startHourType,
+                start_minute: item.startMinute,
+                end_hour_type: item.endHourType,
+                end_minute: item.endMinute,
+                source_type: "scraped_public",
+                source_name: "피온랩 공개 시즌 관측",
+                source_url: source.url,
+                source_observation_count: item.sourceObservationCount,
+                source_status: item.sourceStatus,
+                source_observed_date: item.sourceObservedDate,
+                observer_key: sourceRecordKey,
+                source_record_key: sourceRecordKey,
+                updated_at: new Date().toISOString(),
+              };
+            });
+
+            let upsertedCount = 0;
+
+            if (rows.length > 0) {
+              const { error, count } = await supabase
+                .from("refresh_observations")
+                .upsert(rows, {
+                  onConflict: "source_record_key",
+                  ignoreDuplicates: false,
+                  count: "exact",
+                });
+
+              if (error) throw error;
+              upsertedCount = count ?? rows.length;
+            }
+
+            return {
+              parsedCount: parsed.length,
+              upsertedCount,
+              page: {
+                slug: source.slug,
+                status: response.status,
+                htmlLength: html.length,
+                parsed: parsed.length,
+                sample: parsed.slice(0, 4).map((item) => item.playerName),
+              },
+            };
+          } catch (error) {
+            console.warn("Public refresh source failed:", source.slug, error);
+
+            return {
+              parsedCount: 0,
+              upsertedCount: 0,
+              page: {
+                slug: source.slug,
+                status: 0,
+                htmlLength: 0,
+                parsed: 0,
+                sample: [] as string[],
+              },
+            };
+          }
+        })
+      );
+
+      for (const result of results) {
+        totalParsed += result.parsedCount;
+        totalUpserted += result.upsertedCount;
+        pages.push(result.page);
       }
-
-      const text = htmlToSearchableText(html);
-      const parsed = parsePage(text, source);
-      totalParsed += parsed.length;
-
-      const rows = parsed.map((item) => {
-        const sourceRecordKey = `fconlab:${source.slug}:${normalizePlayerKey(
-          item.playerName
-        )}`;
-
-        return {
-          player_spid: existingSpidByKey.get(sourceRecordKey) ?? null,
-          player_name: item.playerName,
-          season_name: source.seasonName,
-          observation_kind: item.observationKind,
-          start_hour_type: item.startHourType,
-          start_minute: item.startMinute,
-          end_hour_type: item.endHourType,
-          end_minute: item.endMinute,
-          source_type: "scraped_public",
-          source_name: "피온랩 공개 시즌 관측",
-          source_url: source.url,
-          source_observation_count: item.sourceObservationCount,
-          source_status: item.sourceStatus,
-          source_observed_date: item.sourceObservedDate,
-          observer_key: sourceRecordKey,
-          source_record_key: sourceRecordKey,
-          updated_at: new Date().toISOString(),
-        };
-      });
-
-      if (rows.length > 0) {
-        const { error, count } = await supabase
-          .from("refresh_observations")
-          .upsert(rows, {
-            onConflict: "source_record_key",
-            ignoreDuplicates: false,
-            count: "exact",
-          });
-
-        if (error) throw error;
-        totalUpserted += count ?? rows.length;
-      }
-
-      pages.push({
-        slug: source.slug,
-        status: response.status,
-        htmlLength: html.length,
-        parsed: parsed.length,
-        sample: parsed.slice(0, 4).map((item) => item.playerName),
-      });
     }
 
     const invenResponse = await fetch(INVEN_BULK_URL, {
       cache: "no-store",
+      signal: AbortSignal.timeout(9000),
       headers: {
         "user-agent":
           "FC-Help/1.0 (+https://fchelp.xyz) public-refresh-reference",
@@ -758,33 +799,13 @@ export async function GET(request: Request) {
       });
     }
 
-    const mapperUrl = new URL(
-      "/api/refresh/map-observations/cron",
-      request.url
-    );
-
-    const mapperResponse = await fetch(mapperUrl, {
-      method: "GET",
-      headers: {
-        "x-fc-help-cron-secret": auth.secret,
-      },
-      cache: "no-store",
-    });
-
-    let mapping: unknown = null;
-    try {
-      mapping = await mapperResponse.json();
-    } catch {
-      mapping = { status: mapperResponse.status };
-    }
-
     return NextResponse.json({
       success: true,
       sourcePages: ACTIVE_SOURCES.length,
       totalParsed,
       totalUpserted,
       pages,
-      mapping,
+      mapping: "handled-by-separate-cron",
     });
   } catch (error) {
     console.error("Public refresh scrape failed:", error);

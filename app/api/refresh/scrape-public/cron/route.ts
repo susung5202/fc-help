@@ -210,7 +210,7 @@ function parsePage(text: string, source: SourceConfig): ParsedObservation[] {
     `([가-힣A-Za-zÀ-ž0-9.·'’ -]{1,60}?)\\s+${code}\\s+${positions}\\s+` +
       `(홀수|짝수)시\\s*(\\d{1,2})(?:분)?` +
       `(?:\\s*[~～-]\\s*(?:(홀수|짝수)시\\s*)?(\\d{1,2})분)?\\s+` +
-      `(확인됨|추정|제보)\\s+(\\d+)번(?:\\s*[·•]\\s*(\\d{1,2}\\.\\d{1,2}))?`,
+      `(확인됨|추정|제보(?:\\s*기반)?)\\s+(?:(\\d+)번|제보)(?:\\s*[·•]\\s*(\\d{1,2}\\.\\d{1,2}))?`,
     "g"
   );
 
@@ -225,7 +225,7 @@ function parsePage(text: string, source: SourceConfig): ParsedObservation[] {
     const endMinute =
       match[5] === undefined ? startMinute : Number(match[5]);
     const rawStatus = match[6];
-    const sourceObservationCount = Number(match[7]);
+    const sourceObservationCount = match[7] ? Number(match[7]) : 1;
     const sourceObservedDate = parseObservedDate(match[8]);
 
     if (
@@ -244,7 +244,7 @@ function parsePage(text: string, source: SourceConfig): ParsedObservation[] {
     const sourceStatus =
       rawStatus === "확인됨"
         ? "confirmed"
-        : rawStatus === "제보"
+        : rawStatus.startsWith("제보")
           ? "reported"
           : "estimated";
 

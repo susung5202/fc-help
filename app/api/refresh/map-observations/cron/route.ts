@@ -154,6 +154,10 @@ export async function GET(request: Request) {
         sourceUrl: "https://www.inven.co.kr/board/fifaonline4/3309/36836",
         route: "/api/refresh/scrape-legacy-20ucl/cron",
       },
+      {
+        sourceUrl: "https://www.inven.co.kr/board/fifaonline4/3145/43746",
+        route: "/api/refresh/scrape-legacy-collection/cron",
+      },
     ];
 
     for (const source of bootstrapSources) {

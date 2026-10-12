@@ -251,25 +251,6 @@ export async function GET(request: Request) {
       if (error) throw error;
     }
 
-    const mapperUrl = new URL(
-      "/api/refresh/map-observations/cron",
-      request.url
-    );
-
-    const mapperResponse = await fetch(mapperUrl, {
-      headers: {
-        "x-fc-help-cron-secret": auth.secret,
-      },
-      cache: "no-store",
-    });
-
-    let mapping: unknown = null;
-    try {
-      mapping = await mapperResponse.json();
-    } catch {
-      mapping = { status: mapperResponse.status };
-    }
-
     return NextResponse.json({
       success: true,
       source: SOURCE_URL,
@@ -283,7 +264,6 @@ export async function GET(request: Request) {
             ? `${item.startHourType} ${item.startMinute}~${item.endMinute}`
             : `${item.startHourType} ${item.startMinute}`,
       })),
-      mapping,
     });
   } catch (error) {
     console.error("Legacy refresh scrape failed:", error);

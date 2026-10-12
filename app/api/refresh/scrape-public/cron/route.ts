@@ -164,6 +164,96 @@ const SOURCES: SourceConfig[] = [
     seasonName: "LE (Legend of Europa)",
     url: "https://fconlab.com/refresh/seasons/le",
   },
+  {
+    slug: "cu",
+    seasonCode: "CU",
+    seasonName: "CU (Champions of Europe)",
+    url: "https://fconlab.com/refresh/seasons/cu",
+  },
+  {
+    slug: "eu24",
+    seasonCode: "EU24",
+    seasonName: "EU24 (UEFA EURO 2024)",
+    url: "https://fconlab.com/refresh/seasons/eu24",
+  },
+  {
+    slug: "no7",
+    seasonCode: "NO7",
+    seasonName: "NO7 (NUMBER 7)",
+    url: "https://fconlab.com/refresh/seasons/no7",
+  },
+  {
+    slug: "23ucl",
+    seasonCode: "23UCL",
+    seasonName: "23 UCL (23 UEFA Champions League)",
+    url: "https://fconlab.com/refresh/seasons/23ucl",
+  },
+  {
+    slug: "bld",
+    seasonCode: "BLD",
+    seasonName: "BLD (Best Legends)",
+    url: "https://fconlab.com/refresh/seasons/bld",
+  },
+  {
+    slug: "dc",
+    seasonCode: "DC",
+    seasonName: "DC (Decade)",
+    url: "https://fconlab.com/refresh/seasons/dc",
+  },
+  {
+    slug: "jnm",
+    seasonCode: "JNM",
+    seasonName: "JNM (Journeyman)",
+    url: "https://fconlab.com/refresh/seasons/jnm",
+  },
+  {
+    slug: "tb",
+    seasonCode: "TB",
+    seasonName: "TB (Tournament Best)",
+    url: "https://fconlab.com/refresh/seasons/tb",
+  },
+  {
+    slug: "20ucl",
+    seasonCode: "20UCL",
+    seasonName: "20 UCL (20 UEFA Champions League)",
+    url: "https://fconlab.com/refresh/seasons/20ucl",
+  },
+  {
+    slug: "coc",
+    seasonCode: "COC",
+    seasonName: "COC (Competitor Of Continents)",
+    url: "https://fconlab.com/refresh/seasons/coc",
+  },
+  {
+    slug: "fa",
+    seasonCode: "FA",
+    seasonName: "FA (FREE AGENT)",
+    url: "https://fconlab.com/refresh/seasons/fa",
+  },
+  {
+    slug: "mc",
+    seasonCode: "MC",
+    seasonName: "MC (Multi-League Champions)",
+    url: "https://fconlab.com/refresh/seasons/mc",
+  },
+  {
+    slug: "spl",
+    seasonCode: "SPL",
+    seasonName: "SPL (Spotlight)",
+    url: "https://fconlab.com/refresh/seasons/spl",
+  },
+  {
+    slug: "tt",
+    seasonCode: "TT",
+    seasonName: "TT (Top Transfer)",
+    url: "https://fconlab.com/refresh/seasons/tt",
+  },
+  {
+    slug: "21ucl",
+    seasonCode: "21UCL",
+    seasonName: "21 UCL (21 UEFA Champions League)",
+    url: "https://fconlab.com/refresh/seasons/21ucl",
+  },
 ];
 
 function decodeHtmlEntities(value: string) {

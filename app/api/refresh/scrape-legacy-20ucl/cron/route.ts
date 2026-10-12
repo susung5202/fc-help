@@ -43,6 +43,7 @@ function normalizePlayerKey(value: string) {
 
 function sanitizePlayerName(value: string) {
   return value
+    .replace(/^-[^-]+-[\s]*/, "")
     .replace(/^[-–—·•]+|[-–—·•]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();

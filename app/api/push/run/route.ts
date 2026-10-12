@@ -76,13 +76,38 @@ export async function GET(
     const authorization =
       request.headers.get("authorization");
 
-    const cronSecret =
+    const envCronSecret =
       process.env.CRON_SECRET;
 
-    if (
-      !cronSecret ||
-      authorization !== `Bearer ${cronSecret}`
-    ) {
+    const suppliedDbSecret =
+      request.headers.get("x-fc-help-cron-secret");
+
+    const supabase =
+      createAdminClient();
+
+    let authorized =
+      Boolean(
+        envCronSecret &&
+        authorization === `Bearer ${envCronSecret}`
+      );
+
+    if (!authorized && suppliedDbSecret) {
+      const {
+        data: secretRow,
+        error: secretError,
+      } = await supabase
+        .from("cron_secrets")
+        .select("secret")
+        .eq("name", "push_run")
+        .maybeSingle();
+
+      authorized =
+        !secretError &&
+        Boolean(secretRow?.secret) &&
+        secretRow?.secret === suppliedDbSecret;
+    }
+
+    if (!authorized) {
       return NextResponse.json(
         {
           error: "Unauthorized",
@@ -92,9 +117,6 @@ export async function GET(
         }
       );
     }
-
-    const supabase =
-      createAdminClient();
 
     const now = new Date();
 

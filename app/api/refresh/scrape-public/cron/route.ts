@@ -86,6 +86,48 @@ const SOURCES: SourceConfig[] = [
     seasonName: "22 UEFA Champions League",
     url: "https://fconlab.com/refresh/seasons/22ucl",
   },
+  {
+    slug: "spt",
+    seasonCode: "SPT",
+    seasonName: "SPT (Spartan)",
+    url: "https://fconlab.com/refresh/seasons/spt",
+  },
+  {
+    slug: "26hr",
+    seasonCode: "26HR",
+    seasonName: "26HR (26 Heroes)",
+    url: "https://fconlab.com/refresh/seasons/26hr",
+  },
+  {
+    slug: "26toty",
+    seasonCode: "26TOTY",
+    seasonName: "26 TOTY (26 Team Of The Year)",
+    url: "https://fconlab.com/refresh/seasons/26toty",
+  },
+  {
+    slug: "25fsl",
+    seasonCode: "25FSL",
+    seasonName: "25FSL (25 FCO Superchampions League)",
+    url: "https://fconlab.com/refresh/seasons/25fsl",
+  },
+  {
+    slug: "25tots",
+    seasonCode: "25TOTS",
+    seasonName: "25 TOTS (25 Team Of The Season)",
+    url: "https://fconlab.com/refresh/seasons/25tots",
+  },
+  {
+    slug: "fac",
+    seasonCode: "FAC",
+    seasonName: "FAC (Football Association Champions)",
+    url: "https://fconlab.com/refresh/seasons/fac",
+  },
+  {
+    slug: "khd",
+    seasonCode: "KHD",
+    seasonName: "KHD (Korea Heroes Debut)",
+    url: "https://fconlab.com/refresh/seasons/khd",
+  },
 ];
 
 function decodeHtmlEntities(value: string) {

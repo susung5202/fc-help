@@ -45,21 +45,12 @@ export async function GET(request: Request) {
       throw lockError;
     }
 
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (!cronSecret) {
-      return NextResponse.json(
-        { error: "CRON_SECRET is not configured" },
-        { status: 500 }
-      );
-    }
-
     const runUrl = new URL("/api/push/run", request.url);
 
     const response = await fetch(runUrl, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${cronSecret}`,
+        "x-fc-help-cron-secret": suppliedSecret,
       },
       cache: "no-store",
     });

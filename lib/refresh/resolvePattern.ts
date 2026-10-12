@@ -11,6 +11,7 @@ export type RefreshReferencePatternRow = {
   source_name?: string;
   source_url?: string;
   confidence?: "community_reference" | "verified" | "estimated";
+  has_external_conflict?: boolean;
 };
 
 export type ResolvedRefreshPattern = {
@@ -88,6 +89,14 @@ export function resolveRefreshPattern(
         conflictsWithReference: Boolean(reference && !sameAsReference),
       };
     }
+  }
+
+  if (
+    reference &&
+    reference.has_external_conflict &&
+    reference.confidence !== "verified"
+  ) {
+    return null;
   }
 
   if (reference) {

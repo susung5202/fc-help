@@ -20,6 +20,13 @@ type RefreshReference = {
   player_spid: number;
   hour_type: "odd" | "even" | "every";
   refresh_minute: number;
+  confidence: "community_reference" | "verified" | "estimated";
+};
+
+type RefreshObservation = {
+  player_spid: number;
+  start_hour_type: "odd" | "even" | "every";
+  start_minute: number;
 };
 
 type Alert = {
@@ -167,7 +174,7 @@ export async function GET(
       error: referencesError,
     } = await supabase
       .from("refresh_reference_times")
-      .select("player_spid, hour_type, refresh_minute")
+      .select("player_spid, hour_type, refresh_minute, confidence")
       .in("player_spid", playerSpids);
 
     if (referencesError) {
@@ -177,14 +184,34 @@ export async function GET(
     const references =
       (referencesData ?? []) as RefreshReference[];
 
+    const {
+      data: observationsData,
+      error: observationsError,
+    } = await supabase
+      .from("refresh_observations")
+      .select("player_spid, start_hour_type, start_minute")
+      .in("player_spid", playerSpids)
+      .eq("observation_kind", "exact")
+      .eq("source_type", "scraped_public")
+      .in("source_status", ["reported", "confirmed"]);
+
+    if (observationsError) {
+      throw observationsError;
+    }
+
+    const observations =
+      (observationsData ?? []) as RefreshObservation[];
+
     /*
      * 선수별 대표 갱신 패턴 계산
-     * 공개 참고값은 제보가 부족할 때 fallback으로 사용한다.
+     * 미검증 참고값이 신뢰 가능한 외부 exact 관측과 충돌하면
+     * 자동 알림에는 사용하지 않는다.
      */
     const patternMap =
       buildPatternMap(
         reports,
-        references
+        references,
+        observations
       );
 
     let sentCount = 0;
@@ -465,7 +492,8 @@ export async function GET(
  */
 function buildPatternMap(
   reports: RefreshReport[],
-  references: RefreshReference[]
+  references: RefreshReference[],
+  observations: RefreshObservation[]
 ) {
   const grouped = new Map<number, RefreshReport[]>();
 
@@ -475,14 +503,35 @@ function buildPatternMap(
     grouped.set(report.player_spid, current);
   }
 
+  const observationsBySpid = new Map<number, RefreshObservation[]>();
+  for (const observation of observations) {
+    const spid = Number(observation.player_spid);
+    const rows = observationsBySpid.get(spid) ?? [];
+    rows.push(observation);
+    observationsBySpid.set(spid, rows);
+  }
+
   const referenceMap = new Map(
-    references.map((reference) => [
-      Number(reference.player_spid),
-      {
-        hour_type: reference.hour_type,
-        refresh_minute: reference.refresh_minute,
-      },
-    ])
+    references.map((reference) => {
+      const spid = Number(reference.player_spid);
+      const hasExternalConflict =
+        reference.confidence !== "verified" &&
+        (observationsBySpid.get(spid) ?? []).some(
+          (observation) =>
+            observation.start_hour_type !== reference.hour_type ||
+            observation.start_minute !== reference.refresh_minute
+        );
+
+      return [
+        spid,
+        {
+          hour_type: reference.hour_type,
+          refresh_minute: reference.refresh_minute,
+          confidence: reference.confidence,
+          has_external_conflict: hasExternalConflict,
+        },
+      ];
+    })
   );
 
   const playerSpids = new Set<number>([

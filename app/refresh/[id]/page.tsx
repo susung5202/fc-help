@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import RefreshAlertButton from "@/components/RefreshAlertButton";
 import RefreshReportButton from "@/components/RefreshReportButton";
 import RefreshReportSummary from "@/components/RefreshReportSummary";
+import PlayerArtwork from "@/components/PlayerArtwork";
 
 type Player = {
   id: number;
@@ -70,7 +71,6 @@ export default async function RefreshDetailPage({
   );
 
   const seasonName = season?.className ?? "시즌 미확인";
-  const playerImage = `https://fco.dn.nexoncdn.co.kr/live/externalAssets/common/playersAction/p${spid}.png`;
 
   return (
     <main className="min-h-screen bg-[#0f1115] text-white">
@@ -123,8 +123,8 @@ export default async function RefreshDetailPage({
                 />
               )}
 
-              <img
-                src={playerImage}
+              <PlayerArtwork
+                spid={spid}
                 alt={player.name}
                 className="max-h-[330px] max-w-full object-contain"
               />

@@ -226,7 +226,6 @@ export default function RefreshReportSummary({
     () =>
       Boolean(
         reference &&
-          reference.confidence !== "verified" &&
           observations.some(
             (observation) =>
               observation.observation_kind === "exact" &&

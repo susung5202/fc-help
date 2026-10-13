@@ -299,7 +299,11 @@ export default function RefreshFavoritesDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, userId, spidKey]);
 
-  // 한 명이라도 00~20초 갱신 구간에 들어오면 공용 시계도 함께 반짝인다.
+  // 시계는 갱신 대상 선수가 없어도 매분 00~20초에 강조한다.
+  const clockBlinking = nowMs !== null &&
+    new Date(nowMs + KST_OFFSET).getUTCSeconds() <= 20;
+
+  // 실제 갱신 중인 선수 카드만 개별 강조한다.
   const anyRefreshActive = nowMs !== null && favorites.some((item) => {
     const info = infoBySpid[item.player_spid];
     return info?.hourType != null && info.minute != null &&
@@ -324,7 +328,7 @@ export default function RefreshFavoritesDashboard() {
       <section
         aria-label="실시간 한국 시각"
         className={"mt-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-2 rounded-xl border bg-[#171b21] px-4 py-3 transition sm:px-5 " +
-          (anyRefreshActive
+          (clockBlinking
             ? "refresh-window-border border-lime-300/60"
             : "border-white/10")}
       >
@@ -334,7 +338,7 @@ export default function RefreshFavoritesDashboard() {
           </p>
           <p
             className={"mt-0.5 font-mono text-2xl font-black tabular-nums tracking-tight sm:text-3xl " +
-              (anyRefreshActive ? "refresh-window-text text-lime-200" : "text-white")}
+              (clockBlinking ? "refresh-window-text text-lime-200" : "text-white")}
           >
             {nowMs === null ? "--:--:--" : (() => {
               const kst = new Date(nowMs + KST_OFFSET);
@@ -345,8 +349,9 @@ export default function RefreshFavoritesDashboard() {
         </div>
         <div className="text-left sm:text-right">
           <p className={"text-xs font-bold " +
-            (anyRefreshActive ? "text-lime-300" : "text-gray-400")}>
-            {anyRefreshActive ? "● 즐겨찾기 선수 갱신 구간" : clockSource === "server"
+            (clockBlinking ? "text-lime-300" : "text-gray-400")}>
+            {anyRefreshActive ? "● 즐겨찾기 선수 갱신 구간" : clockBlinking
+              ? "● 매분 00~20초 강조" : clockSource === "server"
               ? "● 서버 시간 동기화"
               : clockSource === "device"
                 ? "● 기기 시간 기준"
@@ -379,7 +384,7 @@ export default function RefreshFavoritesDashboard() {
         <>
           <div className="mt-4 flex items-center justify-between gap-3 text-xs text-gray-500">
             <span>즐겨찾기 {favorites.length}명</span>
-            <span>갱신 시작 후 20초 동안 강조 표시</span>
+            <span>시계는 매분 00~20초 강조</span>
           </div>
           {dataError && <p role="alert" className="mt-2 text-xs text-red-300">{dataError}</p>}
           {actionError && <p role="alert" className="mt-2 text-xs text-red-300">{actionError}</p>}
@@ -417,30 +422,28 @@ export default function RefreshFavoritesDashboard() {
                   </Link>
 
                   <div className="min-w-0 flex-1">
-                    <Link href={"/refresh/" + item.player_spid} className="block hover:text-lime-200">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="shrink-0 rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-bold text-lime-300">
-                          {item.season_name || "시즌"}
-                        </span>
-                        <h2 className="truncate text-sm font-bold text-white sm:text-base">
-                          {item.player_name}
-                        </h2>
-                      </div>
-                      <p className={"mt-2 truncate text-xs font-semibold sm:text-sm " +
-                        (isRefreshing ? "refresh-window-text text-lime-200" : "text-lime-300")}>
+                    <Link href={"/refresh/" + item.player_spid} className="flex min-w-0 flex-col items-start gap-1 hover:text-lime-200">
+                      <span className="max-w-full rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-bold text-lime-300">
+                        {item.season_name || "시즌"}
+                      </span>
+                      <h2 className="w-full whitespace-normal break-words text-sm font-bold leading-5 text-white sm:text-base">
+                        {item.player_name}
+                      </h2>
+                      <p
+                        title={info?.sourceLabel ?? "갱신시간 확인 중"}
+                        className={"w-full text-xs font-semibold leading-4 sm:text-sm " +
+                          (isRefreshing ? "refresh-window-text text-lime-200" : "text-lime-300")}
+                      >
                         {hasPattern
                           ? formatPattern(info.hourType!, info.minute!)
                           : dataLoading ? "갱신시간 조회 중" : info?.observationLabel ?? "갱신시간 미확인"}
+                        {hasPattern && info?.sourceLabel === "공개 참고값 · 미검증" &&
+                          <span className="ml-1 text-[10px] font-normal text-gray-500">· 참고</span>}
                       </p>
                     </Link>
-                    <p className="mt-1 truncate text-[10px] text-gray-500 sm:text-xs">
-                      {isRefreshing ? "지금 갱신 구간입니다" : info?.sourceLabel ?? "정보 확인 중"}
-                      {alertBefore !== undefined &&
-                        (" · 🔔 " + (alertBefore === 0 ? "정각" : alertBefore + "분 전"))}
-                    </p>
                   </div>
 
-                  <div className="flex w-[104px] shrink-0 flex-col items-end justify-center gap-1 sm:w-[150px]">
+                  <div className="flex w-[94px] shrink-0 flex-col items-end justify-center gap-1 sm:w-[150px]">
                     {isRefreshing ? (
                       <p className="refresh-window-text text-right text-sm font-black text-lime-200 sm:text-base">
                         갱신 진행 중
@@ -456,6 +459,11 @@ export default function RefreshFavoritesDashboard() {
                       </>
                     ) : (
                       <p className="text-right text-xs text-gray-500">시간 확인 중</p>
+                    )}
+                    {alertBefore !== undefined && (
+                      <span className="text-[10px] font-medium text-blue-200" title={alertBefore === 0 ? "갱신 시각 알림" : alertBefore + "분 전 알림"}>
+                        🔔 알림 중
+                      </span>
                     )}
                     <button
                       type="button"

@@ -103,6 +103,7 @@ export default function CommunityFeed() {
       let query = supabase
         .from("community_posts")
         .select(columns)
+        .eq("is_notice", false)
         .order("created_at", { ascending: false });
 
       if (category !== "all") query = query.eq("category", category);

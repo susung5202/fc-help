@@ -154,16 +154,19 @@ export default async function RefreshDetailPage({
                 playerSpid={player.id}
                 playerName={player.name}
                 seasonName={seasonName}
+                mobileTight
               />
               <RefreshAlertButton
                 playerSpid={player.id}
                 playerName={player.name}
                 seasonName={seasonName}
+                mobileTight
               />
               <RefreshReportButton
                 playerSpid={player.id}
                 playerName={player.name}
                 seasonName={seasonName}
+                mobileTight
               />
             </div>
           </div>

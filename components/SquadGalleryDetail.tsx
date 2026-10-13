@@ -226,7 +226,7 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
   const isOwner = Boolean(userId && post.author_id === userId);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+    <div className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 sm:py-10">
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link href="/squad/gallery" className="text-sm font-bold text-gray-400 hover:text-white">← 스쿼드 갤러리</Link>
         <div className="flex items-center gap-2">
@@ -275,11 +275,11 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <section className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#171b1f]">
+      <section className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-[#171b1f] sm:mt-5 sm:rounded-3xl">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
           <div>
             <p className="text-xs font-black tracking-[0.14em] text-lime-400">SQUAD PLAYERS</p>
-            <h2 className="mt-1 text-2xl font-black">포함 선수</h2>
+            <h2 className="mt-1 text-lg font-black sm:text-2xl">포함 선수</h2>
             <p className="mt-1 text-xs text-gray-500">이 스쿼드에 등록된 선수 {filledSlots.length}명을 리스트로 확인할 수 있습니다.</p>
           </div>
           {playerDetailsLoading && <span className="text-xs font-bold text-gray-500">선수 정보 불러오는 중...</span>}
@@ -297,21 +297,21 @@ export default function SquadGalleryDetail({ id }: { id: string }) {
             const displayOvr = detail?.positionOvr ?? player.ovr ?? null;
 
             return (
-              <article key={slot.slotId} className="grid gap-3 px-4 py-3 transition hover:bg-white/[0.025] md:grid-cols-[76px_minmax(180px,1.5fr)_90px_80px_80px_minmax(140px,1fr)] md:items-center sm:px-5">
-                <div className="relative h-20 w-16 md:h-16 md:w-14">
+              <article key={slot.slotId} className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-3 py-2.5 transition hover:bg-white/[0.025] md:grid-cols-[76px_minmax(180px,1.5fr)_90px_80px_80px_minmax(140px,1fr)] md:gap-3 md:px-4 md:py-3 sm:px-5">
+                <div className="relative row-span-3 h-16 w-14 md:row-span-1 md:h-16 md:w-14">
                   <PlayerArtwork key={player.artworkSpid ?? player.id} spid={player.artworkSpid ?? player.id} alt={player.name} className="absolute bottom-0 left-1/2 max-h-[76px] max-w-[145%] -translate-x-1/2 object-contain md:max-h-[62px]" />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-black text-white" title={player.name}>{player.name}</p>
+                <div className="col-span-2 min-w-0 md:col-span-1">
+                  <p className="break-words text-sm font-black leading-5 text-white md:truncate md:text-base" title={player.name}>{player.name}</p>
                   <div className="mt-1 flex h-6 items-center">
                     {player.seasonImg ? <img src={player.seasonImg} alt={player.seasonName ?? "시즌"} title={player.seasonName ?? undefined} className="h-5 max-w-12 object-contain" /> : <span className="text-[10px] font-bold text-gray-600">시즌 정보 없음</span>}
                   </div>
                   {detail?.failed && <p className="mt-1 text-[9px] font-bold text-amber-300">일부 정보 로딩 실패</p>}
                 </div>
-                <div className="flex items-center gap-2 md:block"><span className="text-[10px] font-bold text-gray-600 md:hidden">포지션</span><span className="inline-flex rounded-lg border border-lime-300/20 bg-lime-300/[0.07] px-2.5 py-1.5 text-xs font-black text-lime-300">{slot.label}</span></div>
-                <div className="flex items-center gap-2 md:block"><span className="text-[10px] font-bold text-gray-600 md:hidden">강화</span><span className={`inline-flex h-7 min-w-10 items-center justify-center rounded-[3px] border px-2 text-xs font-black leading-none sm:border-2 ${getEnhancementBadgeTone(player.grade)}`} title={`${player.grade}강`}>{player.grade}</span></div>
-                <div className="flex items-center gap-3 text-xs font-black md:block"><span className="text-lime-300">OVR {displayOvr ?? "-"}</span><span className="text-gray-400 md:mt-1 md:block">급여 {detail?.salary ?? "-"}</span></div>
-                <div className="flex items-center justify-between gap-3 md:block md:text-right"><span className="text-[10px] font-bold text-gray-600 md:block">{player.grade}강 가격</span><span className="text-sm font-black text-white md:mt-1 md:block" title={price ?? undefined}>{detail ? formatPlayerPrice(price) : "불러오는 중..."}</span></div>
+                <div className="flex items-center gap-1 md:block"><span className="text-[10px] font-bold text-gray-600 md:hidden">포지션</span><span className="inline-flex rounded-lg border border-lime-300/20 bg-lime-300/[0.07] px-2.5 py-1.5 text-xs font-black text-lime-300">{slot.label}</span></div>
+                <div className="flex items-center justify-end gap-1 md:block"><span className="text-[10px] font-bold text-gray-600 md:hidden">강화</span><span className={`inline-flex h-7 min-w-10 items-center justify-center rounded-[3px] border px-2 text-xs font-black leading-none sm:border-2 ${getEnhancementBadgeTone(player.grade)}`} title={`${player.grade}강`}>{player.grade}</span></div>
+                <div className="flex items-center gap-1 text-[11px] font-black md:block md:text-xs"><span className="text-lime-300">OVR {displayOvr ?? "-"}</span><span className="text-gray-400 md:mt-1 md:block">급여 {detail?.salary ?? "-"}</span></div>
+                <div className="flex items-center justify-end gap-1 md:block md:text-right"><span className="hidden text-[10px] font-bold text-gray-600 md:block">{player.grade}강 가격</span><span className="text-[11px] font-black text-white md:mt-1 md:block md:text-sm" title={price ?? undefined}>{detail ? formatPlayerPrice(price) : "불러오는 중..."}</span></div>
               </article>
             );
           })}

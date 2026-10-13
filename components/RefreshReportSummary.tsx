@@ -59,6 +59,7 @@ export default function RefreshReportSummary({
   const [reference, setReference] = useState<Reference | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [showAllObservations, setShowAllObservations] = useState(false);
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
 
@@ -284,25 +285,25 @@ export default function RefreshReportSummary({
 
   return (
     <>
-      <section className="mt-12 rounded-2xl border border-white/10 bg-[#181b21] p-6">
+      <section id="refresh-summary" className="mt-5 scroll-mt-16 rounded-2xl border border-white/10 bg-[#181b21] p-3 sm:p-6 md:mt-12">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-lime-400">
               REFRESH TIME
             </p>
 
-            <h2 className="mt-1 text-2xl font-bold">
+            <h2 className="mt-1 text-xl font-bold sm:text-2xl">
               갱신시간
             </h2>
           </div>
         </div>
 
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-400">
-          여기에서 표시하는 갱신시간은 2시간 거래량이 갱신되는 기준 시각입니다.
-          기준가·상한가·하한가는 이 시각 이후 약 0~20분 사이에 변동될 수 있습니다.
+        <p className="mt-2 max-w-3xl text-xs leading-5 text-gray-400 sm:mt-3 sm:text-sm sm:leading-6">
+          거래량 갱신 기준 시각입니다. 실제 기준가·상한가·하한가의 변경 시각과는 다를 수 있습니다.
+          <span className="hidden sm:inline"> 변경은 이후 약 0~20분 사이에 발생할 수 있습니다.</span>
         </p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-8 sm:gap-4 lg:grid-cols-4">
           <InfoBox
             title="갱신 기준 시각"
             value={expectedRefresh}
@@ -332,6 +333,15 @@ export default function RefreshReportSummary({
           />
         </div>
 
+        <button
+          type="button"
+          aria-expanded={showMobileDetails}
+          onClick={() => setShowMobileDetails((value) => !value)}
+          className="mt-3 w-full rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2.5 text-xs font-bold text-gray-200 md:hidden"
+        >
+          {showMobileDetails ? "출처·제보 상세 접기 ↑" : "출처·제보 자세히 보기 ↓"}
+        </button>
+
         {!stats && !reference && (
           <div className="mt-6 rounded-xl border border-dashed border-white/10 px-5 py-10 text-center">
             <p className="font-semibold">
@@ -345,6 +355,7 @@ export default function RefreshReportSummary({
           </div>
         )}
 
+        <div className={showMobileDetails ? "block" : "hidden md:block"}>
         {observations.length > 0 && (
           <div className="mt-6 rounded-xl border border-violet-300/15 bg-violet-300/[0.04] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -435,6 +446,8 @@ export default function RefreshReportSummary({
           </div>
         )}
 
+        </div>
+
         {hasExternalConflict && (
           <div className="mt-4 rounded-xl border border-red-300/20 bg-red-300/[0.05] px-4 py-3 text-xs leading-5 text-red-100">
             독립 공개 출처의 exact 기록과 기존 참고값이 충돌해 자동 알림 기준에서 제외했습니다.
@@ -502,8 +515,9 @@ export default function RefreshReportSummary({
         )}
       </section>
 
+      <div className={showMobileDetails ? "block" : "hidden md:block"}>
       {stats && (
-        <section className="mt-6 rounded-2xl border border-white/10 bg-[#181b21] p-6">
+        <section className="mt-4 rounded-2xl border border-white/10 bg-[#181b21] p-3 sm:mt-6 sm:p-6">
           <div>
             <p className="text-sm font-semibold text-lime-400">
               REPORT DISTRIBUTION
@@ -549,7 +563,7 @@ export default function RefreshReportSummary({
         </section>
       )}
 
-      <section className="mt-6 rounded-2xl border border-white/10 bg-[#181b21] p-6">
+      <section className="mt-4 rounded-2xl border border-white/10 bg-[#181b21] p-3 sm:mt-6 sm:p-6">
         <div>
           <p className="text-sm font-semibold text-lime-400">
             REPORTS
@@ -589,6 +603,7 @@ export default function RefreshReportSummary({
           </div>
         )}
       </section>
+      </div>
     </>
   );
 }
@@ -601,12 +616,12 @@ function InfoBox({
   value: string;
 }) {
   return (
-    <div className="rounded-xl bg-white/[0.04] p-5">
-      <p className="text-sm text-gray-500">
+    <div className="min-w-0 rounded-xl bg-white/[0.04] p-3 sm:p-5">
+      <p className="text-[11px] text-gray-500 sm:text-sm">
         {title}
       </p>
 
-      <p className="mt-2 text-xl font-bold">
+      <p className="mt-1 break-words text-base font-bold leading-6 sm:mt-2 sm:text-xl">
         {value}
       </p>
     </div>

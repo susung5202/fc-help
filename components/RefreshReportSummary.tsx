@@ -58,6 +58,7 @@ export default function RefreshReportSummary({
   const [reports, setReports] = useState<Report[]>([]);
   const [reference, setReference] = useState<Reference | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
+  const [showAllObservations, setShowAllObservations] = useState(false);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
 
@@ -349,16 +350,16 @@ export default function RefreshReportSummary({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-violet-200">
-                  웹 관측 데이터 {observations.length}건
+                  갱신시간 참고 근거 {observations.length}건
                 </p>
                 <p className="mt-1 text-xs leading-5 text-gray-500">
-                  공개 웹에서 수집한 참고 정보입니다. 범위 관측은 정확한 알림 시각으로 사용하지 않습니다.
+                  각 기록의 원문 출처를 확인할 수 있습니다. 공개 자료는 FC Help 독립 검증 전 참고값이며, 범위 관측은 정확한 알림 시각으로 사용하지 않습니다.
                 </p>
               </div>
             </div>
 
             <div className="mt-4 space-y-3">
-              {observations.slice(0, 5).map((observation) => (
+              {(showAllObservations ? observations : observations.slice(0, 5)).map((observation) => (
                 <div
                   key={observation.id}
                   className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/5 bg-black/10 px-4 py-3"
@@ -390,6 +391,17 @@ export default function RefreshReportSummary({
                 </div>
               ))}
             </div>
+            {observations.length > 5 && (
+              <button
+                type="button"
+                onClick={() => setShowAllObservations((value) => !value)}
+                className="mt-4 text-sm font-semibold text-violet-200 hover:text-white"
+              >
+                {showAllObservations
+                  ? "근거 접기"
+                  : `전체 근거 ${observations.length}건 보기`}
+              </button>
+            )}
           </div>
         )}
 

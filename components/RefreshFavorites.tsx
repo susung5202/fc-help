@@ -139,7 +139,7 @@ export function RefreshFavoritesProvider({ children }: { children: ReactNode }) 
   );
 }
 
-function useFavorites() {
+export function useFavorites() {
   const value = useContext(FavoritesContext);
   if (!value) throw new Error("RefreshFavoritesProvider가 필요합니다.");
   return value;

@@ -199,8 +199,13 @@ export default async function PlayersPage({
                 &apos;{query}&apos; 검색 결과가 없습니다.
               </p>
               <p className="mt-2 text-sm text-gray-500">
-                다른 선수 이름으로 검색해보세요.
+                다른 선수 이름이나 시즌으로 검색해보세요.
               </p>
+              {seasonFilter !== null && (
+                <Link href={`/players?q=${encodeURIComponent(query)}&sort=${sortMode}`} className="mt-5 inline-block rounded-xl bg-lime-400 px-4 py-2.5 text-sm font-bold text-black">
+                  시즌 필터 해제
+                </Link>
+              )}
             </div>
           ) : (
             <>
@@ -330,14 +335,14 @@ function RankingBlock({
   const first = resolved[0];
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#181b21] shadow-2xl shadow-black/10">
-      <div className="border-b border-white/10 px-6 py-5">
-        <h2 className="text-xl font-extrabold">{title}</h2>
+    <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#181b21] shadow-black/10 md:rounded-3xl md:shadow-2xl">
+      <div className="border-b border-white/10 px-4 py-3 md:px-6 md:py-5">
+        <h2 className="text-lg font-extrabold md:text-xl">{title}</h2>
         <p className="mt-1 text-xs text-gray-500">{description}</p>
       </div>
 
       {!first ? (
-        <div className="flex min-h-[520px] items-center justify-center px-6 text-center">
+        <div className="flex min-h-40 items-center justify-center px-6 text-center md:min-h-[520px]">
           <div>
             <p className="font-semibold text-gray-300">공식 데이터를 불러오지 못했습니다.</p>
             <p className="mt-2 text-sm text-gray-500">
@@ -349,7 +354,26 @@ function RankingBlock({
         <>
           <Link
             href={`/players/${first.player.id}`}
-            className="group block overflow-hidden border-b border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent"
+            className="group flex items-center gap-3 border-b border-white/10 bg-lime-300/[0.04] px-4 py-3 transition hover:bg-lime-300/[0.08] md:hidden"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-lime-400 text-xs font-black text-black">1</span>
+            <div className="flex h-14 w-14 shrink-0 items-end justify-center overflow-hidden rounded-lg bg-white/5">
+              <PlayerArtwork
+                spid={first.player.id}
+                alt={first.player.name}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-lime-300">{first.season?.className ?? "시즌 미확인"} · +{first.item.grade}</p>
+              <p className="mt-0.5 truncate text-sm font-black">{first.player.name}</p>
+              <p className="mt-1 truncate text-xs text-gray-400">{metricLabel(first.item)}</p>
+            </div>
+            <span className="text-gray-500" aria-hidden>›</span>
+          </Link>
+          <Link
+            href={`/players/${first.player.id}`}
+            className="group hidden overflow-hidden border-b border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent md:block"
           >
             <div className="flex items-center justify-between gap-3 px-6 pt-5">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-400 text-sm font-black text-black">
@@ -417,7 +441,7 @@ function RankingBlock({
               <Link
                 key={`${player.id}-${item.grade}`}
                 href={`/players/${player.id}`}
-                className="flex items-center gap-3 px-5 py-4 transition hover:bg-white/[0.04]"
+                className="flex items-center gap-3 px-4 py-3 transition hover:bg-white/[0.04] md:px-5 md:py-4"
               >
                 <span className="w-6 text-center text-sm font-black text-gray-500">
                   {index + 2}

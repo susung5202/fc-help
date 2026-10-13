@@ -15,6 +15,7 @@ type Post = {
   content: string;
   image_urls: string[] | null;
   created_at: string;
+  is_notice: boolean;
 };
 
 const CATEGORY_LABEL: Record<Post["category"], string> = {
@@ -36,13 +37,15 @@ export default function CommunityDetail({ id }: { id: string }) {
   const [likeCount, setLikeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [changingNotice, setChangingNotice] = useState(false);
 
   async function load() {
     setLoading(true);
     setMessage("");
 
     const [{ data: postData, error: postError }, { data: commentData }, { data: likeData }, { data: authData }] = await Promise.all([
-      supabase.from("community_posts").select("id,author_id,category,title,content,image_urls,created_at").eq("id", id).maybeSingle(),
+      supabase.from("community_posts").select("id,author_id,category,title,content,image_urls,created_at,is_notice").eq("id", id).maybeSingle(),
       supabase.from("community_comments").select("id,post_id,user_id,parent_id,content,created_at,updated_at").eq("post_id", id).order("created_at", { ascending: true }),
       supabase.from("community_likes").select("post_id,user_id").eq("post_id", id),
       supabase.auth.getUser(),
@@ -62,6 +65,13 @@ export default function CommunityDetail({ id }: { id: string }) {
     setComments(loadedComments);
     setCommentCount(loadedComments.length);
     setViewerId(uid);
+    if (uid) {
+      const { data: admin } = await supabase.from("admin_users")
+        .select("user_id").eq("user_id", uid).maybeSingle();
+      setIsAdmin(Boolean(admin));
+    } else {
+      setIsAdmin(false);
+    }
     setLikeCount((likeData ?? []).length);
     setLiked(Boolean(uid && (likeData ?? []).some((row) => row.user_id === uid)));
 
@@ -95,6 +105,23 @@ export default function CommunityDetail({ id }: { id: string }) {
     }
   }
 
+  async function toggleNotice() {
+    if (!post || !isAdmin || changingNotice) return;
+    setChangingNotice(true);
+    setMessage("");
+    const nextNotice = !post.is_notice;
+    const { error } = await supabase.rpc("set_community_post_notice", {
+      p_post_id: post.id,
+      p_is_notice: nextNotice,
+    });
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setPost((current) => current ? { ...current, is_notice: nextNotice } : current);
+    }
+    setChangingNotice(false);
+  }
+
   async function deletePost() {
     if (!post || post.author_id !== viewerId || !window.confirm("게시글을 삭제할까요?")) return;
     const { data: mediaData } = await supabase.from("community_posts").select("image_paths").eq("id", post.id).maybeSingle();
@@ -124,7 +151,13 @@ export default function CommunityDetail({ id }: { id: string }) {
     <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-10">
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link href="/community" className="text-sm font-bold text-gray-400 hover:text-white">← 커뮤니티</Link>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {isAdmin && (
+            <button type="button" disabled={changingNotice} onClick={() => void toggleNotice()}
+              className="rounded-lg border border-lime-300/35 bg-lime-300/10 px-3 py-2 text-xs font-bold text-lime-300 disabled:opacity-50">
+              {changingNotice ? "변경 중..." : post.is_notice ? "📌 공지 해제" : "📌 공지 고정"}
+            </button>
+          )}
           {isOwner ? (
             <>
               <Link href={`/community/${post.id}/edit`} className="rounded-lg border border-white/15 px-3 py-2 text-xs font-bold text-gray-200 hover:bg-white/5">수정</Link>
@@ -151,6 +184,7 @@ export default function CommunityDetail({ id }: { id: string }) {
         </div>
 
         <div className="mt-4">
+          {post.is_notice && <span className="mr-2 inline-block rounded-md bg-lime-300 px-2 py-1 text-[10px] font-black text-black">📌 관리자 공지</span>}
           <span className="inline-block rounded-md border border-lime-300/15 bg-lime-300/[0.05] px-2 py-1 text-[10px] font-black text-lime-200">{CATEGORY_LABEL[post.category]}</span>
           <h1 className="mt-2 break-words text-xl font-black leading-7 text-white sm:text-2xl sm:leading-8">{post.title}</h1>
         </div>

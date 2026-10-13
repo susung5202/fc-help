@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 type ReportStatus = "pending" | "resolved" | "dismissed";
-type TargetType = "community_post" | "community_comment" | "squad_post" | "squad_comment";
+type TargetType = "community_post" | "community_comment" | "squad_post" | "squad_comment" | "refresh_report";
 
 type ReportRecord = {
   id: string;
@@ -51,6 +51,7 @@ const TARGET_LABEL: Record<TargetType, string> = {
   community_comment: "커뮤니티 댓글",
   squad_post: "스쿼드 게시글",
   squad_comment: "스쿼드 댓글",
+  refresh_report: "갱신시간 제보",
 };
 
 const STATUS_LABEL: Record<ReportStatus, string> = {
@@ -138,12 +139,17 @@ export default function AdminReports() {
       const communityCommentIds = loadedReports.filter((report) => report.target_type === "community_comment").map((report) => Number(report.target_id)).filter(Number.isFinite);
       const squadPostIds = loadedReports.filter((report) => report.target_type === "squad_post").map((report) => report.target_id);
       const squadCommentIds = loadedReports.filter((report) => report.target_type === "squad_comment").map((report) => Number(report.target_id)).filter(Number.isFinite);
+      const refreshReportIds = loadedReports.filter((report) => report.target_type === "refresh_report")
+        .map((report) => Number(report.target_id)).filter(Number.isSafeInteger);
 
-      const [communityPosts, communityComments, squadPosts, squadComments] = await Promise.all([
+      const [communityPosts, communityComments, squadPosts, squadComments, refreshReports] = await Promise.all([
         communityPostIds.length > 0 ? supabase.from("community_posts").select("id,title,content").in("id", communityPostIds) : Promise.resolve({ data: [] }),
         communityCommentIds.length > 0 ? supabase.from("community_comments").select("id,post_id,content").in("id", communityCommentIds) : Promise.resolve({ data: [] }),
         squadPostIds.length > 0 ? supabase.from("squad_posts").select("id,title,description").in("id", squadPostIds) : Promise.resolve({ data: [] }),
         squadCommentIds.length > 0 ? supabase.from("squad_comments").select("id,post_id,content").in("id", squadCommentIds) : Promise.resolve({ data: [] }),
+        refreshReportIds.length > 0 ? supabase.from("refresh_reports")
+          .select("id,player_spid,player_name,season_name,hour_type,refresh_minute")
+          .in("id", refreshReportIds) : Promise.resolve({ data: [] }),
       ]);
 
       for (const row of (communityPosts.data ?? []) as { id: string; title: string; content: string }[]) {
@@ -157,6 +163,20 @@ export default function AdminReports() {
       }
       for (const row of (squadComments.data ?? []) as { id: number; post_id: string; content: string }[]) {
         nextTargets[targetKey("squad_comment", String(row.id))] = { exists: true, label: `스쿼드 댓글 #${row.id}`, preview: shortText(row.content), href: `/squad/gallery/${row.post_id}` };
+      }
+
+      for (const row of (refreshReports.data ?? []) as {
+        id: number; player_spid: number; player_name: string; season_name: string;
+        hour_type: string; refresh_minute: number | null;
+      }[]) {
+        const pattern = row.hour_type === "odd" ? "홀수" : row.hour_type === "even" ? "짝수" : row.hour_type === "every" ? "매시" : "미확인";
+        const minute = row.refresh_minute == null ? "" : " " + String(row.refresh_minute).padStart(2, "0") + "분";
+        nextTargets[targetKey("refresh_report", String(row.id))] = {
+          exists: true,
+          label: `${row.season_name || "시즌"} · ${row.player_name}`,
+          preview: `제보값: ${pattern}${minute} · 제보번호 #${row.id}`,
+          href: `/refresh/${row.player_spid}`,
+        };
       }
 
       for (const report of loadedReports) {
@@ -215,6 +235,35 @@ export default function AdminReports() {
       "신고 대상 콘텐츠 삭제";
 
     try {
+      if (report.target_type === "refresh_report") {
+        const { error: removalError } = await supabase.rpc("remove_reported_refresh_time", {
+          p_moderation_report_id: report.id,
+          p_resolution_note: resolutionNote,
+        });
+        if (removalError) {
+          setMessage(removalError.message);
+          return;
+        }
+        const resolvedAt = new Date().toISOString();
+        setTargets((current) => ({
+          ...current,
+          [targetKey(report.target_type, report.target_id)]: {
+            exists: false,
+            label: "갱신시간 제보 · 삭제됨",
+            preview: "관리자가 잘못된 제보를 삭제했습니다.",
+            href: null,
+          },
+        }));
+        setReports((current) => current.map((item) =>
+          item.id === report.id ? {
+            ...item, status: "resolved",
+            resolution_note: resolutionNote, resolved_at: resolvedAt, resolved_by: viewerId,
+          } : item
+        ));
+        setMessage("잘못된 갱신시간 제보를 삭제하고 신고를 처리했습니다.");
+        return;
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
       if (!accessToken) {
@@ -337,7 +386,7 @@ export default function AdminReports() {
                     <span className="rounded-md border border-red-300/15 bg-red-400/[0.05] px-2 py-1 text-[10px] font-black text-red-200">{REASON_LABEL[report.reason] || report.reason}</span>
                     <span className="text-[10px] font-bold text-gray-600">{TARGET_LABEL[report.target_type]}</span>
                   </div>
-                  <h2 className="mt-2 truncate text-base font-black text-white">{target?.label || TARGET_LABEL[report.target_type]}</h2>
+                  <h2 className="mt-2 break-words text-base font-black text-white">{target?.label || TARGET_LABEL[report.target_type]}</h2>
                   <p className="mt-1 text-xs leading-5 text-gray-500">{target?.preview || "대상 정보를 불러오는 중..."}</p>
                 </div>
                 <span className="shrink-0 text-[10px] text-gray-600">{new Date(report.created_at).toLocaleString("ko-KR")}</span>

@@ -76,9 +76,20 @@ export default function AdminDashboardPage() {
               <h2 className="text-xl font-black">신고 관리</h2>
               <span className="text-2xl font-black text-red-200">{pending === null ? "—" : pending}</span>
             </div>
-            <p className="mt-2 text-sm leading-6 text-gray-400">신고된 게시글·댓글을 검토하고 삭제, 처리 완료, 기각을 관리합니다.</p>
+            <p className="mt-2 text-sm leading-6 text-gray-400">게시글·댓글·잘못된 갱신시간 제보를 검토하고 처리합니다.</p>
             <p className="mt-4 text-sm font-bold text-lime-300">신고함 열기 →</p>
           </Link>
+          <div className="rounded-2xl border border-white/10 bg-[#171b21] p-6">
+            <p className="text-xs font-black text-lime-300">COMMUNITY NOTICES</p>
+            <h2 className="mt-3 text-xl font-black">공지 게시글 관리</h2>
+            <p className="mt-2 text-sm leading-6 text-gray-400">
+              관리자만 공지를 등록하거나 게시글을 공지로 고정·해제할 수 있습니다. 고정 개수 제한은 없습니다.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href="/community/write" className="rounded-lg bg-lime-300 px-3 py-2 text-xs font-black text-black">공지 작성 →</Link>
+              <Link href="/community" className="rounded-lg border border-white/15 px-3 py-2 text-xs font-bold text-gray-200">게시판에서 고정·해제 →</Link>
+            </div>
+          </div>
         </div>
       </div>
     </main>

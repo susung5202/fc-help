@@ -322,8 +322,27 @@ const SOURCES: SourceConfig[] = [
   },
 ];
 
-// Daily refresh focuses on current/high-demand seasons. Legacy observations remain in DB.
-const ACTIVE_SOURCES = SOURCES.slice(0, 15);
+// Always prioritize current seasons and use the remaining request budget for
+// older seasons on a rotating schedule. Never request all pages in one run.
+const DAILY_PRIORITY_COUNT = 10;
+const DAILY_ROTATION_COUNT = 5;
+
+function getDailySources(now = new Date()): SourceConfig[] {
+  const priority = SOURCES.slice(0, DAILY_PRIORITY_COUNT);
+  const older = SOURCES.slice(DAILY_PRIORITY_COUNT);
+  if (older.length === 0) return priority;
+
+  // KST date determines one stable batch throughout the day.
+  const kstDate = now.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+  const dayNumber = Math.floor(Date.parse(`${kstDate}T00:00:00Z`) / 86400000);
+  const batchCount = Math.ceil(older.length / DAILY_ROTATION_COUNT);
+  const batch = ((dayNumber % batchCount) + batchCount) % batchCount;
+  const rotated = older.slice(
+    batch * DAILY_ROTATION_COUNT,
+    (batch + 1) * DAILY_ROTATION_COUNT
+  );
+  return [...priority, ...rotated];
+}
 
 function decodeHtmlEntities(value: string) {
   return value
@@ -612,10 +631,11 @@ export async function GET(request: Request) {
       sample: string[];
     }> = [];
 
+    const selectedSources = getDailySources();
     const batchSize = 4;
 
-    for (let offset = 0; offset < ACTIVE_SOURCES.length; offset += batchSize) {
-      const batch = ACTIVE_SOURCES.slice(offset, offset + batchSize);
+    for (let offset = 0; offset < selectedSources.length; offset += batchSize) {
+      const batch = selectedSources.slice(offset, offset + batchSize);
 
       const results = await Promise.all(
         batch.map(async (source) => {
@@ -801,7 +821,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      sourcePages: ACTIVE_SOURCES.length,
+      sourcePages: selectedSources.length,
       totalParsed,
       totalUpserted,
       pages,

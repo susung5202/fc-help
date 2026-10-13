@@ -303,13 +303,6 @@ export default function RefreshFavoritesDashboard() {
   const clockBlinking = nowMs !== null &&
     new Date(nowMs + KST_OFFSET).getUTCSeconds() <= 20;
 
-  // 실제 갱신 중인 선수 카드만 개별 강조한다.
-  const anyRefreshActive = nowMs !== null && favorites.some((item) => {
-    const info = infoBySpid[item.player_spid];
-    return info?.hourType != null && info.minute != null &&
-      isActiveRefreshWindow(info.hourType, info.minute, nowMs);
-  });
-
   async function removeFavorite(item: typeof favorites[number]) {
     setActionError("");
     try {
@@ -350,8 +343,7 @@ export default function RefreshFavoritesDashboard() {
         <div className="text-left sm:text-right">
           <p className={"text-xs font-bold " +
             (clockBlinking ? "text-lime-300" : "text-gray-400")}>
-            {anyRefreshActive ? "● 즐겨찾기 선수 갱신 구간" : clockBlinking
-              ? "● 매분 00~20초 강조" : clockSource === "server"
+            {clockBlinking ? "갱신시간입니다. 이적시장을 확인해주세요." : clockSource === "server"
               ? "● 서버 시간 동기화"
               : clockSource === "device"
                 ? "● 기기 시간 기준"
@@ -384,7 +376,6 @@ export default function RefreshFavoritesDashboard() {
         <>
           <div className="mt-4 flex items-center justify-between gap-3 text-xs text-gray-500">
             <span>즐겨찾기 {favorites.length}명</span>
-            <span>시계는 매분 00~20초 강조</span>
           </div>
           {dataError && <p role="alert" className="mt-2 text-xs text-red-300">{dataError}</p>}
           {actionError && <p role="alert" className="mt-2 text-xs text-red-300">{actionError}</p>}

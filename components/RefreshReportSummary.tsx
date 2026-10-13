@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import ReportButton from "@/components/ReportButton";
 import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
 import { observationConflictsWithPattern } from "@/lib/refresh/observationConflict";
 
@@ -9,6 +10,7 @@ type HourType = "odd" | "even" | "every" | "unknown";
 
 type Report = {
   id: number;
+  user_id: string;
   hour_type: HourType;
   refresh_minute: number | null;
   created_at: string;
@@ -60,6 +62,8 @@ export default function RefreshReportSummary({
   const [observations, setObservations] = useState<Observation[]>([]);
   const [showAllObservations, setShowAllObservations] = useState(false);
   const [showMobileDetails, setShowMobileDetails] = useState(false);
+  const [showAllReports, setShowAllReports] = useState(false);
+  const [viewerId, setViewerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
 
@@ -75,7 +79,7 @@ export default function RefreshReportSummary({
       ] = await Promise.all([
         supabase
           .from("refresh_reports")
-          .select("id, hour_type, refresh_minute, created_at")
+          .select("id, user_id, hour_type, refresh_minute, created_at")
           .eq("player_spid", playerSpid)
           .order("created_at", { ascending: false }),
         supabase
@@ -119,6 +123,8 @@ export default function RefreshReportSummary({
       }
 
       setReports((reportData ?? []) as Report[]);
+      const { data: authData } = await supabase.auth.getUser();
+      setViewerId(authData.user?.id ?? null);
       setReference((referenceData as Reference | null) ?? null);
       setObservations(Array.from(mergedObservations.values()));
       setLoading(false);
@@ -579,27 +585,30 @@ export default function RefreshReportSummary({
             아직 등록된 제보가 없습니다.
           </div>
         ) : (
-          <div className="mt-6 divide-y divide-white/10">
-            {reports.slice(0, 10).map((report) => (
-              <div
-                key={report.id}
-                className="flex items-center justify-between gap-4 py-4"
-              >
-                <div>
-                  <p className="font-semibold">
-                    {formatReport(report)}
-                  </p>
-
-                  <p className="mt-1 text-xs text-gray-500">
-                    유저 제보
+          <div className="mt-4 divide-y divide-white/10 sm:mt-6">
+            {(showAllReports ? reports : reports.slice(0, 10)).map((report) => (
+              <div key={report.id} className="flex items-center justify-between gap-3 py-3 sm:py-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold sm:text-base">{formatReport(report)}</p>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    유저 제보 · {formatDate(report.created_at)}
                   </p>
                 </div>
-
-                <span className="whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(report.created_at)}
-                </span>
+                <ReportButton
+                  targetType="refresh_report"
+                  targetId={report.id}
+                  reportedUserId={report.user_id}
+                  viewerId={viewerId}
+                  className="shrink-0 rounded-lg border border-red-400/20 px-2.5 py-2 text-[11px] font-bold text-red-300 transition hover:bg-red-400/5"
+                />
               </div>
             ))}
+            {reports.length > 10 && (
+              <button type="button" onClick={() => setShowAllReports((value) => !value)}
+                className="mt-3 w-full rounded-lg border border-white/10 py-2.5 text-xs font-bold text-gray-300">
+                {showAllReports ? "제보 접기 ↑" : `전체 제보 ${reports.length}건 확인 ↓`}
+              </button>
+            )}
           </div>
         )}
       </section>

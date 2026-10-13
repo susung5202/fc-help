@@ -8,7 +8,8 @@ export type ReportTargetType =
   | "community_post"
   | "community_comment"
   | "squad_post"
-  | "squad_comment";
+  | "squad_comment"
+  | "refresh_report";
 
 const REASONS = [
   ["spam", "스팸/도배"],
@@ -36,7 +37,7 @@ export default function ReportButton({
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState<Reason>("spam");
+  const [reason, setReason] = useState<Reason>(targetType === "refresh_report" ? "misinformation" : "spam");
   const [details, setDetails] = useState("");
   const [saving, setSaving] = useState(false);
   const [reported, setReported] = useState(false);
@@ -86,7 +87,7 @@ export default function ReportButton({
   return (
     <>
       <button type="button" onClick={startReport} disabled={reported} className={className}>
-        {reported ? "신고됨" : "신고"}
+        {reported ? "신고됨" : targetType === "refresh_report" ? "잘못된 제보 신고" : "신고"}
       </button>
 
       {open && (
@@ -95,7 +96,7 @@ export default function ReportButton({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-black tracking-[0.14em] text-red-300">REPORT</p>
-                <h3 className="mt-1 text-lg font-black text-white">신고 사유 선택</h3>
+                <h3 className="mt-1 text-lg font-black text-white">{targetType === "refresh_report" ? "잘못된 갱신시간 신고" : "신고 사유 선택"}</h3>
               </div>
               <button type="button" disabled={saving} onClick={() => setOpen(false)} className="h-9 w-9 rounded-full bg-white/5 text-xl text-gray-300">×</button>
             </div>
@@ -108,7 +109,7 @@ export default function ReportButton({
               ))}
             </div>
 
-            <textarea value={details} onChange={(event) => setDetails(event.target.value)} maxLength={500} rows={4} placeholder="추가 설명 (선택)" className="mt-4 w-full resize-none rounded-xl border border-white/10 bg-[#0f1115] px-3 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-red-300/30" />
+            <textarea value={details} onChange={(event) => setDetails(event.target.value)} maxLength={500} rows={4} placeholder={targetType === "refresh_report" ? "틀린 이유 또는 올바른 갱신시간 (선택)" : "추가 설명 (선택)"} className="mt-4 w-full resize-none rounded-xl border border-white/10 bg-[#0f1115] px-3 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-red-300/30" />
             {error && <p className="mt-2 text-xs text-amber-300">{error}</p>}
 
             <div className="mt-4 grid grid-cols-2 gap-2">

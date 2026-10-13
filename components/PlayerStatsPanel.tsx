@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import type { PlayerStatsData } from "@/lib/fconline/playerStats";
+import type { PlayerStatsData, PlayerStatGroup } from "@/lib/fconline/playerStats";
 import type {
   PlayerTeamColors,
   TeamColorOption,
@@ -23,6 +23,10 @@ type ApiResponse = {
   stats: PlayerStatsData;
   teamColors: PlayerTeamColors;
 };
+
+const MOBILE_ABILITY_GROUPS: Array<PlayerStatGroup | "주요" | "전체"> = [
+  "주요", "공격", "패스", "드리블", "수비", "피지컬", "골키퍼", "전체",
+];
 
 const STRONG_RANGES = [
   { key: "0-1", label: "0-1강", levels: [1] },
@@ -109,6 +113,8 @@ export default function PlayerStatsPanel({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [abilityGroup, setAbilityGroup] = useState<PlayerStatGroup | "주요" | "전체">("주요");
+  const [abilitySearch, setAbilitySearch] = useState("");
   const requestId = useRef(0);
 
   const reinforcement = selectedOption(
@@ -151,6 +157,21 @@ export default function PlayerStatsPanel({
       };
     });
   }, [stats, selectedTeamColors]);
+
+  const mobileAbilities = useMemo(() => {
+    const keyword = abilitySearch.trim().toLowerCase();
+    if (keyword) {
+      return adjustedAbilities.filter((stat) => stat.label.toLowerCase().includes(keyword));
+    }
+    if (abilityGroup === "주요") {
+      return [...adjustedAbilities]
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+    }
+    return abilityGroup === "전체"
+      ? adjustedAbilities
+      : adjustedAbilities.filter((stat) => stat.group === abilityGroup);
+  }, [adjustedAbilities, abilityGroup, abilitySearch]);
 
   function replaceUrl(
     nextStrong: number,
@@ -263,8 +284,8 @@ export default function PlayerStatsPanel({
   }
 
   return (
-    <section className="mt-12 rounded-2xl border border-white/10 bg-[#181b21] p-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <section className="mt-5 rounded-2xl border border-white/10 bg-[#181b21] p-3 sm:p-6 md:mt-12">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-semibold text-lime-400">PLAYER STATS</p>
           <h2 className="mt-1 text-2xl font-bold">상세 능력치</h2>
@@ -303,7 +324,67 @@ export default function PlayerStatsPanel({
         ))}
       </div>
 
-      <div className="mt-7 grid gap-6 lg:grid-cols-2">
+      <nav aria-label="선수 상세 바로가기" className="sticky top-0 z-20 -mx-3 mt-5 flex gap-2 overflow-x-auto border-y border-white/10 bg-[#171b21]/95 px-3 py-2 backdrop-blur md:hidden">
+        <a href="#player-abilities" className="shrink-0 rounded-full bg-lime-400 px-3 py-1.5 text-xs font-bold text-black">능력치</a>
+        <a href="#player-options" className="shrink-0 rounded-full border border-white/15 px-3 py-1.5 text-xs font-bold text-gray-200">강화·적응도</a>
+        <a href="#player-colors" className="shrink-0 rounded-full border border-white/15 px-3 py-1.5 text-xs font-bold text-gray-200">팀컬러</a>
+      </nav>
+
+      <div id="player-abilities" className="scroll-mt-16 mt-4 rounded-xl border border-white/10 bg-[#12151a] p-3 md:hidden">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-base font-black">능력치 빠른 조회</h3>
+          <span className="text-[11px] text-gray-500">강화 +{strong} · 적응도 {grow}</span>
+        </div>
+        <input
+          type="search"
+          value={abilitySearch}
+          onChange={(event) => setAbilitySearch(event.target.value)}
+          placeholder="예: 속력, 골 결정력, 몸싸움"
+          aria-label="능력치 이름 검색"
+          className="mt-3 w-full rounded-lg border border-white/10 bg-[#20252d] px-3 py-2.5 text-sm text-white outline-none placeholder:text-gray-500 focus:border-lime-400"
+        />
+        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+          {MOBILE_ABILITY_GROUPS.map((group) => (
+            <button
+              key={group}
+              type="button"
+              onClick={() => { setAbilityGroup(group); setAbilitySearch(""); }}
+              aria-pressed={!abilitySearch && abilityGroup === group}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                !abilitySearch && abilityGroup === group
+                  ? "border-lime-400 bg-lime-400 text-black"
+                  : "border-white/15 text-gray-400 hover:text-white"
+              }`}
+            >
+              {group}
+            </button>
+          ))}
+        </div>
+        {!stats ? (
+          <p className="mt-4 py-5 text-center text-sm text-gray-500">능력치를 불러오지 못했습니다.</p>
+        ) : mobileAbilities.length === 0 ? (
+          <p className="mt-4 py-5 text-center text-sm text-gray-500">일치하는 능력치가 없습니다.</p>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-x-3">
+            {mobileAbilities.map((stat) => (
+              <div key={stat.label} className="flex min-w-0 items-center justify-between gap-1 border-b border-white/5 py-2">
+                <span className="min-w-0 text-xs leading-4 text-gray-400">{stat.label}</span>
+                <span className={`shrink-0 text-base font-black tabular-nums ${getStatTextTone(stat.value)}`}>
+                  {stat.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {abilityGroup === "주요" && !abilitySearch && stats && (
+          <button type="button" onClick={() => setAbilityGroup("전체")}
+            className="mt-3 w-full rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5">
+            전체 능력치 보기 ↓
+          </button>
+        )}
+      </div>
+
+      <div id="player-options" className="scroll-mt-16 mt-6 grid gap-4 lg:grid-cols-2 lg:gap-6">
         <StatOptionSection title="강화">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {STRONG_RANGES.map((range) => {
@@ -375,7 +456,32 @@ export default function PlayerStatsPanel({
         </p>
       )}
 
-      <div className="mt-8 rounded-2xl border border-white/10 bg-[#12151a] p-5">
+      <div id="player-colors" className="scroll-mt-16 mt-6 md:hidden">
+        <details className="rounded-xl border border-white/10 bg-[#12151a] p-3">
+          <summary className="cursor-pointer py-1 text-sm font-bold text-gray-200">
+            팀컬러 선택 · {selectedTeamColors.length}/3 적용 <span className="text-xs font-normal text-gray-500">(펼쳐서 설정)</span>
+          </summary>
+          <p className="mt-3 text-xs text-gray-500">팀컬러 선택 즉시 능력치에 반영됩니다.</p>
+          {selectedTeamColors.length > 0 && (
+            <button type="button" onClick={clearTeamColors} className="mt-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300">
+              전체 해제
+            </button>
+          )}
+          <div className="mt-4 space-y-5">
+            <TeamColorList title="강화 팀컬러" emptyText="적용할 강화 팀컬러가 없습니다."
+              options={teamColors.reinforcement} selectedIndex={reinforcementPick}
+              onSelect={(index) => chooseTeamColor("reinforcement", index)} />
+            <TeamColorList title="소속 팀컬러" emptyText="적용할 소속 팀컬러가 없습니다."
+              options={teamColors.affiliation} selectedIndex={affiliationPick}
+              onSelect={(index) => chooseTeamColor("affiliation", index)} />
+            <TeamColorList title="관계/특성 팀컬러" emptyText="적용할 관계/특성 팀컬러가 없습니다."
+              options={teamColors.feature} selectedIndex={featurePick}
+              onSelect={(index) => chooseTeamColor("feature", index)} />
+          </div>
+        </details>
+      </div>
+
+      <div className="mt-8 hidden rounded-2xl border border-white/10 bg-[#12151a] p-5 md:block">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-gray-300">적용 가능한 팀컬러</p>
@@ -420,14 +526,14 @@ export default function PlayerStatsPanel({
       </div>
 
       {!stats ? (
-        <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-10 text-center">
+        <div className="mt-8 hidden rounded-xl border border-white/10 bg-white/[0.03] px-5 py-10 text-center md:block">
           <p className="font-semibold">능력치를 불러오지 못했습니다.</p>
           <p className="mt-2 text-sm text-gray-500">
             FC 온라인 데이터센터 응답을 확인해주세요.
           </p>
         </div>
       ) : (
-        <div className="mt-8 rounded-2xl border border-white/10 bg-[#12151a] p-5">
+        <div className="mt-8 hidden rounded-2xl border border-white/10 bg-[#12151a] p-5 md:block">
           <div className="grid md:grid-cols-2 xl:grid-cols-3 xl:gap-x-8">
             {adjustedAbilities.map((stat, index) => (
               <div

@@ -332,9 +332,18 @@ function getDailySources(now = new Date()): SourceConfig[] {
   const older = SOURCES.slice(DAILY_PRIORITY_COUNT);
   if (older.length === 0) return priority;
 
-  // KST date determines one stable batch throughout the day.
-  const kstDate = now.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
-  const dayNumber = Math.floor(Date.parse(`${kstDate}T00:00:00Z`) / 86400000);
+  // Use KST calendar components, not a locale-dependent date string.
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const value = (type: string) =>
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+  const dayNumber = Math.floor(
+    Date.UTC(value("year"), value("month") - 1, value("day")) / 86400000
+  );
   const batchCount = Math.ceil(older.length / DAILY_ROTATION_COUNT);
   const batch = ((dayNumber % batchCount) + batchCount) % batchCount;
   const rotated = older.slice(

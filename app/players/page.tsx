@@ -57,9 +57,9 @@ async function getSeasons(): Promise<Season[]> {
 export default async function PlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string; season?: string }>;
 }) {
-  const { q = "", sort = "default" } = await searchParams;
+  const { q = "", sort = "default", season: seasonParam = "" } = await searchParams;
   const query = q.trim();
   const sortMode: SortMode = sort === "ovr" ? "ovr" : "default";
 
@@ -74,14 +74,21 @@ export default async function PlayersPage({
   );
   const playerMap = new Map(players.map((player) => [player.id, player]));
 
-  const matchedPlayers = query
-    ? players
-        .filter((player) =>
-          player.name.toLowerCase().includes(query.toLowerCase())
-        )
-        .sort((a, b) => b.id - a.id)
-        .slice(0, 100)
+  const queryMatches = query
+    ? players.filter((player) =>
+        player.name.toLowerCase().includes(query.toLowerCase())
+      )
     : [];
+  const availableSeasonIds = [...new Set(
+    queryMatches.map((player) => Math.floor(player.id / 1_000_000))
+  )].sort((a, b) => b - a);
+  const seasonFilter = seasonParam && availableSeasonIds.includes(Number(seasonParam))
+    ? Number(seasonParam)
+    : null;
+  const matchedPlayers = queryMatches
+    .filter((player) => seasonFilter === null || Math.floor(player.id / 1_000_000) === seasonFilter)
+    .sort((a, b) => b.id - a.id)
+    .slice(0, 100);
 
   const ovrMap =
     query && sortMode === "ovr"
@@ -130,17 +137,17 @@ export default async function PlayersPage({
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-6 py-16">
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-16">
         <p className="text-sm font-semibold text-lime-400">PLAYER DATABASE</p>
-        <h1 className="mt-2 text-4xl font-bold">선수 DB</h1>
-        <p className="mt-3 text-gray-400">
+        <h1 className="mt-1 text-3xl font-bold sm:mt-2 sm:text-4xl">선수 DB</h1>
+        <p className="mt-2 text-sm leading-6 text-gray-400 sm:mt-3 sm:text-base">
           FC 온라인 공식 데이터를 기반으로 선수 정보와 최근 공식경기 통계를 확인합니다.
         </p>
 
         <form
           action="/players"
           method="GET"
-          className="mt-10 flex max-w-3xl rounded-2xl border border-white/10 bg-[#181b21] p-2"
+          className="mt-6 flex max-w-3xl rounded-2xl border border-white/10 bg-[#181b21] p-1.5 sm:mt-10 sm:p-2"
         >
           <input type="hidden" name="sort" value={sortMode} />
           <input
@@ -148,19 +155,19 @@ export default async function PlayersPage({
             name="q"
             defaultValue={query}
             placeholder="선수 이름을 검색하세요"
-            className="flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none placeholder:text-gray-500"
+            className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-gray-500 sm:px-4 sm:py-3"
           />
           <button
             type="submit"
-            className="rounded-xl bg-lime-400 px-6 py-3 text-sm font-bold text-black transition hover:bg-lime-300"
+            className="shrink-0 rounded-xl bg-lime-400 px-4 py-2.5 text-sm font-bold text-black transition hover:bg-lime-300 sm:px-6 sm:py-3"
           >
             검색
           </button>
         </form>
 
-        <div className="mt-12">
+        <div className="mt-7 sm:mt-12">
           {!query ? (
-            <div className="grid gap-6 xl:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 xl:grid-cols-3">
               <RankingBlock
                 title="최근 인기 선수"
                 description="전일 상위 1만 랭커 공식경기 출전 수 기준"
@@ -202,19 +209,20 @@ export default async function PlayersPage({
                   <p className="text-sm text-gray-500">검색 결과</p>
                   <h2 className="mt-1 text-2xl font-bold">{query}</h2>
                   <span className="mt-1 block text-sm text-gray-500">
-                    {results.length}개
+                    {seasonFilter === null ? "전체 시즌" : seasonMap.get(seasonFilter)?.className ?? "선택 시즌"} · {results.length}개
+                    {results.length === 100 ? " (최대 100개)" : ""}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   <SortLink
-                    href={`/players?q=${encodeURIComponent(query)}&sort=default`}
+                    href={`/players?q=${encodeURIComponent(query)}&sort=default${seasonFilter === null ? "" : `&season=${seasonFilter}`}`}
                     active={sortMode === "default"}
                   >
                     기본순
                   </SortLink>
                   <SortLink
-                    href={`/players?q=${encodeURIComponent(query)}&sort=ovr`}
+                    href={`/players?q=${encodeURIComponent(query)}&sort=ovr${seasonFilter === null ? "" : `&season=${seasonFilter}`}`}
                     active={sortMode === "ovr"}
                   >
                     OVR 높은순
@@ -222,7 +230,23 @@ export default async function PlayersPage({
                 </div>
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <form action="/players" method="GET" className="mb-4 flex items-center gap-2 rounded-xl border border-white/10 bg-[#181b21] p-2 sm:max-w-lg">
+                <input type="hidden" name="q" value={query} />
+                <input type="hidden" name="sort" value={sortMode} />
+                <label htmlFor="player-season-filter" className="shrink-0 pl-1 text-xs font-semibold text-gray-400">시즌</label>
+                <select id="player-season-filter" name="season" defaultValue={seasonFilter ?? ""}
+                  className="min-w-0 flex-1 rounded-lg bg-[#272c35] px-2 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-lime-400/50">
+                  <option value="">전체 시즌</option>
+                  {availableSeasonIds.map((id) => (
+                    <option key={id} value={id}>
+                      {seasonMap.get(id)?.className ?? `시즌 ${id}`}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="shrink-0 rounded-lg bg-white/10 px-4 py-2 text-xs font-bold text-white hover:bg-white/20">적용</button>
+              </form>
+
+              <div className="grid gap-2 md:grid-cols-2 md:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                 {results.map((player) => {
                   const seasonId = Math.floor(player.id / 1_000_000);
                   const season = seasonMap.get(seasonId);
@@ -436,9 +460,24 @@ function PlayerCard({
   ovrInfo?: PlayerOvrInfo | null;
 }) {
   return (
-    <Link
+    <>
+      <Link
+        href={`/players/${player.id}`}
+        className="group flex min-h-20 items-center gap-3 rounded-xl border border-white/10 bg-[#181b21] px-3 py-2.5 transition hover:border-lime-400/40 md:hidden"
+      >
+        <div className="flex h-16 w-16 shrink-0 items-end justify-center overflow-hidden rounded-lg bg-white/[0.05]">
+          <PlayerArtwork spid={player.id} alt={player.name} className="max-h-full max-w-full object-contain" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="text-[11px] font-bold text-lime-300">{season?.className ?? "시즌 미확인"}</span>
+          <h3 className="mt-0.5 whitespace-normal break-words text-sm font-bold leading-5">{player.name}</h3>
+          {ovrInfo && <p className="mt-1 text-xs text-gray-400">OVR {ovrInfo.ovr} · {ovrInfo.position}</p>}
+        </div>
+        <span aria-hidden className="shrink-0 text-xl text-gray-600">›</span>
+      </Link>
+      <Link
       href={`/players/${player.id}`}
-      className="group overflow-hidden rounded-2xl border border-white/10 bg-[#181b21] transition hover:-translate-y-1 hover:border-lime-400/50"
+      className="group hidden overflow-hidden rounded-2xl border border-white/10 bg-[#181b21] transition hover:-translate-y-1 hover:border-lime-400/50 md:block"
     >
       <div className="relative flex h-[340px] items-end justify-center overflow-hidden bg-gradient-to-b from-white/5 to-transparent sm:h-[370px]">
         {season?.seasonImg && (
@@ -470,5 +509,6 @@ function PlayerCard({
         <h3 className="mt-3 text-lg font-bold">{player.name}</h3>
       </div>
     </Link>
+    </>
   );
 }

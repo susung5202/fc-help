@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import RefreshAlertButton from "@/components/RefreshAlertButton";
 import RefreshReportButton from "@/components/RefreshReportButton";
 import RefreshReportSummary from "@/components/RefreshReportSummary";
+import { RefreshFavoritesProvider, RefreshFavoriteButton } from "@/components/RefreshFavorites";
 import PlayerArtwork from "@/components/PlayerArtwork";
 
 type Player = {
@@ -73,6 +74,7 @@ export default async function RefreshDetailPage({
   const seasonName = season?.className ?? "시즌 미확인";
 
   return (
+    <RefreshFavoritesProvider>
     <main className="min-h-screen bg-[#0f1115] text-white">
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -148,6 +150,11 @@ export default async function RefreshDetailPage({
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
+              <RefreshFavoriteButton
+                playerSpid={player.id}
+                playerName={player.name}
+                seasonName={seasonName}
+              />
               <RefreshAlertButton
                 playerSpid={player.id}
                 playerName={player.name}
@@ -173,5 +180,6 @@ export default async function RefreshDetailPage({
         FC Help · FC Online Data & Community
       </footer>
     </main>
+    </RefreshFavoritesProvider>
   );
 }

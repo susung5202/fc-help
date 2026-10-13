@@ -121,7 +121,7 @@ export default function CommunityDetail({ id }: { id: string }) {
   const images = Array.isArray(post.image_urls) ? post.image_urls : [];
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
+    <div className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-6 sm:py-10">
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link href="/community" className="text-sm font-bold text-gray-400 hover:text-white">← 커뮤니티</Link>
         <div className="flex items-center gap-2">
@@ -138,7 +138,7 @@ export default function CommunityDetail({ id }: { id: string }) {
 
       <article className="rounded-2xl border border-white/10 bg-[#15191d] p-4 sm:p-6">
         <div className="flex items-start gap-3">
-          <Link href={`/profile/${author?.username || post.author_id}`} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-sm font-black text-lime-200">
+          <Link href={`/profile/${author?.username || post.author_id}`} className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-sm font-black text-lime-200 sm:h-11 sm:w-11">
             {author?.avatar_url ? <img src={author.avatar_url} alt="" className="h-full w-full object-cover" /> : authorInitial}
           </Link>
           <div className="min-w-0 flex-1">
@@ -150,17 +150,17 @@ export default function CommunityDetail({ id }: { id: string }) {
           </div>
         </div>
 
-        <div className="mt-5 flex items-center gap-2">
-          <span className="rounded-md border border-lime-300/15 bg-lime-300/[0.05] px-2 py-1 text-[10px] font-black text-lime-200">{CATEGORY_LABEL[post.category]}</span>
-          <h1 className="text-xl font-black leading-8 text-white sm:text-2xl">{post.title}</h1>
+        <div className="mt-4">
+          <span className="inline-block rounded-md border border-lime-300/15 bg-lime-300/[0.05] px-2 py-1 text-[10px] font-black text-lime-200">{CATEGORY_LABEL[post.category]}</span>
+          <h1 className="mt-2 break-words text-xl font-black leading-7 text-white sm:text-2xl sm:leading-8">{post.title}</h1>
         </div>
-        <p className="mt-5 min-h-32 whitespace-pre-wrap break-words text-sm leading-7 text-gray-200 sm:text-base">{post.content}</p>
+        <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-gray-200 sm:mt-5 sm:min-h-32 sm:text-base sm:leading-7">{post.content}</p>
 
         {images.length > 0 && (
           <div className={`mt-5 grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
             {images.map((url, index) => (
               <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
-                <img src={url} alt={`게시글 첨부 이미지 ${index + 1}`} className={`w-full object-cover ${images.length === 1 ? "max-h-[640px]" : "aspect-square"}`} />
+                <img src={url} alt={`게시글 첨부 이미지 ${index + 1}`} className={`w-full object-contain ${images.length === 1 ? "max-h-80 sm:max-h-[640px]" : "aspect-square sm:object-cover"}`} />
               </a>
             ))}
           </div>
@@ -170,7 +170,7 @@ export default function CommunityDetail({ id }: { id: string }) {
           <button type="button" onClick={() => void toggleLike()} className={`rounded-xl border px-4 py-2.5 text-sm font-black transition ${liked ? "border-rose-300/35 bg-rose-400/10 text-rose-300" : "border-white/10 text-gray-300 hover:bg-white/5"}`}>
             {liked ? "♥ 좋아요" : "♡ 좋아요"} {likeCount}
           </button>
-          <span className="text-xs font-bold text-gray-500">댓글 {commentCount}</span>
+          <a href="#comments" className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-400 transition hover:border-lime-300/30 hover:text-lime-200">댓글 {commentCount}개 ↓</a>
         </div>
       </article>
 

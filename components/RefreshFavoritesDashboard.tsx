@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import PlayerArtwork from "@/components/PlayerArtwork";
+import RefreshAlertButton from "@/components/RefreshAlertButton";
 import { useFavorites } from "@/components/RefreshFavorites";
 import { createClient } from "@/lib/supabase/client";
 import { resolveRefreshPattern, type RefreshHourType } from "@/lib/refresh/resolvePattern";
@@ -390,14 +391,13 @@ export default function RefreshFavoritesDashboard() {
               const nextAt = hasPattern && nowMs !== null
                 ? nextRefreshAt(info.hourType!, info.minute!, nowMs)
                 : null;
-              const alertBefore = alertsBySpid[item.player_spid];
 
               return (
                 <article
                   key={item.player_spid}
                   className={"flex min-h-[82px] w-full items-center gap-3 rounded-xl border bg-[#171b21] px-3 py-2.5 transition sm:gap-4 sm:px-4 " +
                     (isRefreshing
-                      ? "refresh-window-border border-lime-300/60"
+                      ? "refresh-window-player border-lime-300/75"
                       : "border-white/10")}
                 >
                   <Link
@@ -437,7 +437,7 @@ export default function RefreshFavoritesDashboard() {
                   <div className="flex w-[94px] shrink-0 flex-col items-end justify-center gap-1 sm:w-[150px]">
                     {isRefreshing ? (
                       <p className="refresh-window-text text-right text-sm font-black text-lime-200 sm:text-base">
-                        갱신 진행 중
+                        갱신 예상 시각
                       </p>
                     ) : nextAt !== null && nowMs !== null ? (
                       <>
@@ -451,11 +451,20 @@ export default function RefreshFavoritesDashboard() {
                     ) : (
                       <p className="text-right text-xs text-gray-500">시간 확인 중</p>
                     )}
-                    {alertBefore !== undefined && (
-                      <span className="text-[10px] font-medium text-blue-200" title={alertBefore === 0 ? "갱신 시각 알림" : alertBefore + "분 전 알림"}>
-                        🔔 알림 중
-                      </span>
-                    )}
+                    <RefreshAlertButton
+                      playerSpid={item.player_spid}
+                      playerName={item.player_name}
+                      seasonName={item.season_name}
+                      compact
+                      onAlertChange={(minutesBefore) =>
+                        setAlertsBySpid((previous) => {
+                          const updated = { ...previous };
+                          if (minutesBefore === null) delete updated[item.player_spid];
+                          else updated[item.player_spid] = minutesBefore;
+                          return updated;
+                        })
+                      }
+                    />
                     <button
                       type="button"
                       onClick={() => void removeFavorite(item)}

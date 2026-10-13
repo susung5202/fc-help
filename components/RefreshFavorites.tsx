@@ -81,9 +81,12 @@ export function RefreshFavoritesProvider({ children }: { children: ReactNode }) 
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") void load();
     });
+    const onAlertSaved = () => void load();
+    window.addEventListener("fc-help-refresh-favorites-changed", onAlertSaved);
     return () => {
       active = false;
       listener.subscription.unsubscribe();
+      window.removeEventListener("fc-help-refresh-favorites-changed", onAlertSaved);
     };
   }, [supabase]);
 

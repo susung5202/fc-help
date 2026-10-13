@@ -145,6 +145,7 @@ export default function CommunityDetail({ id }: { id: string }) {
   const author = profiles[post.author_id];
   const authorInitial = (author?.display_name || "F").trim().slice(0, 1).toUpperCase();
   const isOwner = viewerId === post.author_id;
+  const canEditPost = isOwner && (!post.is_notice || isAdmin);
   const images = Array.isArray(post.image_urls) ? post.image_urls : [];
 
   return (
@@ -158,12 +159,12 @@ export default function CommunityDetail({ id }: { id: string }) {
               {changingNotice ? "변경 중..." : post.is_notice ? "📌 공지 해제" : "📌 공지 고정"}
             </button>
           )}
-          {isOwner ? (
+          {canEditPost ? (
             <>
               <Link href={`/community/${post.id}/edit`} className="rounded-lg border border-white/15 px-3 py-2 text-xs font-bold text-gray-200 hover:bg-white/5">수정</Link>
               <button type="button" onClick={() => void deletePost()} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs font-bold text-red-300 hover:bg-red-400/5">게시글 삭제</button>
             </>
-          ) : (
+          ) : !isOwner ? (
             <ReportButton targetType="community_post" targetId={post.id} reportedUserId={post.author_id} viewerId={viewerId} className="rounded-lg border border-red-400/15 px-3 py-2 text-xs font-bold text-red-300/80 hover:bg-red-400/5" />
           )}
         </div>

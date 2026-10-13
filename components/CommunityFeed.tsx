@@ -156,14 +156,14 @@ export default function CommunityFeed() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-      <div className="flex items-end justify-between gap-4">
+    <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-10">
+      <div className="flex items-center justify-between gap-2 sm:items-end sm:gap-4">
         <div>
           <p className="text-xs font-black tracking-[0.16em] text-lime-400">COMMUNITY</p>
-          <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">FC Help 커뮤니티</h1>
-          <p className="mt-2 text-sm text-gray-500">FC Online 이야기, 질문, 스쿼드와 팁을 자유롭게 나눠보세요.</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-4xl">FC Help 커뮤니티</h1>
+          <p className="mt-2 hidden text-sm text-gray-500 sm:block">FC Online 이야기, 질문, 스쿼드와 팁을 자유롭게 나눠보세요.</p>
         </div>
-        <Link href="/community/write" className="shrink-0 rounded-xl bg-lime-300 px-4 py-3 text-sm font-black text-black transition hover:bg-lime-200">글쓰기</Link>
+        <Link href="/community/write" className="shrink-0 rounded-xl bg-lime-300 px-3 py-2.5 text-xs font-black text-black transition hover:bg-lime-200 sm:px-4 sm:py-3 sm:text-sm">글쓰기</Link>
       </div>
 
       <form onSubmit={submitSearch} className="mt-6 flex gap-2">
@@ -198,6 +198,8 @@ export default function CommunityFeed() {
         ))}
       </div>
 
+      {!loading && !error && <p className="mt-2 text-xs text-gray-500">{posts.length}개 게시글 · {mode === "popular" ? "최근 7일 인기순" : "최신순"}</p>}
+
       {searchTerm && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3.5 py-2.5 text-xs">
           <p className="min-w-0 truncate text-gray-400"><span className="font-black text-white">“{searchTerm}”</span> 검색 결과</p>
@@ -207,7 +209,7 @@ export default function CommunityFeed() {
 
       {error && <div className="mt-5 rounded-xl border border-amber-300/15 bg-amber-300/5 px-4 py-3 text-xs text-amber-100">{error}</div>}
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-[#15191d]">
+      <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-[#15191d] sm:mt-5 sm:rounded-2xl">
         {loading ? (
           <div className="py-20 text-center text-sm text-gray-500">게시글을 불러오는 중...</div>
         ) : posts.length === 0 ? (
@@ -228,9 +230,9 @@ export default function CommunityFeed() {
               const comments = commentCounts[post.id] ?? 0;
               const popularScore = likes * 2 + comments;
               return (
-                <article key={post.id} className="px-4 py-4 transition hover:bg-white/[0.025] sm:px-5">
-                  <div className="flex items-start gap-3">
-                    <Link href={`/profile/${profile?.username || post.author_id}`} className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-xs font-black text-lime-200">
+                <article key={post.id} className="px-3 py-3 transition hover:bg-white/[0.025] sm:px-5 sm:py-4">
+                  <div className="flex items-start gap-2.5 sm:gap-3">
+                    <Link href={`/profile/${profile?.username || post.author_id}`} className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-xs font-black text-lime-200 sm:h-9 sm:w-9">
                       {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : initial}
                     </Link>
                     <div className="min-w-0 flex-1">
@@ -240,15 +242,15 @@ export default function CommunityFeed() {
                         {profile?.username && <span>@{profile.username}</span>}
                         <span>·</span><span>{timeAgo(post.created_at)}</span>
                       </div>
-                      <Link href={`/community/${post.id}`} className="mt-1.5 block">
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-md border border-lime-300/15 bg-lime-300/[0.05] px-2 py-1 text-[10px] font-black text-lime-200">{CATEGORY_LABEL[post.category]}</span>
-                          {mode === "popular" && popularScore > 0 && <span className="rounded-md border border-rose-300/15 bg-rose-400/[0.05] px-2 py-1 text-[10px] font-black text-rose-300">HOT {popularScore}</span>}
-                          <h2 className="min-w-0 truncate text-base font-black text-white sm:text-lg">{post.title}</h2>
+                      <Link href={`/community/${post.id}`} className="mt-1.5 block rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-300">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-md border border-lime-300/15 bg-lime-300/[0.05] px-1.5 py-0.5 text-[10px] font-black text-lime-200 sm:px-2 sm:py-1">{CATEGORY_LABEL[post.category]}</span>
+                          {mode === "popular" && popularScore > 0 && <span className="rounded-md border border-rose-300/15 bg-rose-400/[0.05] px-1.5 py-0.5 text-[10px] font-black text-rose-300">HOT {popularScore}</span>}
                         </div>
-                        <p className="mt-2 line-clamp-2 whitespace-pre-wrap text-sm leading-6 text-gray-400">{post.content}</p>
+                        <h2 className="mt-1.5 line-clamp-2 break-words text-sm font-black leading-5 text-white sm:text-lg sm:leading-7">{post.title}</h2>
+                        <p className="mt-1 line-clamp-1 whitespace-pre-wrap text-xs leading-5 text-gray-500 sm:mt-2 sm:line-clamp-2 sm:text-sm sm:leading-6 sm:text-gray-400">{post.content}</p>
                       </Link>
-                      <div className="mt-3 flex gap-4 text-[11px] font-bold text-gray-600">
+                      <div className="mt-2 flex gap-4 text-[11px] font-bold text-gray-500 sm:mt-3">
                         <span>♥ {likes}</span><span>댓글 {comments}</span>
                       </div>
                     </div>

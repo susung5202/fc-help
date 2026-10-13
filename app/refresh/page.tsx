@@ -463,9 +463,9 @@ async function getObservationHintMap(
 export default async function RefreshPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string; season?: string }>;
 }) {
-  const { q = "", sort = "default" } = await searchParams;
+  const { q = "", sort = "default", season: seasonParam = "" } = await searchParams;
   const query = q.trim();
   const sortMode: SortMode =
     sort === "ovr" ? "ovr" : sort === "nearest" ? "nearest" : "default";
@@ -481,14 +481,21 @@ export default async function RefreshPage({
     seasons.map((season) => [Number(season.seasonId), season])
   );
 
-  const matchedPlayers = query
-    ? players
-        .filter((player) =>
-          player.name.toLowerCase().includes(query.toLowerCase())
-        )
-        .sort((a, b) => b.id - a.id)
-        .slice(0, 100)
+  const queryMatches = query
+    ? players.filter((player) =>
+        player.name.toLowerCase().includes(query.toLowerCase())
+      )
     : [];
+  const availableSeasonIds = [...new Set(
+    queryMatches.map((player) => Math.floor(player.id / 1_000_000))
+  )].sort((a, b) => b - a);
+  const seasonFilter = seasonParam && availableSeasonIds.includes(Number(seasonParam))
+    ? Number(seasonParam)
+    : null;
+  const matchedPlayers = queryMatches
+    .filter((player) => seasonFilter === null || Math.floor(player.id / 1_000_000) === seasonFilter)
+    .sort((a, b) => b.id - a.id)
+    .slice(0, 100);
 
   const [ovrMap, nearestRefreshMap, observationHintMap] = await Promise.all([
     query && sortMode === "ovr"
@@ -589,20 +596,21 @@ export default async function RefreshPage({
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-6 py-16">
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-16">
         <p className="text-sm font-semibold text-lime-400">REFRESH TIME</p>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-4xl font-bold">갱신시간</h1>
-          <Link href="/refresh/favorites" className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2.5 text-sm font-bold text-amber-200 transition hover:bg-amber-300/15">★ 내 즐겨찾기</Link>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+          <h1 className="text-3xl font-bold sm:text-4xl">갱신시간</h1>
+          <Link href="/refresh/favorites" className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-200 transition hover:bg-amber-300/15 sm:px-4 sm:py-2.5 sm:text-sm">★ 내 즐겨찾기</Link>
         </div>
-        <p className="mt-3 text-gray-400">
-          선수별 2시간 거래량 갱신 기준 시각을 확인하고 알림을 설정할 수 있습니다. 기준가·상한가·하한가는 이 시각 이후 약 0~20분 사이에 변동될 수 있습니다.
+        <p className="mt-2 text-sm leading-6 text-gray-400 sm:mt-3 sm:text-base">
+          선수별 갱신시간을 검색하고 즐겨찾기·알림을 설정하세요.
+          <span className="hidden sm:inline"> 2시간 거래량 갱신 기준값이며 기준가 변동은 이후 약 0~20분 사이에 발생할 수 있습니다.</span>
         </p>
 
         <form
           action="/refresh"
           method="GET"
-          className="mt-10 flex max-w-3xl rounded-2xl border border-white/10 bg-[#181b21] p-2"
+          className="mt-6 flex max-w-3xl rounded-2xl border border-white/10 bg-[#181b21] p-1.5 sm:mt-10 sm:p-2"
         >
           <input type="hidden" name="sort" value={sortMode} />
           <input
@@ -610,26 +618,26 @@ export default async function RefreshPage({
             name="q"
             defaultValue={query}
             placeholder="갱신시간을 확인할 선수 이름을 검색하세요"
-            className="flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none placeholder:text-gray-500"
+            className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-gray-500 sm:px-4 sm:py-3"
           />
           <button
             type="submit"
-            className="rounded-xl bg-lime-400 px-6 py-3 text-sm font-bold text-black transition hover:bg-lime-300"
+            className="shrink-0 rounded-xl bg-lime-400 px-4 py-2.5 text-sm font-bold text-black transition hover:bg-lime-300 sm:px-6 sm:py-3"
           >
             검색
           </button>
         </form>
 
-        <div className="mt-12">
+        <div className="mt-7 sm:mt-12">
           {!query ? (
             <div>
-              <div className="rounded-2xl border border-lime-300/15 bg-lime-300/[0.04] px-5 py-5 sm:px-6">
+              <div className="rounded-2xl border border-lime-300/15 bg-lime-300/[0.04] px-4 py-4 sm:px-6 sm:py-5">
                 <p className="text-xs font-black tracking-[0.14em] text-lime-400">DATA BOOTSTRAP</p>
                 <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <h2 className="text-2xl font-black">바로 확인 가능한 갱신시간</h2>
-                    <p className="mt-2 text-sm leading-6 text-gray-400">
-                      출처가 표시된 초기 공개 참고값 {showcase.count}장을 먼저 제공하고, FC Help 유저 제보가 쌓이면 제보 결과로 계속 보정합니다.
+                    <h2 className="text-xl font-black sm:text-2xl">바로 확인 가능한 갱신시간</h2>
+                    <p className="mt-2 text-xs leading-5 text-gray-400 sm:text-sm sm:leading-6">
+                      공개 참고값 {showcase.count}장 · 유저 제보와 교차 검증하며 개선하고 있습니다. 미검증 자료일 수 있습니다.
                     </p>
                   </div>
                   <span className="rounded-full border border-lime-300/20 bg-black/20 px-3 py-1.5 text-xs font-black text-lime-200">
@@ -639,7 +647,7 @@ export default async function RefreshPage({
               </div>
 
               {showcaseCards.length > 0 ? (
-                <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="mt-4 grid gap-2 md:mt-6 md:grid-cols-2 md:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                   {showcaseCards.map(({ player, refresh }) => {
                     const seasonId = Math.floor(player.id / 1_000_000);
                     const season = seasonMap.get(seasonId);
@@ -666,7 +674,7 @@ export default async function RefreshPage({
                   </p>
                   <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
                     <div>
-                      <h2 className="text-2xl font-black">갱신시간 요청 많은 선수</h2>
+                      <h2 className="text-xl font-black sm:text-2xl">갱신시간 요청 많은 선수</h2>
                       <p className="mt-2 text-sm leading-6 text-gray-400">
                         아직 기준값이 없는 선수 중 갱신 알림 등록이 많은 순서입니다.
                         먼저 알림을 등록해두면 데이터가 확보된 뒤 기존 설정으로 알림이 적용됩니다.
@@ -674,7 +682,7 @@ export default async function RefreshPage({
                     </div>
                   </div>
 
-                  <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="mt-4 grid gap-2 md:mt-6 md:grid-cols-2 md:gap-5 lg:grid-cols-4">
                     {demandCards.map(({ player, requestCount }) => {
                       const seasonId = Math.floor(player.id / 1_000_000);
                       const season = seasonMap.get(seasonId);
@@ -697,8 +705,13 @@ export default async function RefreshPage({
                 &apos;{query}&apos; 검색 결과가 없습니다.
               </p>
               <p className="mt-2 text-sm text-gray-500">
-                다른 선수 이름으로 검색해보세요.
+                다른 선수 이름이나 시즌으로 검색해보세요.
               </p>
+              {seasonFilter !== null && (
+                <Link href={`/refresh?q=${encodeURIComponent(query)}&sort=${sortMode}`} className="mt-5 inline-block rounded-xl bg-lime-400 px-4 py-2.5 text-sm font-bold text-black">
+                  시즌 필터 해제
+                </Link>
+              )}
             </div>
           ) : (
             <>
@@ -707,25 +720,25 @@ export default async function RefreshPage({
                   <p className="text-sm text-gray-500">검색 결과</p>
                   <h2 className="mt-1 text-2xl font-bold">{query}</h2>
                   <span className="mt-1 block text-sm text-gray-500">
-                    {results.length}개
+                    {seasonFilter === null ? "전체 시즌" : seasonMap.get(seasonFilter)?.className ?? "선택 시즌"} · {results.length}개{results.length === 100 ? " (최대 100개)" : ""}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   <SortLink
-                    href={`/refresh?q=${encodeURIComponent(query)}&sort=default`}
+                    href={`/refresh?q=${encodeURIComponent(query)}&sort=default${seasonFilter === null ? "" : `&season=${seasonFilter}`}`}
                     active={sortMode === "default"}
                   >
                     기본순
                   </SortLink>
                   <SortLink
-                    href={`/refresh?q=${encodeURIComponent(query)}&sort=ovr`}
+                    href={`/refresh?q=${encodeURIComponent(query)}&sort=ovr${seasonFilter === null ? "" : `&season=${seasonFilter}`}`}
                     active={sortMode === "ovr"}
                   >
                     OVR 높은순
                   </SortLink>
                   <SortLink
-                    href={`/refresh?q=${encodeURIComponent(query)}&sort=nearest`}
+                    href={`/refresh?q=${encodeURIComponent(query)}&sort=nearest${seasonFilter === null ? "" : `&season=${seasonFilter}`}`}
                     active={sortMode === "nearest"}
                   >
                     가까운 갱신시간순
@@ -733,7 +746,22 @@ export default async function RefreshPage({
                 </div>
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <form action="/refresh" method="GET" className="mb-4 flex items-center gap-2 rounded-xl border border-white/10 bg-[#181b21] p-2 sm:max-w-lg">
+                <input type="hidden" name="q" value={query} />
+                <input type="hidden" name="sort" value={sortMode} />
+                <label htmlFor="refresh-season-filter" className="shrink-0 pl-1 text-xs font-semibold text-gray-400">시즌</label>
+                <select id="refresh-season-filter" name="season" defaultValue={seasonFilter ?? ""}
+                  className="min-w-0 flex-1 rounded-lg bg-[#272c35] px-2 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-lime-400/50">
+                  <option value="">전체 시즌</option>
+                  {availableSeasonIds.map((id) => (
+                    <option key={id} value={id}>
+                      {seasonMap.get(id)?.className ?? `시즌 ${id}`}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="shrink-0 rounded-lg bg-white/10 px-4 py-2 text-xs font-bold text-white hover:bg-white/20">적용</button>
+              </form>
+              <div className="grid gap-2 md:grid-cols-2 md:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                 {results.map((player) => {
                   const seasonId = Math.floor(player.id / 1_000_000);
                   const season = seasonMap.get(seasonId);
@@ -799,17 +827,17 @@ function RefreshPlayerCard({
   observationHint?: string;
 }) {
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#181b21] transition hover:-translate-y-1 hover:border-lime-400/50">
+    <article className="group relative overflow-hidden rounded-xl border border-white/10 bg-[#181b21] transition hover:border-lime-400/50 md:rounded-2xl md:hover:-translate-y-1">
       <Link
         href={`/refresh/${player.id}`}
-        className="block"
+        className="flex min-h-20 items-center gap-3 py-2.5 pl-3 pr-12 md:block md:p-0"
       >
-      <div className="relative flex h-56 items-end justify-center overflow-hidden bg-gradient-to-b from-white/5 to-transparent">
+      <div className="relative flex h-16 w-16 shrink-0 items-end justify-center overflow-hidden rounded-lg bg-gradient-to-b from-white/5 to-transparent md:h-56 md:w-full md:rounded-none">
         {season?.seasonImg && (
           <img
             src={season.seasonImg}
             alt={season.className}
-            className="absolute left-4 top-4 h-7 object-contain"
+            className="absolute left-1 top-1 h-4 max-w-12 object-contain md:left-4 md:top-4 md:h-7 md:max-w-none"
           />
         )}
 
@@ -820,9 +848,9 @@ function RefreshPlayerCard({
         />
       </div>
 
-      <div className="p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-lime-400/10 px-2 py-1 text-xs font-bold text-lime-400">
+      <div className="min-w-0 flex-1 md:p-5">
+        <div className="flex flex-wrap items-center gap-1 md:gap-2">
+          <span className="rounded-md bg-lime-400/10 px-1.5 py-0.5 text-[10px] font-bold text-lime-400 md:px-2 md:py-1 md:text-xs">
             {season?.className ?? "시즌 미확인"}
           </span>
           {ovrInfo && (
@@ -831,21 +859,21 @@ function RefreshPlayerCard({
             </span>
           )}
         </div>
-        <h3 className="mt-3 text-lg font-bold">{player.name}</h3>
+        <h3 className="mt-1 whitespace-normal break-words text-sm font-bold leading-5 md:mt-3 md:text-lg">{player.name}</h3>
         {nearestRefresh ? (
-          <p className="mt-2 text-sm font-semibold text-lime-300">
-            다음 갱신 구간 시작 {nearestRefresh.label}
+          <p className="mt-1 text-xs font-semibold leading-5 text-lime-300 md:mt-2 md:text-sm">
+            <span className="hidden md:inline">다음 갱신 구간 시작 </span>{nearestRefresh.label}
           </p>
         ) : observationHint ? (
-          <p className="mt-2 text-sm font-semibold text-violet-200">
+          <p className="mt-1 text-xs font-semibold leading-5 text-violet-200 md:mt-2 md:text-sm">
             {observationHint}
           </p>
         ) : demandCount ? (
-          <p className="mt-2 text-sm font-semibold text-amber-200">
+          <p className="mt-1 text-xs font-semibold text-amber-200 md:mt-2 md:text-sm">
             알림 요청 {demandCount}건 · 첫 제보 기다리는 중
           </p>
         ) : (
-          <p className="mt-2 text-sm text-gray-500">갱신시간 확인하기 →</p>
+          <p className="mt-1 text-xs text-gray-500 md:mt-2 md:text-sm">갱신시간 확인하기 →</p>
         )}
       </div>
       </Link>

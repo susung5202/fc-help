@@ -356,12 +356,25 @@ async function getObservationHintMap(
 
   try {
     const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("refresh_observations")
-      .select("player_spid, player_name, season_name, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_status")
-      .limit(500);
+    const selectFields =
+      "player_spid, player_name, season_name, observation_kind, start_hour_type, start_minute, end_hour_type, end_minute, source_status";
+    const [linked, unlinked] = await Promise.all([
+      supabase
+        .from("refresh_observations")
+        .select(selectFields)
+        .in("player_spid", players.map((player) => player.id))
+        .order("source_observed_date", { ascending: false })
+        .limit(1000),
+      supabase
+        .from("refresh_observations")
+        .select(selectFields)
+        .is("player_spid", null)
+        .in("player_name", Array.from(new Set(players.map((player) => player.name))))
+        .limit(500),
+    ]);
 
-    if (error) throw error;
+    if (linked.error || unlinked.error) throw linked.error ?? unlinked.error;
+    const data = [...(linked.data ?? []), ...(unlinked.data ?? [])];
 
     type HintRow = {
       player_spid: number | string | null;

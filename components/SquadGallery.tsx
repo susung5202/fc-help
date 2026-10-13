@@ -129,12 +129,12 @@ export default function SquadGallery() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+    <div className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 sm:py-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-black tracking-[0.18em] text-lime-400">SQUAD GALLERY</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">스쿼드 갤러리</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
+          <h1 className="mt-1 text-2xl font-black tracking-tight sm:mt-2 sm:text-5xl">스쿼드 갤러리</h1>
+          <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-gray-400 sm:block">
             다른 구단주의 스쿼드를 구경하고, 마음에 드는 스쿼드는 그대로 복사해서 내 스쿼드로 수정할 수 있습니다.
           </p>
         </div>
@@ -143,19 +143,19 @@ export default function SquadGallery() {
         </Link>
       </div>
 
-      <div className="mt-7 rounded-2xl border border-white/10 bg-[#171b1f] p-3 sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="mt-4 rounded-xl border border-white/10 bg-[#171b1f] p-2.5 sm:mt-7 sm:rounded-2xl sm:p-4">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 sm:flex sm:gap-3">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="제목, 작성자, 선수, 팀컬러 통합 검색"
-            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-lime-400/50"
+            className="col-span-2 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-sm text-white outline-none placeholder:text-gray-600 focus:border-lime-400/50 sm:col-span-1 sm:px-4 sm:py-3"
           />
 
           <button
             type="button"
             onClick={() => setShowFilters((value) => !value)}
-            className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition ${
+            className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-black transition sm:px-4 sm:py-3 sm:text-sm ${
               showFilters || activeFilterCount > 0
                 ? "border-lime-300/40 bg-lime-300/10 text-lime-300"
                 : "border-white/10 text-gray-300 hover:bg-white/5"
@@ -170,11 +170,11 @@ export default function SquadGallery() {
             <span className={`text-[9px] transition ${showFilters ? "rotate-180" : ""}`}>▼</span>
           </button>
 
-          <div className="grid grid-cols-2 gap-2 sm:w-56">
-            <button type="button" onClick={() => setSort("latest")} className={`rounded-xl border px-3 py-3 text-sm font-black transition ${sort === "latest" ? "border-lime-300/40 bg-lime-300/10 text-lime-300" : "border-white/10 text-gray-400 hover:bg-white/5"}`}>
+          <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:w-56 sm:gap-2">
+            <button type="button" onClick={() => setSort("latest")} className={`rounded-xl border px-2 py-2.5 text-xs font-black transition sm:px-3 sm:py-3 sm:text-sm ${sort === "latest" ? "border-lime-300/40 bg-lime-300/10 text-lime-300" : "border-white/10 text-gray-400 hover:bg-white/5"}`}>
               최신
             </button>
-            <button type="button" onClick={() => setSort("popular")} className={`rounded-xl border px-3 py-3 text-sm font-black transition ${sort === "popular" ? "border-lime-300/40 bg-lime-300/10 text-lime-300" : "border-white/10 text-gray-400 hover:bg-white/5"}`}>
+            <button type="button" onClick={() => setSort("popular")} className={`rounded-xl border px-2 py-2.5 text-xs font-black transition sm:px-3 sm:py-3 sm:text-sm ${sort === "popular" ? "border-lime-300/40 bg-lime-300/10 text-lime-300" : "border-white/10 text-gray-400 hover:bg-white/5"}`}>
               인기
             </button>
           </div>
@@ -249,7 +249,7 @@ export default function SquadGallery() {
         )}
       </div>
 
-      <div className="mt-3 space-y-4">
+      <div className="mt-3 space-y-2.5 sm:space-y-4">
         {loading && <div className="rounded-2xl border border-white/10 bg-[#171b1f] py-16 text-center text-sm text-gray-500">스쿼드를 불러오는 중...</div>}
         {!loading && error && <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5 text-sm text-red-300">{error}</div>}
         {!loading && !error && filtered.length === 0 && (

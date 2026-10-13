@@ -213,8 +213,8 @@ export default function ThreadedComments({
     const own = viewerId === comment.user_id;
 
     return (
-      <div key={comment.id} className={isReply ? "ml-7 border-l border-white/10 pl-3 sm:ml-10 sm:pl-4" : ""}>
-        <div className="rounded-xl border border-white/[0.08] bg-black/10 p-3.5">
+      <div key={comment.id} className={isReply ? "ml-3 border-l border-white/10 pl-2 sm:ml-10 sm:pl-4" : ""}>
+        <div className="rounded-xl border border-white/[0.08] bg-black/10 p-2.5 sm:p-3.5">
           <div className="flex items-start justify-between gap-3">
             <Link href={`/profile/${profile?.username || comment.user_id}`} className="inline-flex min-w-0 items-center gap-2 transition hover:text-lime-300">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-[10px] font-black text-lime-200">
@@ -254,9 +254,9 @@ export default function ThreadedComments({
           </div>
 
           {!isReply && replyTo === comment.id && (
-            <div className="mt-3 flex gap-2 border-t border-white/[0.06] pt-3">
+            <div className="mt-3 flex flex-col gap-2 border-t border-white/[0.06] pt-3 sm:flex-row">
               <textarea value={replyText} onChange={(event) => setReplyText(event.target.value)} maxLength={maxLength} rows={2} placeholder={`${displayName}님에게 답글 작성`} className="min-w-0 flex-1 resize-none rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-sm text-white outline-none placeholder:text-gray-600 focus:border-lime-300/35" />
-              <button type="button" disabled={busy} onClick={() => void submitReply(comment.id)} className="rounded-xl bg-lime-300 px-3 text-xs font-black text-black disabled:opacity-50">등록</button>
+              <button type="button" disabled={busy || !replyText.trim()} onClick={() => void submitReply(comment.id)} className="self-end rounded-xl bg-lime-300 px-4 py-2 text-xs font-black text-black disabled:opacity-50 sm:self-stretch">답글 등록</button>
             </div>
           )}
         </div>
@@ -271,15 +271,15 @@ export default function ThreadedComments({
   }
 
   return (
-    <section className="mt-5 rounded-2xl border border-white/10 bg-[#15191d] p-4 sm:p-5">
+    <section id="comments" className="mt-4 scroll-mt-20 rounded-xl border border-white/10 bg-[#15191d] p-3 sm:mt-5 sm:rounded-2xl sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-black">댓글 <span className="text-lime-300">{comments.length}</span></h2>
         {!viewerId && <Link href="/login" className="text-xs font-bold text-lime-300">로그인 후 작성</Link>}
       </div>
 
-      <div className="mt-4 flex gap-2">
-        <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={maxLength} rows={3} placeholder={viewerId ? placeholder : "로그인 후 댓글을 작성할 수 있습니다."} className="min-w-0 flex-1 resize-none rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-lime-300/40" />
-        <button type="button" disabled={busy} onClick={() => void submitTopLevel()} className="rounded-xl bg-lime-300 px-4 text-sm font-black text-black disabled:opacity-50">등록</button>
+      <div className="mt-3 flex flex-col gap-2 sm:mt-4 sm:flex-row">
+        <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={maxLength} rows={2} placeholder={viewerId ? placeholder : "로그인 후 댓글을 작성할 수 있습니다."} className="min-w-0 flex-1 resize-none rounded-xl border border-white/10 bg-[#0f1115] px-3 py-2.5 text-sm text-white outline-none placeholder:text-gray-600 focus:border-lime-300/40 sm:px-4 sm:py-3" />
+        <button type="button" disabled={busy || !content.trim()} onClick={() => void submitTopLevel()} className="self-end rounded-xl bg-lime-300 px-5 py-2.5 text-sm font-black text-black disabled:opacity-50 sm:self-stretch sm:px-4">댓글 등록</button>
       </div>
 
       {message && <p className="mt-3 text-xs text-amber-300">{message}</p>}

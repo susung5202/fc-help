@@ -127,7 +127,8 @@ export default function RefreshAlertButton({
     }
 
     setRegistered(true);
-    setMessage("알림이 등록되었습니다.");
+    window.dispatchEvent(new Event("fc-help-refresh-favorites-changed"));
+    setMessage("알림이 등록되었고 즐겨찾기에 추가되었습니다.");
     setLoading(false);
 
     setTimeout(() => {

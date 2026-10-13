@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { RefreshFavoritesProvider, RefreshFavoritesList } from "@/components/RefreshFavorites";
+import { RefreshFavoritesProvider } from "@/components/RefreshFavorites";
+import RefreshFavoritesDashboard from "@/components/RefreshFavoritesDashboard";
 
 export const metadata: Metadata = {
   title: "갱신시간 즐겨찾기 | FC Help",
@@ -19,9 +20,9 @@ export default function RefreshFavoritesPage() {
           <div className="mt-8">
             <p className="text-xs font-black tracking-[0.16em] text-amber-300">MY FAVORITES</p>
             <h1 className="mt-2 text-3xl font-black">갱신시간 즐겨찾기</h1>
-            <p className="mt-3 text-sm text-gray-400">즐겨찾기한 선수를 모아보고 갱신시간을 확인할 수 있습니다.</p>
+            <p className="mt-3 text-sm text-gray-400">즐겨찾기한 선수의 갱신시간과 남은 시간을 실시간으로 확인할 수 있습니다.</p>
           </div>
-          <RefreshFavoritesList />
+          <RefreshFavoritesDashboard />
         </div>
       </main>
     </RefreshFavoritesProvider>

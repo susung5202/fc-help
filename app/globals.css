@@ -29,3 +29,33 @@ body {
 main > header:first-child {
   display: none;
 }
+
+/* Short, gentle highlight only while a favorite reaches the 00–20s refresh window. */
+@keyframes refresh-clock-sparkle {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1);
+    text-shadow: 0 0 0 rgba(190, 242, 100, 0);
+  }
+  50% {
+    opacity: 0.66;
+    filter: brightness(1.35);
+    text-shadow: 0 0 12px rgba(190, 242, 100, 0.7);
+  }
+}
+@keyframes refresh-border-glow {
+  0%, 100% { border-color: rgba(190, 242, 100, 0.45); }
+  50% { border-color: rgba(190, 242, 100, 0.95); }
+}
+.refresh-window-text {
+  animation: refresh-clock-sparkle 1s ease-in-out infinite;
+}
+.refresh-window-border {
+  animation: refresh-border-glow 1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .refresh-window-text,
+  .refresh-window-border {
+    animation: none;
+  }
+}

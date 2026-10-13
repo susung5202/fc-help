@@ -80,17 +80,19 @@ function nextRefreshAt(hourType: ExactHour, minute: number, nowMs: number): numb
   return null;
 }
 
-const clockFormatter = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  weekday: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
+// 00~20초: 즐겨찾기 선수의 실제 갱신 주기가 시작된 직후만 강조한다.
+function isActiveRefreshWindow(hourType: ExactHour, minute: number, nowMs: number) {
+  const kstNow = new Date(nowMs + KST_OFFSET);
+  const hour = kstNow.getUTCHours();
+  return (
+    kstNow.getUTCMinutes() === minute &&
+    kstNow.getUTCSeconds() <= 20 &&
+    (hourType === "every" ||
+      (hourType === "odd" && hour % 2 === 1) ||
+      (hourType === "even" && hour % 2 === 0))
+  );
+}
+
 const timeFormatter = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
   hour: "2-digit",
@@ -297,6 +299,13 @@ export default function RefreshFavoritesDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, userId, spidKey]);
 
+  // 한 명이라도 00~20초 갱신 구간에 들어오면 공용 시계도 함께 반짝인다.
+  const anyRefreshActive = nowMs !== null && favorites.some((item) => {
+    const info = infoBySpid[item.player_spid];
+    return info?.hourType != null && info.minute != null &&
+      isActiveRefreshWindow(info.hourType, info.minute, nowMs);
+  });
+
   async function removeFavorite(item: typeof favorites[number]) {
     setActionError("");
     try {
@@ -312,122 +321,157 @@ export default function RefreshFavoritesDashboard() {
 
   return (
     <>
-      <div className="mt-7 rounded-2xl border border-lime-300/20 bg-[#171b21] p-5 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-black tracking-[0.12em] text-lime-300">
-              FC ONLINE 갱신 기준 시간
-            </p>
-            <p className="mt-2 font-mono text-2xl font-black tabular-nums sm:text-4xl">
-              {nowMs === null ? "--:--:--" : clockFormatter.format(new Date(nowMs))}
-            </p>
-          </div>
-          <span className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300">
-            {clockSource === "server"
-              ? "KST · 서버 시간 동기화"
-              : clockSource === "device"
-                ? "KST · 기기 시계(서버 연결 실패)"
-                : "시간 동기화 중"}
-          </span>
+      <section
+        aria-label="실시간 한국 시각"
+        className={"mt-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-2 rounded-xl border bg-[#171b21] px-4 py-3 transition sm:px-5 " +
+          (anyRefreshActive
+            ? "refresh-window-border border-lime-300/60"
+            : "border-white/10")}
+      >
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold tracking-wide text-gray-400">
+            FC 온라인 갱신 기준 시계 · KST
+          </p>
+          <p
+            className={"mt-0.5 font-mono text-2xl font-black tabular-nums tracking-tight sm:text-3xl " +
+              (anyRefreshActive ? "refresh-window-text text-lime-200" : "text-white")}
+          >
+            {nowMs === null ? "--:--:--" : timeFormatter.format(new Date(nowMs)) +
+              ":" + String(new Date(nowMs + KST_OFFSET).getUTCSeconds()).padStart(2, "0")}
+          </p>
         </div>
-        <p className="mt-3 text-xs leading-5 text-gray-500">
-          FC Help 서버 시각을 기준으로 실시간 표시합니다. 넥슨 게임 서버의 직접 측정 시계는 아니며,
-          FC 온라인 갱신시간 계산에 사용하는 한국 표준시(KST)입니다.
-        </p>
-      </div>
+        <div className="text-left sm:text-right">
+          <p className={"text-xs font-bold " +
+            (anyRefreshActive ? "text-lime-300" : "text-gray-400")}>
+            {anyRefreshActive ? "● 즐겨찾기 선수 갱신 구간" : clockSource === "server"
+              ? "● 서버 시간 동기화"
+              : clockSource === "device"
+                ? "● 기기 시간 기준"
+                : "시계 동기화 중"}
+          </p>
+          <p className="mt-1 text-[11px] text-gray-600">
+            넥슨 서버 직접 측정값이 아닌 FC Help 서버 기준
+          </p>
+        </div>
+      </section>
 
       {loading ? (
-        <p className="py-20 text-center text-sm text-gray-500">즐겨찾기를 불러오는 중...</p>
+        <p className="py-16 text-center text-sm text-gray-500">즐겨찾기를 불러오는 중...</p>
       ) : !userId ? (
-        <div className="mt-8 rounded-2xl border border-white/10 bg-[#171b21] px-6 py-20 text-center">
-          <p className="text-lg font-black">로그인 후 즐겨찾기를 사용할 수 있습니다.</p>
-          <Link href="/login" className="mt-6 inline-block rounded-xl bg-lime-400 px-5 py-3 text-sm font-bold text-black">
+        <div className="mt-5 rounded-xl border border-white/10 bg-[#171b21] px-5 py-12 text-center">
+          <p className="font-bold">로그인 후 즐겨찾기를 사용할 수 있습니다.</p>
+          <Link href="/login" className="mt-4 inline-block rounded-lg bg-lime-400 px-4 py-2.5 text-sm font-bold text-black">
             로그인하기 →
           </Link>
         </div>
       ) : favorites.length === 0 ? (
-        <div className="mt-8 rounded-2xl border border-white/10 bg-[#171b21] px-6 py-20 text-center">
-          <p className="text-lg font-black">저장한 선수가 없습니다.</p>
-          <p className="mt-2 text-sm text-gray-400">선수별 즐겨찾기나 갱신 알림을 등록하면 이곳에 표시됩니다.</p>
-          <Link href="/refresh" className="mt-6 inline-block rounded-xl bg-lime-400 px-5 py-3 text-sm font-bold text-black">
-            갱신시간 검색하기 →
+        <div className="mt-5 rounded-xl border border-white/10 bg-[#171b21] px-5 py-12 text-center">
+          <p className="font-bold">즐겨찾기한 선수가 없습니다.</p>
+          <p className="mt-1 text-xs text-gray-500">알림을 등록하거나 선수별 ☆ 버튼을 누르면 여기에 추가됩니다.</p>
+          <Link href="/refresh" className="mt-4 inline-block rounded-lg bg-lime-400 px-4 py-2.5 text-sm font-bold text-black">
+            선수 검색하기 →
           </Link>
         </div>
       ) : (
         <>
-          <p className="mt-6 text-sm text-gray-400">
-            저장 선수 {favorites.length}명 · 알림 등록 시 자동으로 즐겨찾기에 추가됩니다.
-          </p>
-          {dataError && <p role="alert" className="mt-3 text-sm text-red-300">{dataError}</p>}
-          {actionError && <p role="alert" className="mt-3 text-sm text-red-300">{actionError}</p>}
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-gray-500">
+            <span>즐겨찾기 {favorites.length}명</span>
+            <span>갱신 시작 후 20초 동안 강조 표시</span>
+          </div>
+          {dataError && <p role="alert" className="mt-2 text-xs text-red-300">{dataError}</p>}
+          {actionError && <p role="alert" className="mt-2 text-xs text-red-300">{actionError}</p>}
+
+          <div className="mt-3 flex flex-col gap-2.5">
             {favorites.map((item) => {
               const info = infoBySpid[item.player_spid];
-              const nextAt = info?.hourType != null && info.minute != null && nowMs !== null
-                ? nextRefreshAt(info.hourType, info.minute, nowMs)
+              const hasPattern = info?.hourType != null && info.minute != null;
+              const isRefreshing = hasPattern && nowMs !== null
+                ? isActiveRefreshWindow(info.hourType!, info.minute!, nowMs)
+                : false;
+              const nextAt = hasPattern && nowMs !== null
+                ? nextRefreshAt(info.hourType!, info.minute!, nowMs)
                 : null;
-              const activeAlertMinutes = alertsBySpid[item.player_spid];
+              const alertBefore = alertsBySpid[item.player_spid];
+
               return (
-                <article key={item.player_spid} className="overflow-hidden rounded-2xl border border-white/10 bg-[#181b21]">
-                  <Link href={"/refresh/" + item.player_spid} className="block transition hover:bg-white/[0.04]">
-                    <div className="flex h-36 items-end justify-center bg-gradient-to-b from-white/5 to-transparent">
-                      <PlayerArtwork spid={item.player_spid} alt={item.player_name} className="max-h-full max-w-full object-contain" />
-                    </div>
-                    <div className="px-5 pt-2">
-                      <p className="text-xs font-bold text-lime-300">{item.season_name || "시즌 미확인"}</p>
-                      <h2 className="mt-1 text-lg font-black">{item.player_name}</h2>
-                    </div>
+                <article
+                  key={item.player_spid}
+                  className={"flex min-h-[82px] w-full items-center gap-3 rounded-xl border bg-[#171b21] px-3 py-2.5 transition sm:gap-4 sm:px-4 " +
+                    (isRefreshing
+                      ? "refresh-window-border border-lime-300/60"
+                      : "border-white/10")}
+                >
+                  <Link
+                    href={"/refresh/" + item.player_spid}
+                    className="flex h-14 w-14 shrink-0 items-end justify-center overflow-hidden rounded-lg bg-white/[0.04] sm:h-16 sm:w-16"
+                    aria-label={item.season_name + " " + item.player_name + " 갱신정보"}
+                  >
+                    <PlayerArtwork
+                      spid={item.player_spid}
+                      alt={item.player_name}
+                      className="max-h-full max-w-full object-contain"
+                    />
                   </Link>
-                  <div className="px-5 pb-4 pt-4">
-                    <div className="rounded-xl border border-white/[0.07] bg-black/15 p-3">
-                      <p className="text-[11px] font-bold text-gray-500">갱신 기준 시각</p>
-                      <p className="mt-1 text-lg font-black text-lime-300">
-                        {info?.hourType != null && info.minute != null
-                          ? formatPattern(info.hourType, info.minute)
-                          : dataLoading ? "조회 중..." : "정보 없음"}
+
+                  <div className="min-w-0 flex-1">
+                    <Link href={"/refresh/" + item.player_spid} className="block hover:text-lime-200">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="shrink-0 rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-bold text-lime-300">
+                          {item.season_name || "시즌"}
+                        </span>
+                        <h2 className="truncate text-sm font-bold text-white sm:text-base">
+                          {item.player_name}
+                        </h2>
+                      </div>
+                      <p className={"mt-2 truncate text-xs font-semibold sm:text-sm " +
+                        (isRefreshing ? "refresh-window-text text-lime-200" : "text-lime-300")}>
+                        {hasPattern
+                          ? formatPattern(info.hourType!, info.minute!)
+                          : dataLoading ? "갱신시간 조회 중" : info?.observationLabel ?? "갱신시간 미확인"}
                       </p>
-                      <p className="mt-1 text-[11px] text-gray-500">
-                        {info?.sourceLabel ?? (dataLoading ? "데이터 확인 중" : "갱신시간 확인 중")}
+                    </Link>
+                    <p className="mt-1 truncate text-[10px] text-gray-500 sm:text-xs">
+                      {isRefreshing ? "지금 갱신 구간입니다" : info?.sourceLabel ?? "정보 확인 중"}
+                      {alertBefore !== undefined &&
+                        (" · 🔔 " + (alertBefore === 0 ? "정각" : alertBefore + "분 전"))}
+                    </p>
+                  </div>
+
+                  <div className="flex w-[104px] shrink-0 flex-col items-end justify-center gap-1 sm:w-[150px]">
+                    {isRefreshing ? (
+                      <p className="refresh-window-text text-right text-sm font-black text-lime-200 sm:text-base">
+                        갱신 진행 중
                       </p>
-                      {nextAt != null && nowMs !== null ? (
-                        <div className="mt-3 border-t border-white/10 pt-3">
-                          <p className="text-xs text-gray-400">
-                            다음 갱신 구간 · {timeFormatter.format(new Date(nextAt))}
-                          </p>
-                          <p className="mt-1 font-mono text-2xl font-black tabular-nums text-amber-200">
-                            {remainingLabel(nextAt - nowMs)}
-                            <span className="ml-2 font-sans text-xs font-normal text-gray-400">남음</span>
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="mt-3 border-t border-white/10 pt-3 text-xs text-gray-400">
-                          {info?.observationLabel ?? "아직 갱신시간을 확인하고 있습니다."}
+                    ) : nextAt !== null && nowMs !== null ? (
+                      <>
+                        <p className="text-[10px] text-gray-500">
+                          다음 {timeFormatter.format(new Date(nextAt))}
                         </p>
-                      )}
-                    </div>
-                    {activeAlertMinutes !== undefined && (
-                      <p className="mt-3 text-xs font-bold text-blue-200">
-                        🔔 {activeAlertMinutes === 0 ? "갱신 시각" : activeAlertMinutes + "분 전"} 알림 설정됨
-                      </p>
+                        <p className="font-mono text-sm font-black tabular-nums text-amber-200 sm:text-lg">
+                          {remainingLabel(nextAt - nowMs)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-right text-xs text-gray-500">시간 확인 중</p>
                     )}
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <Link href={"/refresh/" + item.player_spid}
-                        className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 hover:bg-white/5">
-                        상세·알림 설정 →
-                      </Link>
-                      <button type="button" onClick={() => void removeFavorite(item)} disabled={saving}
-                        className="rounded-lg border border-amber-300/20 px-3 py-2 text-xs font-bold text-amber-200 hover:bg-amber-300/10 disabled:opacity-50">
-                        ★ 해제
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void removeFavorite(item)}
+                      disabled={saving}
+                      aria-label={item.player_name + " 즐겨찾기 해제"}
+                      title="즐겨찾기 해제"
+                      className="mt-0.5 rounded-md px-2 py-0.5 text-xs font-bold text-amber-300 transition hover:bg-amber-300/10 disabled:opacity-50"
+                    >
+                      ★ 해제
+                    </button>
                   </div>
                 </article>
               );
             })}
           </div>
-          <p className="mt-5 text-xs leading-5 text-gray-500">
-            표시되는 시간은 2시간 거래량 갱신 기준 시각으로, 기준가 변동의 확정 시각이 아닙니다.
-            정확한 패턴이 없거나 외부 자료와 충돌하면 남은 시간 대신 확인 중으로 표시합니다.
+          <p className="mt-4 text-[11px] leading-5 text-gray-600">
+            갱신 시각은 거래량 업데이트 기준이며 실제 기준가 변동을 보장하지 않습니다.
+            미검증·충돌 데이터는 갱신 강조 효과에 사용하지 않습니다.
           </p>
         </>
       )}

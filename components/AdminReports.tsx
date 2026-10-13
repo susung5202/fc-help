@@ -303,6 +303,7 @@ export default function AdminReports() {
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
+          <Link href="/admin" className="mb-4 inline-block text-xs font-bold text-gray-400 hover:text-lime-300">← 관리자 페이지</Link>
           <p className="text-xs font-black tracking-[0.16em] text-red-300">ADMIN · MODERATION</p>
           <h1 className="mt-1 text-3xl font-black tracking-tight">신고 관리</h1>
           <p className="mt-2 text-sm text-gray-500">대기 중인 신고를 확인하고 콘텐츠를 처리합니다.</p>

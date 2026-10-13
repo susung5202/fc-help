@@ -68,11 +68,24 @@ export default function SquadFeedCard({ post, detailMode = false }: { post: Squa
   const slots = getGallerySlots(post.squad_data);
   const filledSlots = slots.filter((slot) => players[slot.slotId]);
   const [details, setDetails] = useState<Record<string, FeedPlayerDetail>>({});
+  const [showMobilePitch, setShowMobilePitch] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const shouldRenderPitch = detailMode || showMobilePitch || isDesktop;
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const handleChange = () => setIsDesktop(media.matches);
+    handleChange();
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
+  }, []);
+
 
   useEffect(() => {
     let active = true;
 
     async function loadDetails() {
+      if (!shouldRenderPitch) return;
       const next: Record<string, FeedPlayerDetail> = {};
 
       for (let index = 0; index < filledSlots.length; index += 4) {
@@ -109,7 +122,7 @@ export default function SquadFeedCard({ post, detailMode = false }: { post: Squa
     return () => {
       active = false;
     };
-  }, [post.id]);
+  }, [post.id, shouldRenderPitch]);
 
   useEffect(() => {
     const authorId = post.author_id;
@@ -135,14 +148,14 @@ export default function SquadFeedCard({ post, detailMode = false }: { post: Squa
 
   function copySquad() {
     window.localStorage.setItem("fc-help-squad-v1", JSON.stringify(post.squad_data));
-    router.push("/squad");
+    router.push("/squad/maker");
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-white/10 bg-[#171b1f] shadow-[0_20px_70px_rgba(0,0,0,0.24)]">
-      <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+    <article className="overflow-hidden rounded-xl border border-white/10 bg-[#171b1f] shadow-[0_20px_70px_rgba(0,0,0,0.16)] md:rounded-3xl">
+      <div className="flex flex-col gap-2 border-b border-white/10 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-4">
         <div className="min-w-0">
-          <Link href={`/squad/gallery/${post.id}`} className="block truncate text-xl font-black tracking-tight text-white transition hover:text-lime-300 sm:text-2xl">
+          <Link href={`/squad/gallery/${post.id}`} className="block break-words text-base font-black leading-6 tracking-tight text-white transition hover:text-lime-300 sm:text-2xl">
             {post.title}
           </Link>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500">
@@ -182,10 +195,38 @@ export default function SquadFeedCard({ post, detailMode = false }: { post: Squa
         </div>
       </div>
 
-      <div className="p-4 sm:p-5">
+      <div className="p-3 sm:p-5">
+        {!detailMode && (
+          <div className="md:hidden">
+            <Link href={`/squad/gallery/${post.id}`} className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/15 px-3 py-2.5">
+              <div className="flex h-16 w-28 shrink-0 items-end justify-around overflow-hidden rounded-lg border border-white/10 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_24%,#135526_24%,#135526_50%)] px-1">
+                {filledSlots.slice(0, 3).map((slot) => {
+                  const player = players[slot.slotId]!;
+                  return <PlayerArtwork key={slot.slotId} spid={player.artworkSpid ?? player.id} alt="" className="max-h-14 max-w-[34%] object-contain" />;
+                })}
+                {filledSlots.length === 0 && <span className="self-center text-[10px] text-white/70">선수 없음</span>}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black text-lime-300">{post.formation}</p>
+                <p className="mt-1 text-[11px] text-gray-400">선수 {filledSlots.length}/11 · 급여 {post.total_salary || "-"}</p>
+                <p className="mt-1 truncate text-xs font-semibold text-white">구단가치 {formatGalleryValue(post.total_value)}</p>
+              </div>
+              <span aria-hidden className="text-lg text-gray-500">›</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowMobilePitch((open) => !open)}
+              aria-expanded={showMobilePitch}
+              className="mt-2 w-full rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-white/5"
+            >
+              {showMobilePitch ? "전체 배치 접기 ↑" : "전체 배치 미리보기 ↓"}
+            </button>
+          </div>
+        )}
+        {shouldRenderPitch && (
         <Link
           href={`/squad/gallery/${post.id}`}
-          className="relative mx-auto block aspect-[0.86] w-full max-w-[560px] overflow-hidden rounded-3xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner sm:aspect-[0.92] sm:max-w-[620px]"
+          className="relative mx-auto mt-2 block aspect-[0.86] w-full max-w-[560px] overflow-hidden rounded-2xl border border-white/15 bg-[repeating-linear-gradient(180deg,#17612d_0%,#17612d_16.66%,#135526_16.66%,#135526_33.33%)] shadow-inner sm:mt-0 sm:aspect-[0.92] sm:max-w-[620px] sm:rounded-3xl"
         >
           <div className="pointer-events-none absolute inset-5 opacity-35 sm:inset-6">
             <div className="absolute inset-0 border border-white/70" />
@@ -235,9 +276,10 @@ export default function SquadFeedCard({ post, detailMode = false }: { post: Squa
             );
           })}
         </Link>
+        )}
 
-        <div className="mx-auto mt-5 max-w-[620px]">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mx-auto mt-3 max-w-[620px] sm:mt-5">
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
             <Stat label="포메이션" value={post.formation} />
             <Stat label="급여" value={post.total_salary ? `${post.total_salary}/310` : "-"} />
             <Stat label="평균 OVR" value={post.average_ovr == null ? "-" : String(Math.round(post.average_ovr))} />
@@ -245,16 +287,16 @@ export default function SquadFeedCard({ post, detailMode = false }: { post: Squa
           </div>
 
           {post.description && (
-            <p className="mt-4 line-clamp-3 rounded-2xl border border-white/[0.07] bg-black/10 px-4 py-3 text-sm leading-6 text-gray-300">{post.description}</p>
+            <p className="mt-3 line-clamp-2 rounded-xl border border-white/[0.07] bg-black/10 px-3 py-2 text-xs leading-5 text-gray-300 sm:mt-4 sm:line-clamp-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm sm:leading-6">{post.description}</p>
           )}
 
-          <div className="mt-4 flex flex-wrap gap-1.5">
+          <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4">
             {post.team_colors.slice(0, 6).map((teamColor) => (
               <span key={teamColor} className="rounded-full border border-lime-400/20 bg-lime-400/[0.06] px-2.5 py-1 text-[10px] font-bold text-lime-200">{teamColor}</span>
             ))}
           </div>
 
-          <div className="mt-5 flex items-center gap-4 border-t border-white/10 pt-4 text-xs font-bold text-gray-400">
+          <div className="mt-3 flex items-center gap-4 border-t border-white/10 pt-3 text-xs font-bold text-gray-400 sm:mt-5 sm:pt-4">
             <span>♥ {post.likes_count.toLocaleString("ko-KR")}</span>
             <span>댓글 {post.comments_count.toLocaleString("ko-KR")}</span>
             {!detailMode && (

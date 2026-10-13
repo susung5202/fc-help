@@ -44,8 +44,8 @@ export function RefreshFavoritesProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     let active = true;
-    async function load() {
-      setLoading(true);
+    async function load(showLoading = true) {
+      if (showLoading) setLoading(true);
       const { data: auth } = await supabase.auth.getUser();
       if (!active) return;
       const nextId = auth.user?.id ?? null;
@@ -81,7 +81,8 @@ export function RefreshFavoritesProvider({ children }: { children: ReactNode }) 
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") void load();
     });
-    const onAlertSaved = () => void load();
+    // Refresh the stars without unmounting the current alert-settings dialog.
+    const onAlertSaved = () => void load(false);
     window.addEventListener("fc-help-refresh-favorites-changed", onAlertSaved);
     return () => {
       active = false;

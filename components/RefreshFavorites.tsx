@@ -26,6 +26,7 @@ type FavoriteInput = {
   seasonName: string;
 };
 type FavoritesContextValue = {
+  userId: string | null;
   favorites: Favorite[];
   loading: boolean;
   saving: boolean;
@@ -132,7 +133,7 @@ export function RefreshFavoritesProvider({ children }: { children: ReactNode }) 
   }, [favorites, router, saving, supabase, userId]);
 
   return (
-    <FavoritesContext.Provider value={{ favorites, loading, saving, toggle }}>
+    <FavoritesContext.Provider value={{ userId, favorites, loading, saving, toggle }}>
       {children}
     </FavoritesContext.Provider>
   );
@@ -185,7 +186,7 @@ export function RefreshFavoriteButton({
 }
 
 export function RefreshFavoritesList() {
-  const { favorites, loading, saving, toggle } = useFavorites();
+  const { userId, favorites, loading, saving, toggle } = useFavorites();
   const [error, setError] = useState("");
 
   async function remove(item: Favorite) {
@@ -203,6 +204,15 @@ export function RefreshFavoritesList() {
 
   if (loading) {
     return <p className="py-20 text-center text-sm text-gray-500">즐겨찾기를 불러오는 중...</p>;
+  }
+
+  if (!userId) {
+    return (
+      <div className="mt-8 rounded-2xl border border-white/10 bg-[#171b21] px-6 py-20 text-center">
+        <p className="text-lg font-black">로그인 후 즐겨찾기를 사용할 수 있습니다.</p>
+        <Link href="/login" className="mt-6 inline-block rounded-xl bg-lime-400 px-5 py-3 text-sm font-bold text-black">로그인하기 →</Link>
+      </div>
+    );
   }
 
   if (favorites.length === 0) {

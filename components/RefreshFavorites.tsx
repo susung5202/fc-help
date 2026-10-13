@@ -154,7 +154,8 @@ export function RefreshFavoriteButton({
   playerName,
   seasonName,
   compact = false,
-}: FavoriteInput & { compact?: boolean }) {
+  mobileTight = false,
+}: FavoriteInput & { compact?: boolean; mobileTight?: boolean }) {
   const { favorites, loading, saving, toggle } = useFavorites();
   const [error, setError] = useState("");
   const active = favorites.some((row) => row.player_spid === playerSpid);
@@ -179,7 +180,7 @@ export function RefreshFavoriteButton({
         title={active ? "즐겨찾기 해제" : "즐겨찾기 추가"}
         className={compact
           ? `rounded-xl border p-2.5 text-lg shadow-lg transition disabled:opacity-50 ${active ? "border-amber-300/40 bg-amber-300/20 text-amber-300" : "border-white/15 bg-[#111318]/85 text-white hover:border-amber-300/40"}`
-          : `rounded-xl border px-5 py-3 text-sm font-bold transition disabled:opacity-50 ${active ? "border-amber-300/40 bg-amber-300/15 text-amber-200" : "border-white/20 bg-white/5 text-white hover:border-amber-300/40"}`
+          : `rounded-xl border text-sm font-bold transition disabled:opacity-50 ${mobileTight ? "px-2.5 py-2 text-xs sm:px-5 sm:py-3 sm:text-sm" : "px-5 py-3"} ${active ? "border-amber-300/40 bg-amber-300/15 text-amber-200" : "border-white/20 bg-white/5 text-white hover:border-amber-300/40"}`
         }
       >
         {loading ? "…" : compact ? (active ? "★" : "☆") : active ? "★ 즐겨찾기됨" : "☆ 즐겨찾기"}

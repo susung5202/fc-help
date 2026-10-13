@@ -11,6 +11,7 @@ type Post = {
   title: string;
   content: string;
   created_at: string;
+  is_notice: boolean;
 };
 
 type Profile = {
@@ -77,9 +78,31 @@ export default function CommunityFeed() {
       setLoading(true);
       setError("");
 
+      const columns = "id,author_id,category,title,content,created_at,is_notice";
+      // Fetch every notice separately, regardless of category/sort/date limits.
+      // Supabase applies row limits, so fetch in pages instead of assuming 1000 is enough.
+      const notices: Post[] = [];
+      const PAGE_SIZE = 500;
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        const { data: page, error: noticeError } = await supabase
+          .from("community_posts")
+          .select(columns)
+          .eq("is_notice", true)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (!active) return;
+        if (noticeError) {
+          setError("공지글을 불러오지 못했습니다: " + noticeError.message);
+          setLoading(false);
+          return;
+        }
+        notices.push(...((page ?? []) as Post[]));
+        if ((page?.length ?? 0) < PAGE_SIZE) break;
+      }
+
       let query = supabase
         .from("community_posts")
-        .select("id,author_id,category,title,content,created_at")
+        .select(columns)
         .order("created_at", { ascending: false });
 
       if (category !== "all") query = query.eq("category", category);
@@ -102,7 +125,12 @@ export default function CommunityFeed() {
         return;
       }
 
-      const loaded = (data ?? []) as Post[];
+      const regular = (data ?? []) as Post[];
+      const noticeIds = new Set(notices.map((post) => post.id));
+      const loaded = [
+        ...notices,
+        ...regular.filter((post) => !noticeIds.has(post.id) && !post.is_notice),
+      ];
       if (loaded.length === 0) {
         setPosts([]);
         setProfiles({});
@@ -123,14 +151,18 @@ export default function CommunityFeed() {
 
       const nextLikeCounts = countByPost((likeRows ?? []) as { post_id: string }[]);
       const nextCommentCounts = countByPost((commentRows ?? []) as { post_id: string }[]);
-      const sortedPosts = mode === "popular"
-        ? [...loaded].sort((a, b) => {
+      const noticePosts = loaded.filter((post) => post.is_notice)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const regularPosts = loaded.filter((post) => !post.is_notice);
+      const sortedRegular = mode === "popular"
+        ? [...regularPosts].sort((a, b) => {
             const aScore = (nextLikeCounts[a.id] ?? 0) * 2 + (nextCommentCounts[a.id] ?? 0);
             const bScore = (nextLikeCounts[b.id] ?? 0) * 2 + (nextCommentCounts[b.id] ?? 0);
             if (bScore !== aScore) return bScore - aScore;
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           })
-        : loaded;
+        : regularPosts;
+      const sortedPosts = [...noticePosts, ...sortedRegular];
 
       setPosts(sortedPosts);
       setProfiles(Object.fromEntries(((profileRows ?? []) as Profile[]).map((profile) => [profile.id, profile])));
@@ -198,7 +230,7 @@ export default function CommunityFeed() {
         ))}
       </div>
 
-      {!loading && !error && <p className="mt-2 text-xs text-gray-500">{posts.length}개 게시글 · {mode === "popular" ? "최근 7일 인기순" : "최신순"}</p>}
+      {!loading && !error && <p className="mt-2 text-xs text-gray-500">{posts.length}개 게시글 · 공지 {posts.filter((post) => post.is_notice).length}개 · {mode === "popular" ? "최근 7일 인기순" : "최신순"}</p>}
 
       {searchTerm && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3.5 py-2.5 text-xs">
@@ -230,20 +262,21 @@ export default function CommunityFeed() {
               const comments = commentCounts[post.id] ?? 0;
               const popularScore = likes * 2 + comments;
               return (
-                <article key={post.id} className="px-3 py-3 transition hover:bg-white/[0.025] sm:px-5 sm:py-4">
+                <article key={post.id} className={`px-3 py-3 transition hover:bg-white/[0.025] sm:px-5 sm:py-4 ${post.is_notice ? "border-l-2 border-l-lime-300 bg-lime-300/[0.04]" : ""}`}>
                   <div className="flex items-start gap-2.5 sm:gap-3">
                     <Link href={`/profile/${profile?.username || post.author_id}`} className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#242a27] text-xs font-black text-lime-200 sm:h-9 sm:w-9">
                       {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : initial}
                     </Link>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                        {mode === "popular" && <span className="font-black text-rose-300">#{index + 1}</span>}
+                        {post.is_notice ? <span className="font-black text-lime-300">공지 고정</span> : mode === "popular" && <span className="font-black text-rose-300">#{index + 1 - posts.filter((p) => p.is_notice).length}</span>}
                         <Link href={`/profile/${profile?.username || post.author_id}`} className="font-black text-gray-300 hover:text-lime-300">{profile?.display_name || "구단주"}</Link>
                         {profile?.username && <span>@{profile.username}</span>}
                         <span>·</span><span>{timeAgo(post.created_at)}</span>
                       </div>
                       <Link href={`/community/${post.id}`} className="mt-1.5 block rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-300">
                         <div className="flex flex-wrap items-center gap-1.5">
+                          {post.is_notice && <span className="rounded-md bg-lime-300 px-1.5 py-0.5 text-[10px] font-black text-black">📌 공지</span>}
                           <span className="rounded-md border border-lime-300/15 bg-lime-300/[0.05] px-1.5 py-0.5 text-[10px] font-black text-lime-200 sm:px-2 sm:py-1">{CATEGORY_LABEL[post.category]}</span>
                           {mode === "popular" && popularScore > 0 && <span className="rounded-md border border-rose-300/15 bg-rose-400/[0.05] px-1.5 py-0.5 text-[10px] font-black text-rose-300">HOT {popularScore}</span>}
                         </div>

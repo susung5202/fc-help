@@ -363,9 +363,8 @@ export default function RefreshFavoritesDashboard() {
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {favorites.map((item) => {
               const info = infoBySpid[item.player_spid];
-              const hasPattern = info?.hourType != null && info.minute != null;
-              const nextAt = hasPattern && nowMs !== null
-                ? nextRefreshAt(info.hourType!, info.minute!, nowMs)
+              const nextAt = info?.hourType != null && info.minute != null && nowMs !== null
+                ? nextRefreshAt(info.hourType, info.minute, nowMs)
                 : null;
               const activeAlertMinutes = alertsBySpid[item.player_spid];
               return (
@@ -383,7 +382,9 @@ export default function RefreshFavoritesDashboard() {
                     <div className="rounded-xl border border-white/[0.07] bg-black/15 p-3">
                       <p className="text-[11px] font-bold text-gray-500">갱신 기준 시각</p>
                       <p className="mt-1 text-lg font-black text-lime-300">
-                        {hasPattern ? formatPattern(info.hourType!, info.minute!) : dataLoading ? "조회 중..." : "정보 없음"}
+                        {info?.hourType != null && info.minute != null
+                          ? formatPattern(info.hourType, info.minute)
+                          : dataLoading ? "조회 중..." : "정보 없음"}
                       </p>
                       <p className="mt-1 text-[11px] text-gray-500">
                         {info?.sourceLabel ?? (dataLoading ? "데이터 확인 중" : "갱신시간 확인 중")}

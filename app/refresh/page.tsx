@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ServiceUsageNotes from "@/components/ServiceUsageNotes";
 import PlayerArtwork from "@/components/PlayerArtwork";
+import { RefreshFavoritesProvider, RefreshFavoriteButton } from "@/components/RefreshFavorites";
 import { getPlayerOvrMap, type PlayerOvrInfo } from "@/lib/fconline/playerOvr";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveRefreshPattern, type RefreshReferencePatternRow } from "@/lib/refresh/resolvePattern";
@@ -556,6 +557,7 @@ export default async function RefreshPage({
   });
 
   return (
+    <RefreshFavoritesProvider>
     <main className="min-h-screen bg-[#0f1115] text-white">
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -589,7 +591,10 @@ export default async function RefreshPage({
 
       <section className="mx-auto max-w-7xl px-6 py-16">
         <p className="text-sm font-semibold text-lime-400">REFRESH TIME</p>
-        <h1 className="mt-2 text-4xl font-bold">갱신시간</h1>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-4xl font-bold">갱신시간</h1>
+          <Link href="/refresh/favorites" className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2.5 text-sm font-bold text-amber-200 transition hover:bg-amber-300/15">★ 내 즐겨찾기</Link>
+        </div>
         <p className="mt-3 text-gray-400">
           선수별 2시간 거래량 갱신 기준 시각을 확인하고 알림을 설정할 수 있습니다. 기준가·상한가·하한가는 이 시각 이후 약 0~20분 사이에 변동될 수 있습니다.
         </p>
@@ -751,6 +756,7 @@ export default async function RefreshPage({
       </section>
       <ServiceUsageNotes section="refresh" />
     </main>
+    </RefreshFavoritesProvider>
   );
 }
 
@@ -793,10 +799,11 @@ function RefreshPlayerCard({
   observationHint?: string;
 }) {
   return (
-    <Link
-      href={`/refresh/${player.id}`}
-      className="group overflow-hidden rounded-2xl border border-white/10 bg-[#181b21] transition hover:-translate-y-1 hover:border-lime-400/50"
-    >
+    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#181b21] transition hover:-translate-y-1 hover:border-lime-400/50">
+      <Link
+        href={`/refresh/${player.id}`}
+        className="block"
+      >
       <div className="relative flex h-56 items-end justify-center overflow-hidden bg-gradient-to-b from-white/5 to-transparent">
         {season?.seasonImg && (
           <img
@@ -841,6 +848,13 @@ function RefreshPlayerCard({
           <p className="mt-2 text-sm text-gray-500">갱신시간 확인하기 →</p>
         )}
       </div>
-    </Link>
+      </Link>
+      <RefreshFavoriteButton
+        playerSpid={player.id}
+        playerName={player.name}
+        seasonName={season?.className ?? "시즌 미확인"}
+        compact
+      />
+    </article>
   );
 }

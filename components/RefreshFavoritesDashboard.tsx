@@ -336,8 +336,11 @@ export default function RefreshFavoritesDashboard() {
             className={"mt-0.5 font-mono text-2xl font-black tabular-nums tracking-tight sm:text-3xl " +
               (anyRefreshActive ? "refresh-window-text text-lime-200" : "text-white")}
           >
-            {nowMs === null ? "--:--:--" : timeFormatter.format(new Date(nowMs)) +
-              ":" + String(new Date(nowMs + KST_OFFSET).getUTCSeconds()).padStart(2, "0")}
+            {nowMs === null ? "--:--:--" : (() => {
+              const kst = new Date(nowMs + KST_OFFSET);
+              return [kst.getUTCHours(), kst.getUTCMinutes(), kst.getUTCSeconds()]
+                .map((part) => String(part).padStart(2, "0")).join(":");
+            })()}
           </p>
         </div>
         <div className="text-left sm:text-right">
@@ -471,7 +474,7 @@ export default function RefreshFavoritesDashboard() {
           </div>
           <p className="mt-4 text-[11px] leading-5 text-gray-600">
             갱신 시각은 거래량 업데이트 기준이며 실제 기준가 변동을 보장하지 않습니다.
-            미검증·충돌 데이터는 갱신 강조 효과에 사용하지 않습니다.
+            공개 참고값은 미검증일 수 있으며, 대표 시간이 확정되지 않은 선수는 강조하지 않습니다.
           </p>
         </>
       )}

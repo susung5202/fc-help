@@ -246,7 +246,7 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
+    <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-6 sm:py-10">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-black tracking-[0.16em] text-lime-400">COMMUNITY</p>
@@ -255,7 +255,7 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
         <Link href={cancelHref} className="text-sm font-bold text-gray-400 hover:text-white">취소</Link>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-[#15191d] p-4 sm:p-6">
+      <div className="mt-4 rounded-xl border border-white/10 bg-[#15191d] p-3 sm:mt-6 sm:rounded-2xl sm:p-6">
         <label className="text-xs font-black text-gray-400">카테고리</label>
         <div className="mt-2 flex flex-wrap gap-2">
           {CATEGORIES.map(([value, label]) => (
@@ -270,7 +270,7 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
         <div className="mt-1 text-right text-[10px] text-gray-600">{title.length}/80</div>
 
         <label className="mt-4 block text-xs font-black text-gray-400">내용</label>
-        <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={5000} rows={14} placeholder="FC Online 이야기를 자유롭게 작성해보세요." className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-600 focus:border-lime-300/40" />
+        <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={5000} rows={8} placeholder="FC Online 이야기를 자유롭게 작성해보세요." className="mt-2 min-h-48 w-full resize-y rounded-xl border border-white/10 bg-[#0f1115] px-3 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-600 focus:border-lime-300/40 sm:min-h-[336px] sm:px-4" />
         <div className="mt-1 text-right text-[10px] text-gray-600">{content.length}/5000</div>
 
         <div className="mt-5 flex items-center justify-between gap-3">
@@ -304,7 +304,7 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
 
         {message && <p className="mt-3 rounded-xl border border-amber-300/15 bg-amber-300/5 px-3 py-2 text-xs text-amber-100">{message}</p>}
 
-        <div className="mt-6 grid grid-cols-2 gap-2">
+        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] z-10 mt-5 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-[#15191d]/95 p-2 backdrop-blur md:static md:mt-6 md:border-0 md:bg-transparent md:p-0">
           <Link href={cancelHref} className="rounded-xl border border-white/15 py-3 text-center text-sm font-bold text-gray-300">취소</Link>
           <button type="button" disabled={saving} onClick={() => void submit()} className="rounded-xl bg-lime-300 py-3 text-sm font-black text-black disabled:opacity-50">
             {saving ? (editing ? "수정 중..." : "등록 중...") : (editing ? "수정 완료" : "게시글 등록")}

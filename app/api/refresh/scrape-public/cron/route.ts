@@ -612,21 +612,28 @@ export async function GET(request: Request) {
   try {
     const supabase = createAdminClient();
 
-    const { data: existingData, error: existingError } = await supabase
-      .from("refresh_observations")
-      .select("source_record_key, player_spid")
-      .eq("source_type", "scraped_public")
-      .not("source_record_key", "is", null)
-      .limit(5000);
-
-    if (existingError) throw existingError;
-
+    // Supabase projects often cap each SELECT response at 1,000 rows.
+    // A large .limit(5000) silently returned only the first 1,000, causing
+    // later upserts to overwrite previously matched player_spid values with null.
     const existingSpidByKey = new Map<string, number | null>();
-    for (const row of existingData ?? []) {
-      existingSpidByKey.set(
-        String(row.source_record_key),
-        row.player_spid === null ? null : Number(row.player_spid)
-      );
+    const pageSize = 1000;
+    for (let offset = 0; offset < 20000; offset += pageSize) {
+      const { data, error } = await supabase
+        .from("refresh_observations")
+        .select("id, source_record_key, player_spid")
+        .eq("source_type", "scraped_public")
+        .not("source_record_key", "is", null)
+        .order("id", { ascending: true })
+        .range(offset, offset + pageSize - 1);
+
+      if (error) throw error;
+      for (const row of data ?? []) {
+        existingSpidByKey.set(
+          String(row.source_record_key),
+          row.player_spid === null ? null : Number(row.player_spid)
+        );
+      }
+      if (!data || data.length < pageSize) break;
     }
 
     let totalParsed = 0;

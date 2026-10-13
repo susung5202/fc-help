@@ -8,12 +8,14 @@ type RefreshReportButtonProps = {
   playerSpid: number;
   playerName: string;
   seasonName: string;
+  mobileTight?: boolean;
 };
 
 export default function RefreshReportButton({
   playerSpid,
   playerName,
   seasonName,
+  mobileTight = false,
 }: RefreshReportButtonProps) {
   const router = useRouter();
 
@@ -103,7 +105,7 @@ export default function RefreshReportButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-xl border border-white/10 bg-[#181b21] px-5 py-3 text-sm font-semibold transition hover:border-white/30"
+        className={`rounded-xl border border-white/10 bg-[#181b21] text-sm font-semibold transition hover:border-white/30 ${mobileTight ? "px-2.5 py-2 text-xs sm:px-5 sm:py-3 sm:text-sm" : "px-5 py-3"}`}
       >
         갱신시간 제보
       </button>

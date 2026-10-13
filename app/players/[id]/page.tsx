@@ -105,7 +105,7 @@ export default async function PlayerDetailPage({
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-6 py-10">
+      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-10">
         <Link
           href="/players"
           className="text-sm text-gray-400 transition hover:text-white"
@@ -113,14 +113,14 @@ export default async function PlayerDetailPage({
           ← 선수 DB로 돌아가기
         </Link>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[580px_1fr]">
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#181b21]">
-            <div className="relative flex h-[620px] items-end justify-center overflow-hidden bg-gradient-to-b from-white/10 to-transparent sm:h-[680px]">
+        <div className="mt-4 grid grid-cols-[108px_minmax(0,1fr)] gap-4 md:mt-8 md:grid-cols-1 md:gap-8 lg:grid-cols-[580px_1fr]">
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-[#181b21] md:rounded-3xl">
+            <div className="relative flex h-36 items-end justify-center overflow-hidden bg-gradient-to-b from-white/10 to-transparent md:h-[620px] lg:h-[680px]">
               {season?.seasonImg && (
                 <img
                   src={season.seasonImg}
                   alt={seasonName}
-                  className="absolute left-6 top-6 z-10 h-16 object-contain"
+                  className="absolute left-2 top-2 z-10 h-5 object-contain md:left-6 md:top-6 md:h-16"
                 />
               )}
               <PlayerArtwork
@@ -132,23 +132,31 @@ export default async function PlayerDetailPage({
             </div>
           </div>
 
-          <div className="flex flex-col justify-center">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-lg bg-lime-400/10 px-3 py-1.5 text-sm font-bold text-lime-400">
+          <div className="flex min-w-0 flex-col justify-center">
+            <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+              <span className="rounded-md bg-lime-400/10 px-2 py-1 text-xs font-bold text-lime-400 md:rounded-lg md:px-3 md:py-1.5 md:text-sm">
                 {seasonName}
               </span>
               <span
-                className={`rounded-lg border px-3 py-1.5 text-sm font-black ${getEnhancementBadgeTone(strong)}`}
+                className={`rounded-md border px-2 py-1 text-xs font-black md:rounded-lg md:px-3 md:py-1.5 md:text-sm ${getEnhancementBadgeTone(strong)}`}
               >
                 +{strong}
               </span>
             </div>
-            <h1 className="mt-5 text-4xl font-extrabold md:text-5xl">
+            <h1 className="mt-2 break-words text-xl font-extrabold leading-tight md:mt-5 md:text-5xl">
               {player.name}
             </h1>
-            <p className="mt-4 max-w-xl text-gray-400">
+            <p className="mt-4 hidden max-w-xl text-gray-400 md:block">
               FC 온라인 공식 선수 데이터와 데이터센터 능력치를 기반으로 제공합니다.
             </p>
+            <div className="mt-3 flex flex-wrap gap-2 md:hidden">
+              <a href="#player-abilities" className="rounded-lg bg-lime-400 px-3 py-2 text-xs font-bold text-black">
+                능력치 바로보기 ↓
+              </a>
+              <a href="#player-options" className="rounded-lg border border-white/20 px-3 py-2 text-xs font-bold text-white">
+                강화·적응도
+              </a>
+            </div>
           </div>
         </div>
 

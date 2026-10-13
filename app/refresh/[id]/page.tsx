@@ -106,7 +106,7 @@ export default async function RefreshDetailPage({
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-6 py-10">
+      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-10">
         <Link
           href="/refresh"
           className="text-sm text-gray-400 transition hover:text-white"
@@ -114,42 +114,42 @@ export default async function RefreshDetailPage({
           ← 갱신시간 검색으로 돌아가기
         </Link>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[320px_1fr]">
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#181b21]">
-            <div className="relative flex h-[360px] items-end justify-center overflow-hidden bg-gradient-to-b from-white/10 to-transparent">
+        <div className="mt-4 grid grid-cols-[96px_minmax(0,1fr)] gap-3 sm:grid-cols-[136px_minmax(0,1fr)] md:mt-8 md:grid-cols-1 md:gap-8 lg:grid-cols-[320px_1fr]">
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-[#181b21] md:rounded-3xl">
+            <div className="relative flex h-32 items-end justify-center overflow-hidden bg-gradient-to-b from-white/10 to-transparent sm:h-40 md:h-[360px]">
               {season?.seasonImg && (
                 <img
                   src={season.seasonImg}
                   alt={seasonName}
-                  className="absolute left-6 top-6 h-9 object-contain"
+                  className="absolute left-1.5 top-1.5 h-5 max-w-12 object-contain md:left-6 md:top-6 md:h-9 md:max-w-none"
                 />
               )}
 
               <PlayerArtwork
                 spid={spid}
                 alt={player.name}
-                className="max-h-[330px] max-w-full object-contain"
+                className="max-h-full max-w-full object-contain md:max-h-[330px]"
               />
             </div>
           </div>
 
-          <div className="flex flex-col justify-center">
-            <p className="text-sm font-semibold text-lime-400">REFRESH TIME</p>
-            <div className="mt-3">
-              <span className="rounded-lg bg-lime-400/10 px-3 py-1.5 text-sm font-bold text-lime-400">
+          <div className="flex min-w-0 flex-col justify-center">
+            <p className="hidden text-sm font-semibold text-lime-400 md:block">REFRESH TIME</p>
+            <div className="mt-1 md:mt-3">
+              <span className="inline-block max-w-full rounded-md bg-lime-400/10 px-1.5 py-1 text-xs font-bold text-lime-400 md:rounded-lg md:px-3 md:py-1.5 md:text-sm">
                 {seasonName}
               </span>
             </div>
 
-            <h1 className="mt-5 text-4xl font-extrabold md:text-5xl">
+            <h1 className="mt-2 break-words text-xl font-extrabold leading-tight md:mt-5 md:text-5xl">
               {player.name}
             </h1>
 
-            <p className="mt-4 max-w-xl text-gray-400">
+            <p className="mt-4 hidden max-w-xl text-gray-400 md:block">
               공개 참고값과 유저 제보를 바탕으로 2시간 거래량 갱신 기준 시각을 확인하고 알림을 설정할 수 있습니다. 실제 기준가·상한가·하한가는 이후 약 0~20분 사이에 변동될 수 있습니다.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-3 flex flex-wrap items-center gap-2 md:mt-8 md:gap-3">
               <RefreshFavoriteButton
                 playerSpid={player.id}
                 playerName={player.name}

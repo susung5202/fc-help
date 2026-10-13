@@ -28,6 +28,7 @@ type EditablePost = {
   content: string;
   image_urls: string[] | null;
   image_paths: string[] | null;
+  is_notice: boolean;
 };
 
 function fileExtension(file: File) {
@@ -49,6 +50,21 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isNotice, setIsNotice] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function checkAdmin() {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!active || !auth.user) return;
+      const { data: admin } = await supabase.from("admin_users").select("user_id")
+        .eq("user_id", auth.user.id).maybeSingle();
+      if (active) setIsAdmin(Boolean(admin));
+    }
+    void checkAdmin();
+    return () => { active = false; };
+  }, [supabase]);
 
   useEffect(() => {
     if (!postId) return;
@@ -67,7 +83,7 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
 
       const { data, error } = await supabase
         .from("community_posts")
-        .select("id,author_id,category,title,content,image_urls,image_paths")
+        .select("id,author_id,category,title,content,image_urls,image_paths,is_notice")
         .eq("id", postId)
         .maybeSingle();
 
@@ -88,6 +104,7 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
       const urls = Array.isArray(post.image_urls) ? post.image_urls : [];
       const paths = Array.isArray(post.image_paths) ? post.image_paths : [];
       setCategory(post.category);
+      setIsNotice(Boolean(post.is_notice));
       setTitle(post.title);
       setContent(post.content);
       setExistingImages(urls.map((url, index) => ({ url, path: paths[index] ?? "" })).filter((image) => image.path));
@@ -197,6 +214,7 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
       const allImages = [...existingImages, ...uploaded];
       const payload = {
         category,
+        ...(isAdmin ? { is_notice: isNotice } : {}),
         title: nextTitle,
         content: nextContent,
         image_urls: allImages.map((image) => image.url),
@@ -268,6 +286,13 @@ export default function CommunityWrite({ postId }: { postId?: string }) {
         <label className="mt-6 block text-xs font-black text-gray-400">제목</label>
         <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={80} placeholder="제목을 입력하세요" className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f1115] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-lime-300/40" />
         <div className="mt-1 text-right text-[10px] text-gray-600">{title.length}/80</div>
+        {isAdmin && (
+          <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-lime-300/20 bg-lime-300/[0.04] p-3">
+            <input type="checkbox" checked={isNotice} onChange={(event) => setIsNotice(event.target.checked)}
+              className="h-4 w-4 accent-lime-400" />
+            <span className="text-xs font-bold text-lime-200">📌 공지로 등록 · 게시판 최상단에 고정</span>
+          </label>
+        )}
 
         <label className="mt-4 block text-xs font-black text-gray-400">내용</label>
         <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={5000} rows={8} placeholder="FC Online 이야기를 자유롭게 작성해보세요." className="mt-2 min-h-48 w-full resize-y rounded-xl border border-white/10 bg-[#0f1115] px-3 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-600 focus:border-lime-300/40 sm:min-h-[336px] sm:px-4" />
